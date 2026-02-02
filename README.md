@@ -13,7 +13,7 @@ Progetto minimale che integra MLflow, DVC, FastAPI, Streamlit, Docker e GitHub A
 
 ## Setup Iniziale
 
-### 1. Configura DagshHub
+### 1. Configura DagshHub 
 
 ```bash
 # Inizializza DVC
@@ -31,9 +31,8 @@ dvc remote modify origin --local password YOUR_TOKEN
 Crea un file `.env`:
 ```
 MLFLOW_TRACKING_URI=https://dagshub.com/YOUR_USERNAME/YOUR_REPO.mlflow
-MLFLOW_TRACKING_USERNAME=YOUR_USERNAME
-MLFLOW_TRACKING_PASSWORD=YOUR_TOKEN
-DAGSHUB_USER_TOKEN=YOUR_TOKEN
+DAGSHUB_USERNAME=YOUR_USERNAME
+DAGSHUB_TOKEN=YOUR_TOKEN
 ```
 
 ### 3. Installa le dipendenze
@@ -65,10 +64,21 @@ docker-compose up --build
 - Backend: http://localhost:8000
 - Frontend: http://localhost:8501
 
-## Train Model
-
+## Train Model - L'addestramento avviene automaticamente tramite Git Actions quando si pusha il nuovo codice, tuttavia se si vuole forzare il training locale si possono seguire questi passi:
+Effettua addestramento
 ```bash
-python train_model.py
+dvc repro 
+```
+### Aggiorna Github/DagsHub
+Salva il modello ottenuto su DagsHub 
+```bash
+dvc push 
+```
+Aggiorna file .dvc su github 
+```bash
+git add .
+git commit -m "New trained model <add_tag>"
+git push
 ```
 
 ## CI/CD
