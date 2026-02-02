@@ -122,7 +122,7 @@ jobs:
     
     - name: Push to DVC
       run: |
-        dvc add models/model.pkl
+        dvc commit models/model.pkl
         dvc push
       continue-on-error: true
     
