@@ -94,7 +94,10 @@ jobs:
         pip install -r requirements.txt
 
     - name: Init DVC
-      run: dvc init --no-scm
+      run: |
+        if [ ! -d ".dvc" ]; then
+          dvc init --no-scm
+        fi
 
     - name: Setup DVC
       run: |
