@@ -115,8 +115,8 @@ jobs:
     - name: Train Model
       env:
         MLFLOW_TRACKING_URI: "https://dagshub.com/${{ github.repository }}.mlflow"
-        MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
-        MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
+        DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+        DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
       run: |
         python train_model.py
     
