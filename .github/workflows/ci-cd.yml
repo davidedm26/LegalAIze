@@ -101,7 +101,7 @@ jobs:
 
     - name: Setup DVC
       run: |
-        dvc remote add -d origin https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/${{ github.event.repository.name }}.dvc
+        dvc remote list | grep -q '^origin' || dvc remote add -d origin https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/${{ github.event.repository.name }}.dvc
         dvc remote modify origin --local auth basic
         dvc remote modify origin --local user ${{ secrets.DAGSHUB_USERNAME }}
         dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
