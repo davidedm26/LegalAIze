@@ -68,13 +68,13 @@ def train():
         mlflow.log_metric("f1_score", f1)
         
         # Log model
-        mlflow.sklearn.log_model(model, "RF_model")
+        mlflow.sklearn.log_model(model, "model")
         
         print(f"✓ Model trained - Accuracy: {accuracy:.4f}, F1: {f1:.4f}")
         
         # Salva model per DVC
         os.makedirs("models", exist_ok=True)
-        with open("models/RF_model.pkl", "wb") as f:
+        with open("models/model.pkl", "wb") as f:
             pickle.dump(model, f)
         
         # Salva metriche per DVC
