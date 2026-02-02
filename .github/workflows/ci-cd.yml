@@ -123,7 +123,12 @@ jobs:
         DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
       run: |
         python train_model.py
-    
+
+    - name: Commit DVC outputs
+      run: |
+        dvc commit models/model.pkl
+      continue-on-error: true
+
     - name: Push to DVC
       run: |
         dvc push
