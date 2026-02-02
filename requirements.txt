@@ -22,3 +22,6 @@ streamlit==1.29.0
 # Utils
 python-dotenv==1.0.0
 pydantic==2.5.3
+
+# GitHub Integration
+pathspec==0.11.1
