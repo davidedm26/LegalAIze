@@ -65,11 +65,11 @@ def load_model_from_file():
 # Prova a caricare il modello (prima da MLflow, poi da file locale)
 
 # Funzione per caricare un modello specifico dal Model Registry MLflow
-def load_model_from_registry(model_name: str, stage: str = "None"):
+def load_model_from_registry(model_name: str, alias: str = None):
     """
-    Carica un modello dal Model Registry MLflow/DagsHub
+    Carica un modello dal Model Registry MLflow/DagsHub usando un alias (es: 'champion', 'production', ecc.)
     model_name: nome del modello registrato
-    stage: "None" per ultima versione, oppure "Staging", "Production", ecc.
+    alias: alias del modello (None per ultima versione)
     """
     try:
         mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", ""))
@@ -77,16 +77,17 @@ def load_model_from_registry(model_name: str, stage: str = "None"):
         os.environ["MLFLOW_TRACKING_PASSWORD"] = os.getenv("DAGSHUB_TOKEN", "")
 
         client = mlflow.tracking.MlflowClient()
-        # Recupera l'ultima versione del modello registrato
-        if stage == "None":
-            versions = client.get_latest_versions(model_name)
+        if alias:
+            # Usa l'alias per recuperare la versione
+            versions = client.get_model_version_by_alias(model_name, alias)
             if versions:
-                model_uri = versions[0].source
+                model_uri = f"models:/{model_name}@{alias}"
                 return mlflow.sklearn.load_model(model_uri)
         else:
-            versions = client.get_latest_versions(model_name, stages=[stage])
+            # Nessun alias: carica l'ultima versione
+            versions = client.get_latest_versions(model_name)
             if versions:
-                model_uri = versions[0].source
+                model_uri = f"models:/{model_name}/{versions[0].version}"
                 return mlflow.sklearn.load_model(model_uri)
     except Exception as e:
         print(f"Errore caricamento dal Model Registry: {e}")
