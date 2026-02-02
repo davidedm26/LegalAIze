@@ -63,6 +63,36 @@ def load_model_from_file():
     return None
 
 # Prova a caricare il modello (prima da MLflow, poi da file locale)
+
+# Funzione per caricare un modello specifico dal Model Registry MLflow
+def load_model_from_registry(model_name: str, stage: str = "None"):
+    """
+    Carica un modello dal Model Registry MLflow/DagsHub
+    model_name: nome del modello registrato
+    stage: "None" per ultima versione, oppure "Staging", "Production", ecc.
+    """
+    try:
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", ""))
+        os.environ["MLFLOW_TRACKING_USERNAME"] = os.getenv("DAGSHUB_USERNAME", "")
+        os.environ["MLFLOW_TRACKING_PASSWORD"] = os.getenv("DAGSHUB_TOKEN", "")
+
+        client = mlflow.tracking.MlflowClient()
+        # Recupera l'ultima versione del modello registrato
+        if stage == "None":
+            versions = client.get_latest_versions(model_name)
+            if versions:
+                model_uri = versions[0].source
+                return mlflow.sklearn.load_model(model_uri)
+        else:
+            versions = client.get_latest_versions(model_name, stages=[stage])
+            if versions:
+                model_uri = versions[0].source
+                return mlflow.sklearn.load_model(model_uri)
+    except Exception as e:
+        print(f"Errore caricamento dal Model Registry: {e}")
+    return None
+
+# Carica il modello come prima
 model = load_model_from_mlflow()
 if model is None:
     model = load_model_from_file()

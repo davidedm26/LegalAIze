@@ -1,3 +1,4 @@
+# This file saves the model as output on DVC
 stages:
   train:
     cmd: python train_model.py
