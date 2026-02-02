@@ -6,5 +6,5 @@ train:
 
 model:
   max_depth: 5
-  n_estimators: 120
+  n_estimators: 110
   random_state: 42
