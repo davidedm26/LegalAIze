@@ -5,6 +5,7 @@ stages:
     deps:
       - train_model.py
       - params.yaml
+      - data/
     params:
       - train
       - model

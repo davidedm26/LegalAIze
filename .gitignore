@@ -15,6 +15,7 @@ mlartifacts/
 
 # DVC
 /data/*.csv
+/data/*.pdf
 /models/*.pkl
 .dvc/cache
 
