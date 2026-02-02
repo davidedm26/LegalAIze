@@ -1,0 +1,14 @@
+stages:
+  train:
+    cmd: python train_model.py
+    deps:
+      - train_model.py
+      - params.yaml
+    params:
+      - train
+      - model
+    outs:
+      - models/model.pkl
+    metrics:
+      - metrics.json:
+          cache: false
