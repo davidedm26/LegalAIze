@@ -133,7 +133,8 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add models/model.pkl.dvc .dvc/config
+        #git add models/model.pkl.dvc
+        git add .dvc/config
         git commit -m "Update model artifacts [skip ci]" || echo "No changes to commit"
         git push || echo "Nothing to push"
       continue-on-error: true
