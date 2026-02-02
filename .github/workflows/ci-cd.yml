@@ -104,7 +104,7 @@ jobs:
 
     - name: Setup DVC
       run: |
-        dvc remote list | grep -q '^origin' || dvc remote add -d origin https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/${{ github.event.repository.name }}.dvc
+        dvc remote list | grep -q '^origin' || dvc remote add -d origin https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/${{ github.event.repository.name }}.dvc # Add DVC remote if not exists
         dvc remote default origin
         dvc remote modify origin --local auth basic
         dvc remote modify origin --local user ${{ secrets.DAGSHUB_USERNAME }}
@@ -125,20 +125,20 @@ jobs:
         DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
         DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
       run: |
-        dvc repro
+        dvc repro # Reproduce the training stage defined in dvc.yaml
 
     - name: Push to DVC
       run: |
-        dvc push
+        dvc push # Push model artifacts to remote DVC storage
       continue-on-error: true
     
-    - name: Commit DVC files
+    - name: Commit DVC files # Update the dvc.lock and .dvc/config files in the repo based on the new model
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add dvc.lock
         git add .dvc/config
-        git commit -m "Update model artifacts [skip ci]" || echo "No changes to commit"
+        git commit -m "Update model artifacts" || echo "No changes to commit"
         git push || echo "Nothing to push"
       continue-on-error: true
 
