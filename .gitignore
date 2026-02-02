@@ -17,6 +17,7 @@ mlartifacts/
 /data/*.csv
 /models/*.pkl
 .dvc/cache
+/.dvc/
 
 # IDE
 .vscode/
@@ -33,3 +34,6 @@ Thumbs.db
 
 # Docker
 *.log
+
+# Token
+github_token.txt

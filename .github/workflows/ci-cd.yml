@@ -83,16 +83,19 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PYTHON_VERSION }}
-    
+
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
-    
+
+    - name: Init DVC
+      run: dvc init --no-scm
+
     - name: Setup DVC
       run: |
         dvc remote modify origin --local auth basic
@@ -102,7 +105,7 @@ jobs:
     
     - name: Train Model
       env:
-        MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+        MLFLOW_TRACKING_URI: "https://dagshub.com/${{ github.repository }}.mlflow"
         MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
         MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
       run: |
