@@ -42,6 +42,10 @@ def train():
     
     # Inizia MLflow run
     with mlflow.start_run():
+        # Forza il tracciamento del commit su DagsHub/MLflow se in GitHub Actions
+        if os.getenv("GITHUB_SHA"):
+            mlflow.set_tag("mlflow.source.git.commit", os.getenv("GITHUB_SHA"))
+            
         # Log parametri
         mlflow.log_params(params['model'])
         mlflow.log_params(params['train'])
