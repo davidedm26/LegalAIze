@@ -125,12 +125,7 @@ jobs:
         DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
         DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
       run: |
-        python train_model.py
-
-    - name: Commit DVC outputs
-      run: |
-        dvc commit -f models/model.pkl
-      continue-on-error: true
+        dvc repro
 
     - name: Push to DVC
       run: |
@@ -141,7 +136,7 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        #git add models/model.pkl.dvc
+        git add dvc.lock
         git add .dvc/config
         git commit -m "Update model artifacts [skip ci]" || echo "No changes to commit"
         git push || echo "Nothing to push"
