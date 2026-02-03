@@ -8,3 +8,9 @@ model:
   max_depth: 5
   n_estimators: 110
   random_state: 42
+
+ingestion:
+  chunk_size: 1000
+  chunk_overlap: 200
+  raw_data_dir: "data"
+  processed_data_dir: "data/processed"
