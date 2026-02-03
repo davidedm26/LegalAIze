@@ -80,7 +80,7 @@ jobs:
     name: Train & Track Model
     runs-on: ubuntu-latest
     needs: lint-and-test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && github.event_name == 'push'
     
     steps:
     - uses: actions/checkout@v3
@@ -146,7 +146,7 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
     needs: [build-docker, train-model]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && github.event_name == 'push'
     
     steps:
     - uses: actions/checkout@v3
