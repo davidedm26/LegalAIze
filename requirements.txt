@@ -23,5 +23,10 @@ streamlit==1.29.0
 python-dotenv==1.0.0
 pydantic==2.5.3
 
+# PDF Processing & RAG
+pymupdf==1.23.8
+langchain-text-splitters==0.0.1
+langchain>=0.1.0
+
 # GitHub Integration
 pathspec==0.11.1
