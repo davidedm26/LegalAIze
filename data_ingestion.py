@@ -23,19 +23,17 @@ def extract_text_from_pdf(pdf_path):
 
 def process_law_text(raw_pages, source_name):
     """
-    Tenta di identificare gli articoli e pulire il testo.
-    In un contesto reale, qui useremmo regex più sofisticate.
+    Unisce le pagine mantenendo la struttura dei paragrafi.
     """
-    processed_chunks = []
-    # Uniamo tutto il testo per ora, mantenendo traccia della fonte
     full_text = ""
     for p in raw_pages:
-        full_text += f"\n[Page {p['page']}]\n{p['text']}"
+        full_text += f"\n{p['text']}"
     
-    # Pulizia minima
-    full_text = re.sub(r'\s+', ' ', full_text).strip()
+    # Pulizia: riduciamo gli spazi ma manteniamo i ritorni a capo (\n)
+    full_text = re.sub(r'[ \t]+', ' ', full_text)
+    full_text = re.sub(r'\n\s*\n+', '\n\n', full_text)
     
-    return full_text
+    return full_text.strip()
 
 def main():
     params = load_params()
@@ -47,9 +45,16 @@ def main():
     if not os.path.exists(processed_dir):
         os.makedirs(processed_dir)
         
+    # Separatori semantici per leggi (Articoli)
+    custom_separators = [
+        "\nArticle ", "\nArticolo ", 
+        "\n\n", "\n", " ", ""
+    ]
+    
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=ingestion_params['chunk_size'],
-        chunk_overlap=ingestion_params['chunk_overlap']
+        chunk_overlap=ingestion_params['chunk_overlap'],
+        separators=custom_separators
     )
     
     all_docs = []
