@@ -38,4 +38,4 @@ Thumbs.db
 *.log
 
 # Token
-github_token.txt
+dagshub_token.txt
