@@ -111,6 +111,11 @@ jobs:
         dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
       continue-on-error: true
 
+    - name: Pull data from DVC
+      run: |
+        dvc pull
+      continue-on-error: true
+
     - name: Verify DagHub Connection
       env:
         MLFLOW_TRACKING_URI: "https://dagshub.com/${{ github.repository }}.mlflow"
