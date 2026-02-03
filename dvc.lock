@@ -34,3 +34,34 @@ stages:
       hash: md5
       md5: 2c2c99e7ed9548fa2afc1a2d7bb8b90c
       size: 200977
+  ingest:
+    cmd: python data_ingestion.py
+    deps:
+    - path: data/ai_act.pdf
+      hash: md5
+      md5: a31da461b015738b42cc2f719a9acee4
+      size: 2583319
+    - path: data/gdpr.pdf
+      hash: md5
+      md5: b5d6ffe189fdf6ae561c6128595efab8
+      size: 982296
+    - path: data_ingestion.py
+      hash: md5
+      md5: 18c0e9cf771ee3d7cf158e04bba89473
+      size: 2869
+    - path: params.yaml
+      hash: md5
+      md5: f888038595d567ba3409d181834db5bc
+      size: 265
+    params:
+      params.yaml:
+        ingestion:
+          chunk_size: 1000
+          chunk_overlap: 200
+          raw_data_dir: data
+          processed_data_dir: data/processed
+    outs:
+    - path: data/processed/chunks.json
+      hash: md5
+      md5: 03d9bdcb4178550e3c3e2a55e6ea56ea
+      size: 1283229
