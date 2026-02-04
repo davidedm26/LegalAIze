@@ -1,2 +1,7 @@
 /chunks.json
-/vector_index
+/vector_index/collection/*
+
+# Escludi l'indice vettoriale generato
+/vector_index/
+# Escludi i file di stato SQLite se presenti
+*.sqlite
