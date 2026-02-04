@@ -1,6 +1,3 @@
-"""
-FastAPI Backend - Minimal ML API
-"""
 import os
 import yaml
 from fastapi import FastAPI, HTTPException, Body
@@ -10,12 +7,11 @@ from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from dotenv import load_dotenv
 
-# Carica variabili ambiente
-load_dotenv()
+load_dotenv() # Load environment variables from .env file
 
-app = FastAPI(title="LegalAIze Audit API", version="1.0.0")
+app = FastAPI(title="LegalAIze Audit API", version="1.0.0") # FastAPI instance
 
-# CORS
+# CORS - Cross-Origin Resource Sharing , allow all origins for simplicity
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,27 +20,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configurazione
+# Load parameters from params.yaml
 def load_params():
-    paths = ["params.yaml", "../params.yaml", "b:/Workspace/Unina-MSc/AISE/LegalAIze/params.yaml"]
-    for path in paths:
-        if os.path.exists(path):
-            with open(path, "r") as f:
-                return yaml.safe_load(f)
-    return {}
+    with open("params.yaml", "r") as f:
+        return yaml.safe_load(f)
 
-params = load_params()
-vect_params = params.get('vectorization', {})
+params = load_params() # Load parameters
+vect_params = params.get('vectorization', {}) # Vectorization parameters
 
-# Componenti RAG
-embedding_model = None
-vector_db = None  # Rinominato per evitare conflitti con il modulo
+# Global variables for RAG components
+embedding_model = None # Renamed to avoid conflicts with the module
+vector_db = None  # Renamed to avoid conflicts with the module
 
-def init_rag():
+def init_rag(): # Initialize RAG components
     global embedding_model, vector_db
     try:
-        model_name = vect_params.get('model_name', "all-MiniLM-L6-v2")
-        embedding_model = SentenceTransformer(model_name)
+        model_name = vect_params.get('model_name', "all-MiniLM-L6-v2") # Model name
+        embedding_model = SentenceTransformer(model_name) # Load embedding model
         
         index_path = vect_params.get('vector_index_path', "data/processed/vector_index")
         search_paths = [index_path, os.path.join("..", index_path), os.path.abspath(index_path)]
