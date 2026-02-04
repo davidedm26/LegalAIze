@@ -23,7 +23,8 @@ Progetto minimale che integra MLflow, DVC, FastAPI, Streamlit, Docker e GitHub A
 
 
 ```bash
-
+# Installa dvc
+pip install dvc
 
 # Esegui le seguenti due istruzioni solo se vuoi configurare una nuova repo
 dvc init 
