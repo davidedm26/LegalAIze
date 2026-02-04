@@ -6,3 +6,4 @@
 # Escludi i file di stato SQLite se presenti
 *.sqlite
 .lock
+/vector_index
