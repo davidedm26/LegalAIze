@@ -41,10 +41,6 @@ stages:
       hash: md5
       md5: a31da461b015738b42cc2f719a9acee4
       size: 2583319
-    - path: data/gdpr.pdf
-      hash: md5
-      md5: b5d6ffe189fdf6ae561c6128595efab8
-      size: 982296
     - path: data/iso.pdf
       hash: md5
       md5: 2ae5af2fc9eea16d8d0d3144b57ca428
@@ -55,8 +51,8 @@ stages:
       size: 2998
     - path: params.yaml
       hash: md5
-      md5: db943bc31903cc8c9aad93555a3e4b2c
-      size: 451
+      md5: 00b1a40346b62c3e5e97f1cd454a99e8
+      size: 359
     params:
       params.yaml:
         ingestion:
@@ -67,8 +63,8 @@ stages:
     outs:
     - path: data/processed/chunks.json
       hash: md5
-      md5: 43c70c70a29688b903aacbd6dd84a071
-      size: 1382558
+      md5: a171e7ace8948c8bfea4d892108e5651
+      size: 939870
   vectorize:
     cmd: python vectorize_data.py
     deps:
@@ -78,8 +74,8 @@ stages:
       size: 1382558
     - path: params.yaml
       hash: md5
-      md5: db943bc31903cc8c9aad93555a3e4b2c
-      size: 451
+      md5: 00b1a40346b62c3e5e97f1cd454a99e8
+      size: 359
     - path: vectorize_data.py
       hash: md5
       md5: 7bfbd2575daecf10038aa0343daaf1f8
@@ -95,6 +91,6 @@ stages:
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: 34885d8eedad47065640247009e3346a.dir
+      md5: 0fd444bf6c034ed1645b0b600511705d.dir
       size: 7569967
       nfiles: 4

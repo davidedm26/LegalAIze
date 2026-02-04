@@ -1,22 +1,21 @@
 """
 FastAPI Backend - Minimal ML API
 """
-import pickle
 import os
-from fastapi import FastAPI, HTTPException 
+import yaml
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import numpy as np
-import mlflow
-import mlflow.sklearn
+from sentence_transformers import SentenceTransformer
+from qdrant_client import QdrantClient
 from dotenv import load_dotenv
 
 # Carica variabili ambiente
 load_dotenv()
 
-app = FastAPI(title="ML API", version="1.0.0")
+app = FastAPI(title="LegalAIze Audit API", version="1.0.0")
 
-# CORS per permettere richieste da Streamlit
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,147 +24,145 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Carica model da MLflow o da file locale
-model = None
+# Configurazione
+def load_params():
+    paths = ["params.yaml", "../params.yaml", "b:/Workspace/Unina-MSc/AISE/LegalAIze/params.yaml"]
+    for path in paths:
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                return yaml.safe_load(f)
+    return {}
 
-def load_model_from_mlflow():
-    """Carica il modello più recente da MLflow"""
+params = load_params()
+vect_params = params.get('vectorization', {})
+
+# Componenti RAG
+embedding_model = None
+vector_db = None  # Rinominato per evitare conflitti con il modulo
+
+def init_rag():
+    global embedding_model, vector_db
     try:
-        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", ""))
-        os.environ["MLFLOW_TRACKING_USERNAME"] = os.getenv("DAGSHUB_USERNAME", "")
-        os.environ["MLFLOW_TRACKING_PASSWORD"] = os.getenv("DAGSHUB_TOKEN", "")
+        model_name = vect_params.get('model_name', "all-MiniLM-L6-v2")
+        embedding_model = SentenceTransformer(model_name)
         
-        # Cerca l'ultimo run con successo
-        client = mlflow.tracking.MlflowClient()
-        experiment = client.get_experiment_by_name("Default")
+        index_path = vect_params.get('vector_index_path', "data/processed/vector_index")
+        search_paths = [index_path, os.path.join("..", index_path), os.path.abspath(index_path)]
         
-        if experiment:
-            runs = client.search_runs(
-                experiment_ids=[experiment.experiment_id],
-                order_by=["start_time DESC"],
-                max_results=1
-            )
-            
-            if runs:
-                run_id = runs[0].info.run_id
-                model_uri = f"runs:/{run_id}/model"
-                return mlflow.sklearn.load_model(model_uri)
-    except Exception as e:
-        print(f"Errore caricamento da MLflow: {e}")
-    return None
-
-def load_model_from_file():
-    """Fallback: carica da file locale"""
-    MODEL_PATH = "../models/model.pkl"
-    if os.path.exists(MODEL_PATH):
-        with open(MODEL_PATH, "rb") as f:
-            return pickle.load(f)
-    return None
-
-# Prova a caricare il modello (prima da MLflow, poi da file locale)
-
-# Funzione per caricare un modello specifico dal Model Registry MLflow
-def load_model_from_registry(model_name: str, alias: str = None):
-    """
-    Carica un modello dal Model Registry MLflow/DagsHub usando un alias (es: 'champion', 'production', ecc.)
-    model_name: nome del modello registrato
-    alias: alias del modello (None per ultima versione)
-    """
-    try:
-        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", ""))
-        os.environ["MLFLOW_TRACKING_USERNAME"] = os.getenv("DAGSHUB_USERNAME", "")
-        os.environ["MLFLOW_TRACKING_PASSWORD"] = os.getenv("DAGSHUB_TOKEN", "")
-
-        client = mlflow.tracking.MlflowClient()
-        if alias:
-            # Usa l'alias per recuperare la versione
-            versions = client.get_model_version_by_alias(model_name, alias)
-            if versions:
-                model_uri = f"models:/{model_name}@{alias}"
-                return mlflow.sklearn.load_model(model_uri)
+        final_path = next((p for p in search_paths if os.path.exists(p)), None)
+        if final_path:
+            # Creiamo l'istanza esplicitamente
+            vector_db = QdrantClient(path=final_path)
+            print(f"✓ RAG Initialized with index: {final_path}")
         else:
-            # Nessun alias: carica l'ultima versione
-            versions = client.get_latest_versions(model_name)
-            if versions:
-                model_uri = f"models:/{model_name}/{versions[0].version}"
-                return mlflow.sklearn.load_model(model_uri)
+            print("⚠ Vector index not found!")
     except Exception as e:
-        print(f"Errore caricamento dal Model Registry: {e}")
-    return None
+        print(f"⚠ Init Error: {e}")
 
-# Carica il modello come prima
-model = load_model_from_mlflow()
-if model is None:
-    model = load_model_from_file()
-    if model:
-        print("✓ Modello caricato da file locale")
-else:
-    print("✓ Modello caricato da MLflow/DagShub")
+@app.on_event("startup")
+async def startup_event():
+    init_rag()
 
-class PredictionRequest(BaseModel):
-    features: list[float]
+class SearchResult(BaseModel):
+    content: str
+    source: str
+    score: float
 
-class PredictionResponse(BaseModel):
-    prediction: int
-    probability: list[float]
+class AuditResponse(BaseModel):
+    compliance_score: float
+    findings: list[SearchResult]
+    recommendations: str
 
 @app.get("/")
 def root():
-    """Health check"""
-    return {
-        "status": "ok",
-        "message": "ML API is running",
-        "model_loaded": model is not None
-    }
+    return {"status": "ok", "service": "LegalAIze Audit Tool", "rag_ready": vector_db is not None}
+
+@app.post("/audit", response_model=AuditResponse)
+async def audit(document_text: str = Body(..., embed=True)):
+    """
+    Verifica la conformità di un testo rispetto alle normative indicizzate.
+    """
+    if vector_db is None or embedding_model is None:
+        raise HTTPException(status_code=503, detail="RAG system not initialized")
+    
+    try:
+        # 1. Crea embedding del documento in input
+        vector = embedding_model.encode(document_text).tolist()
+        
+        # 2. Cerca riferimenti normativi pertinenti (Supporto multiversione Qdrant)
+        search_result = []
+        if hasattr(vector_db, "query_points"):
+            # Metodo moderno (Qdrant 1.10+) - raccomandato dato che 'search' è sparito
+            response = vector_db.query_points(
+                collection_name="legal_docs",
+                query=vector,
+                limit=5
+            )
+            search_result = response.points
+        elif hasattr(vector_db, "search"):
+            # Metodo classico
+            search_result = vector_db.search(
+                collection_name="legal_docs",
+                query_vector=vector,
+                limit=5
+            )
+        elif hasattr(vector_db, "query"):
+            # Fallback per versioni specifiche con FastEmbed
+            try:
+                search_result = vector_db.query(
+                    collection_name="legal_docs",
+                    query_vector=vector,
+                    limit=5
+                )
+            except:
+                # Se proprio fallisce, usiamo la query testuale (ma abbiamo già il vettore)
+                search_result = vector_db.query(
+                    collection_name="legal_docs",
+                    query_text=document_text,
+                    limit=5
+                )
+        
+        findings = []
+        scores = []
+        for hit in search_result:
+            # Gestione versatile del payload e dello score
+            payload = getattr(hit, "payload", {}) if hasattr(hit, "payload") else hit.get("payload", {})
+            score = getattr(hit, "score", 0) if hasattr(hit, "score") else hit.get("score", 0)
+            
+            content = payload.get("text", payload.get("content", "Testo non disponibile"))
+            source = payload.get("source", "Unknown")
+            
+            findings.append(SearchResult(
+                content=content,
+                source=source,
+                score=score
+            ))
+            scores.append(score)
+            
+        # 3. Logica semplificata di audit
+        avg_score = sum(scores) / len(scores) if scores else 0
+        compliance_level = "HIGH" if avg_score > 0.7 else "MEDIUM" if avg_score > 0.5 else "LOW"
+        
+        return AuditResponse(
+            compliance_score=round(avg_score, 2),
+            findings=findings,
+            recommendations=f"Analisi completata. Livello di corrispondenza normativa: {compliance_level}. Verificare i dettagli nei riferimenti trovati."
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Audit failed: {str(e)}")
 
 @app.get("/health")
 def health():
-    """Detailed health check"""
-    return {
-        "status": "healthy",
-        "model_loaded": model is not None,
-        "version": "1.0.0"
-    }
+    return {"status": "healthy", "rag_ready": vector_db is not None}
 
-@app.post("/predict", response_model=PredictionResponse)
-def predict(request: PredictionRequest):
-    """
-    Predizione ML
-    
-    Esempio request:
-    {
-        "features": [5.1, 3.5, 1.4, 0.2]
-    }
-    """
-    if model is None:
-        raise HTTPException(
-            status_code=503, 
-            detail="Model not loaded. Train a model first."
-        )
-    
-    try:
-        # Prepara input
-        X = np.array(request.features).reshape(1, -1)
-        
-        # Predizione
-        prediction = int(model.predict(X)[0])
-        probability = model.predict_proba(X)[0].tolist()
-        
-        return PredictionResponse(
-            prediction=prediction,
-            probability=probability
-        )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Prediction error: {str(e)}")
-
-@app.get("/model/info")
+@app.get("/model_info")
 def model_info():
-    """Informazioni sul modello"""
-    if model is None:
-        return {"error": "Model not loaded"}
-    
+    """Informazioni sul modello di embedding"""
+    if embedding_model is None:
+        return {"error": "Embedding model not loaded"}
     return {
-        "type": type(model).__name__,
-        "n_features": model.n_features_in_ if hasattr(model, 'n_features_in_') else None,
-        "n_classes": model.n_classes_ if hasattr(model, 'n_classes_') else None
+        "type": type(embedding_model).__name__,
+        "model_name": getattr(embedding_model, 'model_name', str(embedding_model))
     }
+ 

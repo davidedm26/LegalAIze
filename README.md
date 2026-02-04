@@ -1,21 +1,15 @@
-# AISE Project - ML Pipeline
+# LegalAIze - AI Audit Tool
 
-Progetto minimale che integra MLflow, DVC, FastAPI, Streamlit, Docker e GitHub Actions.
+Strumento di **Audit Normativo** per la verifica della conformità di documentazione tecnica rispetto a **AI Act**, **GDPR** e standard **ISO**.
 
 ## Stack Tecnologico
 
-- **MLflow**: Tracking esperimenti (via DagsHub)
-    <!--
-    DagsHub permette di ospitare un istanza remota di mlflow. Questo consente a più collaboratori di lavorare nello stesso spazio degli esperimenti
-    -->
-- **DVC**: Gestione artefatti e dati (via DagsHub)
-    <!--
-    DVC (Data Version Control) è uno strumento open-source che consente di gestire versionamento, tracciamento e condivisione di dati e modelli nei progetti di machine learning. DVC sta a Dati come Git sta a Codice
-    -->
-- **FastAPI**: Backend API
-- **Streamlit**: Frontend UI
-- **Docker**: Containerizzazione
-- **GitHub Actions**: CI/CD
+- **DVC**: Gestione artefatti e versionamento dell'indice vettoriale.
+- **Qdrant**: Vector Database (Local Mode) per la ricerca semantica.
+- **Sentence Transformers**: Modello `all-MiniLM-L6-v2` per gli embedding.
+- **FastAPI**: Backend per l'esecuzione dell'audit.
+- **Streamlit**: Frontend UI per il caricamento dei documenti e reportistica.
+- **Docker**: Containerizzazione dell'intero stack.
 
 ## Setup Iniziale
 
@@ -80,35 +74,35 @@ git commit -m "Salva progressi e aggiorna artefatti"
 git push          # Aggiorna la repository su GitHub
 ```
 
+## Esecuzione Locale [IN FASE DI SVILUPPO]
 
-
-## Esecuzione Locale (ANCORA IN FASE DI SVILUPPO)
-
-### Backend (FastAPI)
+#### Backend (FastAPI)
 ```bash
 cd backend
+pip install -r requirements.txt
 uvicorn app:app --reload --port 8000
 ```
 
-### Frontend (Streamlit)
+#### Frontend (Streamlit)
 ```bash
 cd frontend
+pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Esecuzione con Docker
+## Esecuzione con Docker [IN FASE DI SVILUPPO]
 
 ```bash
 docker-compose up --build
 ```
 
-- Backend: http://localhost:8000
-- Frontend: http://localhost:8501
+- **Backend**: http://localhost:8000
+- **Frontend**: http://localhost:8501
+
 
 
 ## CI/CD
 
-GitHub Actions esegue automaticamente:
-- Linting e test
-- Build Docker images
-- Push artefatti su DVC (su push a main)
+GitHub Actions esegue automatically:
+- Linting e Testing
+- Docker Build
