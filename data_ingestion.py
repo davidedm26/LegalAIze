@@ -10,7 +10,7 @@ def load_params():
         return yaml.safe_load(f)
 
 def extract_text_from_pdf(pdf_path):
-    """Estrae testo da un file PDF e restituisce una lista di dizionari (pagina, testo)."""
+    """Extracts text from a PDF file and returns a list of dictionaries (page, text)."""
     doc = fitz.open(pdf_path)
     text_content = []
     for page_num in range(len(doc)):
@@ -23,58 +23,57 @@ def extract_text_from_pdf(pdf_path):
 
 def process_law_text(raw_pages, source_name):
     """
-    Unisce le pagine mantenendo la struttura dei paragrafi.
+    Merges pages while maintaining paragraph structure.
     """
     full_text = ""
-    for p in raw_pages:
+    for p in raw_pages: # for each page add its text
         full_text += f"\n{p['text']}"
     
-    # Pulizia: riduciamo gli spazi ma manteniamo i ritorni a capo (\n)
-    full_text = re.sub(r'[ \t]+', ' ', full_text)
-    full_text = re.sub(r'\n\s*\n+', '\n\n', full_text)
+    # Cleaning text
+    full_text = re.sub(r'[ \t]+', ' ', full_text) # replace multiple spaces/tabs with single space
+    full_text = re.sub(r'\n\s*\n+', '\n\n', full_text) # keep double line breaks for paragraphs
     
-    return full_text.strip()
+    return full_text.strip() # return cleaned text
 
 def main():
-    params = load_params()
-    ingestion_params = params['ingestion']
+    params = load_params() # Load parameters from params.yaml
+    ingestion_params = params['ingestion'] # Ingestion parameters
     
-    raw_dir = ingestion_params['raw_data_dir']
-    processed_dir = ingestion_params['processed_data_dir']
+    raw_dir = ingestion_params['raw_data_dir'] # Directory with raw PDFs
+    processed_dir = ingestion_params['processed_data_dir'] # Directory for processed data
     
-    if not os.path.exists(processed_dir):
+    if not os.path.exists(processed_dir): # Create processed data directory if not exists
         os.makedirs(processed_dir)
         
-    # Separatori semantici per leggi (Articoli)
+    # Semanthic separators for laws (Articles)
     custom_separators = [
         "\nArticle ", "\nArticolo ", 
         "\n\n", "\n", " ", ""
     ]
     
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=ingestion_params['chunk_size'],
-        chunk_overlap=ingestion_params['chunk_overlap'],
-        separators=custom_separators
+    splitter = RecursiveCharacterTextSplitter( # Initialize text splitter
+        chunk_size=ingestion_params['chunk_size'], # Chunk size from params
+        chunk_overlap=ingestion_params['chunk_overlap'], # Chunk overlap from params
+        separators=custom_separators # Custom separators
     )
     
-    all_docs = []
+    all_docs = [] # To store all document chunks
     
-    # Processa AI Act e GDPR se presenti
-    pdf_files = [f for f in os.listdir(raw_dir) if f.endswith('.pdf')]
+    pdf_files = [f for f in os.listdir(raw_dir) if f.endswith('.pdf')] # List PDF files
     
     if not pdf_files:
-        print(f"⚠ Nessun file PDF trovato in {raw_dir}. Assicurati di aver fatto 'dvc pull'.")
+        print(f"⚠ No PDF files found in {raw_dir}. Make sure you have run 'dvc pull'.")
         return
 
     for pdf_file in pdf_files:
-        print(f"Analizzando {pdf_file}...")
-        pdf_path = os.path.join(raw_dir, pdf_file)
-        raw_pages = extract_text_from_pdf(pdf_path)
+        print(f"Analyzing {pdf_file}...")
+        pdf_path = os.path.join(raw_dir, pdf_file) # Full path to PDF
         
-        # Estraiamo il testo grezzo (potevamo farlo anche articolo per articolo)
-        text = process_law_text(raw_pages, pdf_file)
+        # Extract raw text from PDF by pages
+        raw_pages = extract_text_from_pdf(pdf_path) # Extract text from PDF, divided by pages
+        text = process_law_text(raw_pages, pdf_file) # Process raw text to maintain paragraph structure
         
-        # Creiamo i chunk
+        # Split text into chunks
         chunks = splitter.split_text(text)
         
         for i, chunk in enumerate(chunks):
@@ -84,12 +83,12 @@ def main():
                 "content": chunk
             })
             
-    # Salva il risultato
-    output_path = os.path.join(processed_dir, "chunks.json")
+    # Save all chunks to a JSON file
+    output_path = os.path.join(processed_dir, "chunks.json") # Output path
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(all_docs, f, indent=2, ensure_ascii=False)
         
-    print(f"✓ Ingestion completata. {len(all_docs)} chunk salvati in {output_path}")
+    print(f"✓ Ingestion completed. {len(all_docs)} chunks saved in {output_path}")
 
 if __name__ == "__main__":
     main()
