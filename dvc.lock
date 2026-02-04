@@ -41,27 +41,56 @@ stages:
       hash: md5
       md5: a31da461b015738b42cc2f719a9acee4
       size: 2583319
-    - path: data/gdpr.pdf
+    - path: data/iso.pdf
       hash: md5
-      md5: b5d6ffe189fdf6ae561c6128595efab8
-      size: 982296
+      md5: 2ae5af2fc9eea16d8d0d3144b57ca428
+      size: 2646955
     - path: data_ingestion.py
       hash: md5
-      md5: 18c0e9cf771ee3d7cf158e04bba89473
-      size: 2869
+      md5: 1bdd1c37329d416183e46053b392fed3
+      size: 3447
     - path: params.yaml
       hash: md5
-      md5: f888038595d567ba3409d181834db5bc
-      size: 265
+      md5: b275db0a83b6f203748510fb2f1f8e15
+      size: 359
     params:
       params.yaml:
         ingestion:
-          chunk_size: 1000
-          chunk_overlap: 200
+          chunk_size: 4000
+          chunk_overlap: 500
           raw_data_dir: data
           processed_data_dir: data/processed
     outs:
     - path: data/processed/chunks.json
       hash: md5
-      md5: 03d9bdcb4178550e3c3e2a55e6ea56ea
-      size: 1283229
+      md5: 79973c7829bfeb716d2115ed8bdc4c5e
+      size: 815917
+  vectorize:
+    cmd: python vectorize_data.py
+    deps:
+    - path: data/processed/chunks.json
+      hash: md5
+      md5: 79973c7829bfeb716d2115ed8bdc4c5e
+      size: 815917
+    - path: params.yaml
+      hash: md5
+      md5: b275db0a83b6f203748510fb2f1f8e15
+      size: 359
+    - path: vectorize_data.py
+      hash: md5
+      md5: 7bfbd2575daecf10038aa0343daaf1f8
+      size: 2610
+    params:
+      params.yaml:
+        vectorization:
+          model_name: all-MiniLM-L6-v2
+          collection_name: legal_docs
+          qdrant_host: localhost
+          qdrant_port: 6333
+          vector_index_path: data/processed/vector_index
+    outs:
+    - path: data/processed/vector_index
+      hash: md5
+      md5: 33b37b11ef92e036a541f65974d89fdd.dir
+      size: 2142766
+      nfiles: 4

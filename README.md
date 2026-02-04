@@ -1,50 +1,37 @@
-# AISE Project - ML Pipeline
+# LegalAIze - AI Audit Tool
 
-Progetto minimale che integra MLflow, DVC, FastAPI, Streamlit, Docker e GitHub Actions.
+Strumento di **Audit Normativo** per la verifica della conformità di documentazione tecnica rispetto a **AI Act**, **GDPR** e standard **ISO**.
 
 ## Stack Tecnologico
 
-- **MLflow**: Tracking esperimenti (via DagsHub)
-    <!--
-    DagsHub permette di ospitare un istanza remota di mlflow. Questo consente a più collaboratori di lavorare nello stesso spazio degli esperimenti
-    -->
-- **DVC**: Gestione artefatti e dati (via DagsHub)
-    <!--
-    DVC (Data Version Control) è uno strumento open-source che consente di gestire versionamento, tracciamento e condivisione di dati e modelli nei progetti di machine learning. DVC sta a Dati come Git sta a Codice
-    -->
-- **FastAPI**: Backend API
-- **Streamlit**: Frontend UI
-- **Docker**: Containerizzazione
-- **GitHub Actions**: CI/CD
+- **DVC**: Gestione artefatti e versionamento dell'indice vettoriale.
+- **Qdrant**: Vector Database (Local Mode) per la ricerca semantica.
+- **Sentence Transformers**: Modello `all-MiniLM-L6-v2` per gli embedding.
+- **FastAPI**: Backend per l'esecuzione dell'audit.
+- **Streamlit**: Frontend UI per il caricamento dei documenti e reportistica.
+- **Docker**: Containerizzazione dell'intero stack.
 
 ## Setup Iniziale
 
 ### 1. Configura DVC (via DagsHub)
 
-Se devi replicare il progetto 
+
 ```bash
-# Inizializza DVC
+# Installa dvc
+pip install dvc
+
+# Esegui le seguenti due istruzioni solo se vuoi configurare una nuova repo
 dvc init 
+dvc remote add origin https://dagshub.com/YOUR_USERNAME/YOUR_REPO.dvc 
 
 # Configura remote DagshHub (sostituisci con le tue credenziali)
-dvc remote add origin https://dagshub.com/YOUR_USERNAME/YOUR_REPO.dvc 
 dvc remote modify origin --local auth basic
-dvc remote modify origin --local user YOUR_USERNAME
-dvc remote modify origin --local password YOUR_TOKEN
+dvc remote modify origin --local user YOUR_USERNAME #username dagshub
+dvc remote modify origin --local password YOUR_TOKEN #token personale dagshub
 
-
+dvc pull #Scarica i dati dal cloud
 ```
 
-Se devi collaborare al progetto
-```bash
-# Configura credenziali locali
-dvc remote modify origin --local auth basic
-dvc remote modify origin --local user YOUR_USERNAME
-dvc remote modify origin --local password YOUR_TOKEN
-
-# Scaricare i dati (Dataset / VectorDB)
-dvc pull
-```
 
 ### 2. Configura MLflow con DagsHub
 
@@ -58,54 +45,64 @@ DAGSHUB_TOKEN=YOUR_TOKEN
 ### 3. Installa le dipendenze
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt #Impiega ~10 minuti
 ```
 
-## Esecuzione Locale
 
-### Backend (FastAPI)
+## Addestramento
+Per addestrare il modello tramite DVC, assicurati che i dati siano sincronizzati (`dvc pull`) e poi esegui:
+
+```bash
+dvc repro
+```
+
+Questo comando ricostruirà la pipeline di addestramento definita nei file `.dvc` e `dvc.yaml`, eseguendo solo gli step necessari in base alle modifiche rilevate. Gli output (modelli, metriche, artefatti) saranno tracciati e versionati automaticamente da DVC.
+
+Al termine, puoi visualizzare lo stato della pipeline con:
+
+```bash
+dvc status
+```
+
+## Salvataggio dei progressi
+Per salvare i progressi (modelli, dati, artefatti) su DagsHub e aggiornare la repository GitHub:
+
+```bash
+dvc push          # Carica i dati/artefatti su DagsHub
+git add .         # Aggiungi i cambiamenti (inclusi i file .dvc aggiornati)
+git commit -m "Salva progressi e aggiorna artefatti"
+git push          # Aggiorna la repository su GitHub
+```
+
+## Esecuzione Locale [IN FASE DI SVILUPPO]
+
+#### Backend (FastAPI)
 ```bash
 cd backend
+pip install -r requirements.txt
 uvicorn app:app --reload --port 8000
 ```
 
-### Frontend (Streamlit)
+#### Frontend (Streamlit)
 ```bash
 cd frontend
+pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Esecuzione con Docker
+## Esecuzione con Docker [IN FASE DI SVILUPPO]
 
 ```bash
 docker-compose up --build
 ```
 
-- Backend: http://localhost:8000
-- Frontend: http://localhost:8501
+- **Backend**: http://localhost:8000
+- **Frontend**: http://localhost:8501
 
-## Train Model 
-L'addestramento avviene automaticamente tramite Git Actions quando si pusha il nuovo codice, tuttavia se si vuole forzare il training locale si possono seguire questi passi:
 
-- Effettua addestramento
-```bash
-dvc repro 
-```
-### Aggiorna Github/DagsHub
-Salva il modello ottenuto su DagsHub 
-```bash
-dvc push 
-```
-Aggiorna file .dvc su github 
-```bash
-git add .
-git commit -m "New trained model <add_tag>"
-git push
-```
 
 ## CI/CD
 
-GitHub Actions esegue automaticamente:
-- Linting e test
-- Build Docker images
-- Push artefatti su DVC (su push a main)
+GitHub Actions esegue automatically:
+- Linting e Testing
+- Docker Build

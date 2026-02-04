@@ -4,24 +4,20 @@ stages:
     deps:
       - data_ingestion.py
       - data/ai_act.pdf
-      - data/gdpr.pdf
+      - data/iso.pdf
       - params.yaml
     params:
       - ingestion
     outs:
       - data/processed/chunks.json
 
-  train:
-    cmd: python train_model.py
+  vectorize:
+    cmd: python vectorize_data.py
     deps:
-      - train_model.py
+      - vectorize_data.py
+      - data/processed/chunks.json
       - params.yaml
-      - data/
     params:
-      - train
-      - model
+      - vectorization
     outs:
-      - models/model.pkl
-    metrics:
-      - metrics.json:
-          cache: false
+      - data/processed/vector_index
