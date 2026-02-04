@@ -47,12 +47,12 @@ stages:
       size: 982296
     - path: data_ingestion.py
       hash: md5
-      md5: 18c0e9cf771ee3d7cf158e04bba89473
-      size: 2869
+      md5: 2a0ccba225633e879f15745e1ab4225c
+      size: 2998
     - path: params.yaml
       hash: md5
-      md5: f888038595d567ba3409d181834db5bc
-      size: 265
+      md5: db943bc31903cc8c9aad93555a3e4b2c
+      size: 451
     params:
       params.yaml:
         ingestion:
@@ -63,5 +63,34 @@ stages:
     outs:
     - path: data/processed/chunks.json
       hash: md5
-      md5: 03d9bdcb4178550e3c3e2a55e6ea56ea
-      size: 1283229
+      md5: e4a7a797c19b1c16d3a79e71078d17a3
+      size: 1188580
+  vectorize:
+    cmd: python vectorize_data.py
+    deps:
+    - path: data/processed/chunks.json
+      hash: md5
+      md5: e4a7a797c19b1c16d3a79e71078d17a3
+      size: 1188580
+    - path: params.yaml
+      hash: md5
+      md5: db943bc31903cc8c9aad93555a3e4b2c
+      size: 451
+    - path: vectorize_data.py
+      hash: md5
+      md5: 7bfbd2575daecf10038aa0343daaf1f8
+      size: 2610
+    params:
+      params.yaml:
+        vectorization:
+          model_name: all-MiniLM-L6-v2
+          collection_name: legal_docs
+          qdrant_host: localhost
+          qdrant_port: 6333
+          vector_index_path: data/processed/vector_index
+    outs:
+    - path: data/processed/vector_index
+      hash: md5
+      md5: 5d6014dd1c11e86a8f18f18fe7a9478f.dir
+      size: 6332975
+      nfiles: 4

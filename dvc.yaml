@@ -11,6 +11,17 @@ stages:
     outs:
       - data/processed/chunks.json
 
+  vectorize:
+    cmd: python vectorize_data.py
+    deps:
+      - vectorize_data.py
+      - data/processed/chunks.json
+      - params.yaml
+    params:
+      - vectorization
+    outs:
+      - data/processed/vector_index
+
   train:
     cmd: python train_model.py
     deps:

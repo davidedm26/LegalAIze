@@ -14,3 +14,10 @@ ingestion:
   chunk_overlap: 200
   raw_data_dir: "data"
   processed_data_dir: "data/processed"
+
+vectorization:
+  model_name: "all-MiniLM-L6-v2"
+  collection_name: "legal_docs"
+  qdrant_host: "localhost"
+  qdrant_port: 6333
+  vector_index_path: "data/processed/vector_index"
