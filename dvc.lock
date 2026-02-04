@@ -47,34 +47,34 @@ stages:
       size: 2646955
     - path: data_ingestion.py
       hash: md5
-      md5: 2a0ccba225633e879f15745e1ab4225c
-      size: 2998
+      md5: 1bdd1c37329d416183e46053b392fed3
+      size: 3447
     - path: params.yaml
       hash: md5
-      md5: 00b1a40346b62c3e5e97f1cd454a99e8
+      md5: b275db0a83b6f203748510fb2f1f8e15
       size: 359
     params:
       params.yaml:
         ingestion:
-          chunk_size: 1000
-          chunk_overlap: 200
+          chunk_size: 4000
+          chunk_overlap: 500
           raw_data_dir: data
           processed_data_dir: data/processed
     outs:
     - path: data/processed/chunks.json
       hash: md5
-      md5: a171e7ace8948c8bfea4d892108e5651
-      size: 939870
+      md5: 79973c7829bfeb716d2115ed8bdc4c5e
+      size: 815917
   vectorize:
     cmd: python vectorize_data.py
     deps:
     - path: data/processed/chunks.json
       hash: md5
-      md5: 43c70c70a29688b903aacbd6dd84a071
-      size: 1382558
+      md5: 79973c7829bfeb716d2115ed8bdc4c5e
+      size: 815917
     - path: params.yaml
       hash: md5
-      md5: 00b1a40346b62c3e5e97f1cd454a99e8
+      md5: b275db0a83b6f203748510fb2f1f8e15
       size: 359
     - path: vectorize_data.py
       hash: md5
@@ -91,6 +91,6 @@ stages:
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: 0fd444bf6c034ed1645b0b600511705d.dir
-      size: 7569967
+      md5: 33b37b11ef92e036a541f65974d89fdd.dir
+      size: 2142766
       nfiles: 4
