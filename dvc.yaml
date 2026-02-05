@@ -21,3 +21,16 @@ stages:
       - vectorization
     outs:
       - data/processed/vector_index
+
+  precompute_rag:
+    cmd: python precompute_rag.py
+    deps:
+      - precompute_rag.py
+      - data/mapping.json
+      - params.yaml
+      - data/processed/vector_index
+    params:
+      - vectorization
+      - ingestion
+    outs:
+      - data/processed/requirement_chunks.json

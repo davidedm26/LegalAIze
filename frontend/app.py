@@ -92,9 +92,32 @@ if st.button("🚀 Esegui Audit", type="primary"):
                 st.markdown("---")
                 st.subheader("📄 Riferimenti Normativi Trovati")
                 
-                for i, finding in enumerate(result["findings"]):
+                # Mostra findings aggregati dai requisiti
+                all_findings = []
+                for req in result.get("requirements", []):
+                    all_findings.extend(req.get("findings", []))
+                
+                for i, finding in enumerate(all_findings):
                     with st.expander(f"Rif {i+1}: {finding['source']} (Score: {finding['score']:.4f})"):
                         st.write(finding['content'])
+                
+                # Sezione dettagliata per requisiti
+                if "requirements" in result and result["requirements"]:
+                    st.markdown("---")
+                    st.subheader("📋 Dettagli per Requisito")
+                    
+                    for req in result["requirements"]:
+                        with st.expander(f"{req['name']} (Score: {req['compliance_score']:.2f}) - {req['id']}"):
+                            st.write(f"**ISO Ref:** {req['iso_ref']}")
+                            st.write("**Articoli AI Act:**")
+                            for art in req['ai_act_articles']:
+                                st.write(f"- {art['ref']}: {art['text'][:100]}...")
+                            if req['findings']:
+                                st.write("**Findings specifici:**")
+                                for finding in req['findings']:
+                                    st.write(f"- {finding['content'][:100]}... (Score: {finding['score']:.4f})")
+                            else:
+                                st.write("Nessun finding specifico trovato.")
             else:
                 st.error(f"Errore API: {response.status_code}")
                 st.write(response.text)

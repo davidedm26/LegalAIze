@@ -51,8 +51,8 @@ stages:
       size: 3447
     - path: params.yaml
       hash: md5
-      md5: b275db0a83b6f203748510fb2f1f8e15
-      size: 359
+      md5: ac8e85396bafae72c9eafaf37281751d
+      size: 499
     params:
       params.yaml:
         ingestion:
@@ -74,12 +74,12 @@ stages:
       size: 815917
     - path: params.yaml
       hash: md5
-      md5: b275db0a83b6f203748510fb2f1f8e15
-      size: 359
+      md5: ac8e85396bafae72c9eafaf37281751d
+      size: 499
     - path: vectorize_data.py
       hash: md5
-      md5: 7bfbd2575daecf10038aa0343daaf1f8
-      size: 2610
+      md5: af01fbe91f97d2b288ba81fa052acfb8
+      size: 3259
     params:
       params.yaml:
         vectorization:
@@ -91,6 +91,44 @@ stages:
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: 33b37b11ef92e036a541f65974d89fdd.dir
+      md5: 913ea22666dc1dd7340782612008c46f.dir
       size: 2142766
       nfiles: 4
+  precompute_rag:
+    cmd: python precompute_rag.py
+    deps:
+    - path: data/mapping.json
+      hash: md5
+      md5: 4c63c54de8ec8b0880eca0b5fb87bccf
+      size: 13551
+    - path: data/processed/vector_index
+      hash: md5
+      md5: 913ea22666dc1dd7340782612008c46f.dir
+      size: 2142766
+      nfiles: 4
+    - path: params.yaml
+      hash: md5
+      md5: ac8e85396bafae72c9eafaf37281751d
+      size: 499
+    - path: precompute_rag.py
+      hash: md5
+      md5: 1d536e836d877e6146bfe48a42da0303
+      size: 4261
+    params:
+      params.yaml:
+        ingestion:
+          chunk_size: 4000
+          chunk_overlap: 500
+          raw_data_dir: data
+          processed_data_dir: data/processed
+        vectorization:
+          model_name: all-MiniLM-L6-v2
+          collection_name: legal_docs
+          qdrant_host: localhost
+          qdrant_port: 6333
+          vector_index_path: data/processed/vector_index
+    outs:
+    - path: data/processed/requirement_chunks.json
+      hash: md5
+      md5: 0186c9aaec3ae0ddefe1692f7d0f45fc
+      size: 187084

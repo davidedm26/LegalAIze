@@ -7,3 +7,5 @@
 *.sqlite
 .lock
 /vector_index
+/requirement_embeddings.json
+/requirement_chunks.json
