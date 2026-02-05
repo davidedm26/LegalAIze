@@ -51,8 +51,8 @@ stages:
       size: 3447
     - path: params.yaml
       hash: md5
-      md5: ac8e85396bafae72c9eafaf37281751d
-      size: 499
+      md5: f815805619020f940d526b419654304f
+      size: 1219
     params:
       params.yaml:
         ingestion:
@@ -74,8 +74,8 @@ stages:
       size: 815917
     - path: params.yaml
       hash: md5
-      md5: ac8e85396bafae72c9eafaf37281751d
-      size: 499
+      md5: f815805619020f940d526b419654304f
+      size: 1219
     - path: vectorize_data.py
       hash: md5
       md5: af01fbe91f97d2b288ba81fa052acfb8
@@ -108,8 +108,8 @@ stages:
       nfiles: 4
     - path: params.yaml
       hash: md5
-      md5: ac8e85396bafae72c9eafaf37281751d
-      size: 499
+      md5: f815805619020f940d526b419654304f
+      size: 1219
     - path: precompute_rag.py
       hash: md5
       md5: 1d536e836d877e6146bfe48a42da0303
