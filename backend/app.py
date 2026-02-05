@@ -30,7 +30,7 @@ app.add_middleware(
 
 # Load parameters from params.yaml
 def load_params():
-    with open("params.yaml", "r") as f:
+    with open("..\params.yaml", "r") as f:
         return yaml.safe_load(f)
 
 params = load_params() # Load parameters
@@ -41,9 +41,11 @@ embedding_model = None # Renamed to avoid conflicts with the module
 vector_db = None  # Renamed to avoid conflicts with the module
 mapping = None  # Mapping of requirements
 llm = None  # LLM for evaluation
+requirement_embeddings = {}  # Pre-computed embeddings for requirements
+requirement_chunks = {}  # Pre-computed relevant chunks per requirement
 
 def init_rag(): # Initialize RAG components
-    global embedding_model, vector_db, mapping, llm
+    global embedding_model, vector_db, mapping, llm, requirement_embeddings, requirement_chunks
     try:
         model_name = vect_params.get('model_name', "all-MiniLM-L6-v2") # Model name
         embedding_model = SentenceTransformer(model_name) # Load embedding model
@@ -59,169 +61,199 @@ def init_rag(): # Initialize RAG components
             print("⚠ Vector index not found!")
         
         # Load mapping
-        mapping_path = os.path.join("data", "mapping.txt")
+        mapping_path = os.path.join("..","data", "mapping.json")
         if os.path.exists(mapping_path):
             with open(mapping_path, "r") as f:
                 mapping = json.load(f)
             print(f"✓ Mapping loaded with {len(mapping)} requirements")
         else:
             print("⚠ Mapping file not found!")
+        # Load pre-computed requirement embeddings
+        embeddings_path_candidates = [
+            os.path.join("..", "data", "processed", "requirement_embeddings.json"),
+            os.path.join("data", "processed", "requirement_embeddings.json"),
+        ]
+        embeddings_path = next((p for p in embeddings_path_candidates if os.path.exists(p)), None)
+        if embeddings_path:
+            with open(embeddings_path, "r", encoding="utf-8") as f:
+                requirement_embeddings = json.load(f)
+            print(f"✓ Requirement embeddings loaded from {embeddings_path}")
+        else:
+            print("⚠ Requirement embeddings file not found! Run DVC stage 'precompute_rag'.")
+
+        # Load pre-computed requirement chunks
+        chunks_path_candidates = [
+            os.path.join("..", "data", "processed", "requirement_chunks.json"),
+            os.path.join("data", "processed", "requirement_chunks.json"),
+        ]
+        chunks_path = next((p for p in chunks_path_candidates if os.path.exists(p)), None)
+        if chunks_path:
+            with open(chunks_path, "r", encoding="utf-8") as f:
+                requirement_chunks = json.load(f)
+            print(f"✓ Requirement chunks loaded from {chunks_path}")
+        else:
+            print("⚠ Requirement chunks file not found! Run DVC stage 'precompute_rag'.")
         
         # Initialize LLM
-        llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.1)
+        llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.1, request_timeout=30)  # Aggiunto timeout
         print("✓ LLM Initialized")
     except Exception as e:
         print(f"⚠ Init Error: {e}")
 
 # Pydantic models for request and response
-# Model for individual search result
-class SearchResult(BaseModel): 
-    content: str 
-    source: str
-    score: float
 
-# Model for requirement report
-class RequirementReport(BaseModel):
-    id: str
-    name: str
-    compliance_score: float
-    findings: list[SearchResult]
-    iso_ref: str
-    ai_act_articles: list[dict]
+# Model for search result (chunk)
+class SearchResult(BaseModel):  # Chunk found in vector DB
+    content: str # Text content of the chunk
+    source: str # Source document of the chunk
+    score: float # Similarity score with the query
+
+# Model for requirement report 
+class RequirementReport(BaseModel): # Report for each requirement
+    Mapped_ID: str # Requirement ID
+    Requirement_Name: str # Requirement Name
+    Score: int # Score from 1 to 5
+    Auditor_Notes: str # Notes from LLM evaluation
+    
 
 # Model for audit response
-class AuditResponse(BaseModel):
-    overall_compliance_score: float
-    requirements: list[RequirementReport]
-    recommendations: str
+class AuditResponse(BaseModel): 
+    requirements: list[RequirementReport] # List of requirement reports
 
-@app.get("/")
-def root():
-    return {"status": "ok", "service": "LegalAIze Audit Tool", "rag_ready": vector_db is not None}
+@app.get("/health") # Health check endpoint
+def health(): 
+    rag_ready = all([
+        vector_db is not None,
+        embedding_model is not None,
+        mapping is not None,
+        llm is not None,
+        bool(requirement_embeddings),
+        bool(requirement_chunks),
+    ])
+    return {"status": "healthy", "rag_ready": rag_ready}
+
 
 @app.post("/audit", response_model=AuditResponse)
-async def audit(document_text: str = Body(..., embed=True)):
+async def audit(document_text: str = Body(..., embed=True)): # Audit endpoint
     """
-    Verifica la conformità di un testo rispetto alle normative indicizzate.
+    Produce an audit report for the given document text.
+    Takes the document text as input and returns the audit report.
     """
     if vector_db is None or embedding_model is None or mapping is None or llm is None:
         raise HTTPException(status_code=503, detail="RAG system not initialized")
     
     try:
-        requirements_reports = []
-        all_scores = []
+        requirements_reports = [] # To store reports for each requirement
+        all_scores = [] # To store all compliance scores
         
-        for req_name, req_data in mapping.items():
-            # Crea embedding del testo del requisito
-            req_text = req_data.get("iso_control_text", "") + " " + " ".join([art.get("text", "") for art in req_data.get("ai_act_articles", [])])
-            req_vector = embedding_model.encode(req_text).tolist()
+        limited_mapping = dict(list(mapping.items())[:3]) # Limit to first 3 requirements for performance
+        
+        for req_name, req_data in limited_mapping.items(): # For each requirement
             
-            # Cerca riferimenti normativi per questo requisito
-            search_result = []
-            if hasattr(vector_db, "query_points"):
-                response = vector_db.query_points(
-                    collection_name="legal_docs",
-                    query=req_vector,
-                    limit=3  # Limita per requisito
+            # Use precomputed requirement vector (kept for consistency, if needed)
+            req_vector = requirement_embeddings.get(req_name)
+
+            # Build full requirement text
+            req_text = req_data.get("iso_control_text", "") + " " + " ".join([art.get("text", "") for art in req_data.get("ai_act_articles", [])]) # Full requirement text
+
+            # Use precomputed normative chunks for this requirement
+            pre_chunks = requirement_chunks.get(req_name, [])
+            findings = [
+                SearchResult(
+                    content=ch.get("content", "Testo non disponibile"),
+                    source=ch.get("source", "Unknown"),
+                    score=float(ch.get("score", 0.0)),
                 )
-                search_result = response.points
-            elif hasattr(vector_db, "search"):
-                search_result = vector_db.search(
-                    collection_name="legal_docs",
-                    query_vector=req_vector,
-                    limit=3
-                )
-            elif hasattr(vector_db, "query"):
-                try:
-                    search_result = vector_db.query(
-                        collection_name="legal_docs",
-                        query_vector=req_vector,
-                        limit=3
-                    )
-                except:
-                    search_result = vector_db.query(
-                        collection_name="legal_docs",
-                        query_text=req_text,
-                        limit=3
-                    )
+                for ch in pre_chunks
+            ]
+            chunks_text = [f.content for f in findings]
             
-            findings = []
-            chunks_text = []
-            for hit in search_result:
-                payload = getattr(hit, "payload", {}) if hasattr(hit, "payload") else hit.get("payload", {})
-                score = getattr(hit, "score", 0) if hasattr(hit, "score") else hit.get("score", 0)
-                
-                content = payload.get("text", payload.get("content", "Testo non disponibile"))
-                source = payload.get("source", "Unknown")
-                
-                findings.append(SearchResult(
-                    content=content,
-                    source=source,
-                    score=score
-                ))
-                chunks_text.append(content)
-            
-            # Usa LLM per valutare la conformità
+            # Use LLM to evaluate compliance
+            chunks_joined = "\n".join(chunks_text) # Create a single string with all chunk texts
             prompt = f"""
-            Valuta la conformità del seguente documento rispetto al requisito specificato.
+You are an expert auditor in regulatory compliance for AI systems, specialized in AI Act and ISO/IEC 42001 standards.
+
+Evaluate the compliance of the provided document against the specified requirement. Use the extracted regulatory references as additional context to interpret the requirement.
+
+Document to evaluate:
+{document_text}
+
+Requirement to verify:
+{req_text}
+
+Relevant regulatory references (extracted from legal corpus):
+{chunks_joined}
+
+Instructions:
+- Score: An integer from 1 to 5 (1 = minimal compliance, 5 = maximum compliance).
+- Auditor Notes: A concise note (max 100 words) explaining the evaluation, citing evidence from the document and references.
+
+Respond exclusively in valid JSON format:
+{{
+  "score": integer from 1 to 5,
+  "auditor_notes": "note text"
+}}
+"""
             
-            Documento da valutare:
-            {document_text}
+            llm_response = llm.invoke(prompt).content.strip() # Get LLM response
             
-            Requisito:
-            {req_text}
-            
-            Riferimenti normativi rilevanti (chunk estratti):
-            {"\n".join(chunks_text)}
-            
-            Fornisci un punteggio di conformità da 0.0 a 1.0 (dove 1.0 significa pienamente conforme) e una breve spiegazione.
-            Formato risposta: Punteggio: [numero], Spiegazione: [testo]
-            """
-            
-            llm_response = llm.invoke(prompt).content.strip()
-            
-            # Estrai punteggio dalla risposta (assumi formato "Punteggio: 0.8, Spiegazione: ...")
+            # Parse LLM response
             try:
-                score_part = llm_response.split("Punteggio:")[1].split(",")[0].strip()
-                req_score = float(score_part)
+                response_json = json.loads(llm_response) # Parse JSON response
+                score_1_5 = int(response_json["score"]) # Score from 1 to 5
+                auditor_notes = response_json["auditor_notes"] # Auditor notes
+                req_score = (score_1_5 - 1) / 4.0  # Convert to 0-1 for overall (if needed)
             except:
-                req_score = 0.0  # Fallback
-            
+                score_1_5 = 0
+                auditor_notes = "Error in LLM analysis"
+                req_score = 0.0
             all_scores.append(req_score)
             
             requirements_reports.append(RequirementReport(
-                id=req_data["id"],
-                name=req_name,
-                compliance_score=round(req_score, 2),
-                findings=findings,
-                iso_ref=req_data["iso_ref"],
-                ai_act_articles=req_data["ai_act_articles"]
+                Mapped_ID=req_data["id"],
+                Requirement_Name=req_name,
+                Score=score_1_5 if score_1_5 != 0 else 'N/A',
+                Auditor_Notes=auditor_notes
             ))
         
-        # Punteggio complessivo
-        overall_score = sum(all_scores) / len(all_scores) if all_scores else 0
-        compliance_level = "HIGH" if overall_score > 0.7 else "MEDIUM" if overall_score > 0.5 else "LOW"
-        
+        # Return the report as a list of requirements
         return AuditResponse(
-            overall_compliance_score=round(overall_score, 2),
-            requirements=requirements_reports,
-            recommendations=f"Analisi completata. Livello di corrispondenza normativa: {compliance_level}. Verificare i dettagli per ciascun requisito."
+            requirements=requirements_reports
         )
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Audit failed: {str(e)}")
 
-@app.get("/health")
-def health():
-    return {"status": "healthy", "rag_ready": vector_db is not None}
+
 
 @app.get("/model_info")
 def model_info():
-    """Informazioni sul modello di embedding"""
-    if embedding_model is None:
-        return {"error": "Embedding model not loaded"}
-    return {
-        "type": type(embedding_model).__name__,
-        "model_name": getattr(embedding_model, 'model_name', str(embedding_model))
+    """Comprehensive information about the system components"""
+    info = {
+        "embedding_model": {
+            "loaded": embedding_model is not None,
+            "type": type(embedding_model).__name__ if embedding_model else None,
+            "model_name": getattr(embedding_model, 'model_name', None) if embedding_model else None,
+            "max_seq_length": getattr(embedding_model, 'max_seq_length', None) if embedding_model else None,
+        },
+        "vector_db": {
+            "loaded": vector_db is not None,
+            "type": type(vector_db).__name__ if vector_db else None,
+            "path": getattr(vector_db, '_location', None) if vector_db else None,
+        },
+        "llm": {
+            "loaded": llm is not None,
+            "model_name": getattr(llm, 'model_name', None) if llm else None,
+            "provider": "OpenAI" if llm else None,
+        },
+        "mapping": {
+            "loaded": mapping is not None,
+            "num_requirements": len(mapping) if mapping else 0,
+        },
+        "requirement_embeddings": {
+            "precomputed": bool(requirement_embeddings),
+            "num_embeddings": len(requirement_embeddings),
+        }
     }
+    return info
  
