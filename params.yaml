@@ -12,3 +12,7 @@ vectorization:
   qdrant_host: "localhost"
   qdrant_port: 6333
   vector_index_path: "data/processed/vector_index"
+
+precompute:
+  top_k: 3  # number of chunks per requirement in precompute_rag
+  chunks_output: "data/processed/requirement_chunks.json"

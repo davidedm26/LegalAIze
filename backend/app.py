@@ -41,11 +41,10 @@ embedding_model = None # Renamed to avoid conflicts with the module
 vector_db = None  # Renamed to avoid conflicts with the module
 mapping = None  # Mapping of requirements
 llm = None  # LLM for evaluation
-requirement_embeddings = {}  # Pre-computed embeddings for requirements
 requirement_chunks = {}  # Pre-computed relevant chunks per requirement
 
 def init_rag(): # Initialize RAG components
-    global embedding_model, vector_db, mapping, llm, requirement_embeddings, requirement_chunks
+    global embedding_model, vector_db, mapping, llm, requirement_chunks
     try:
         model_name = vect_params.get('model_name', "all-MiniLM-L6-v2") # Model name
         embedding_model = SentenceTransformer(model_name) # Load embedding model
@@ -68,19 +67,6 @@ def init_rag(): # Initialize RAG components
             print(f"✓ Mapping loaded with {len(mapping)} requirements")
         else:
             print("⚠ Mapping file not found!")
-        # Load pre-computed requirement embeddings
-        embeddings_path_candidates = [
-            os.path.join("..", "data", "processed", "requirement_embeddings.json"),
-            os.path.join("data", "processed", "requirement_embeddings.json"),
-        ]
-        embeddings_path = next((p for p in embeddings_path_candidates if os.path.exists(p)), None)
-        if embeddings_path:
-            with open(embeddings_path, "r", encoding="utf-8") as f:
-                requirement_embeddings = json.load(f)
-            print(f"✓ Requirement embeddings loaded from {embeddings_path}")
-        else:
-            print("⚠ Requirement embeddings file not found! Run DVC stage 'precompute_rag'.")
-
         # Load pre-computed requirement chunks
         chunks_path_candidates = [
             os.path.join("..", "data", "processed", "requirement_chunks.json"),
@@ -127,7 +113,6 @@ def health():
         embedding_model is not None,
         mapping is not None,
         llm is not None,
-        bool(requirement_embeddings),
         bool(requirement_chunks),
     ])
     return {"status": "healthy", "rag_ready": rag_ready}
@@ -150,9 +135,6 @@ async def audit(document_text: str = Body(..., embed=True)): # Audit endpoint
         
         for req_name, req_data in limited_mapping.items(): # For each requirement
             
-            # Use precomputed requirement vector (kept for consistency, if needed)
-            req_vector = requirement_embeddings.get(req_name)
-
             # Build full requirement text
             req_text = req_data.get("iso_control_text", "") + " " + " ".join([art.get("text", "") for art in req_data.get("ai_act_articles", [])]) # Full requirement text
 
@@ -249,10 +231,6 @@ def model_info():
         "mapping": {
             "loaded": mapping is not None,
             "num_requirements": len(mapping) if mapping else 0,
-        },
-        "requirement_embeddings": {
-            "precomputed": bool(requirement_embeddings),
-            "num_embeddings": len(requirement_embeddings),
         }
     }
     return info

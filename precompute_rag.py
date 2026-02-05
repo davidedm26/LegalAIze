@@ -28,6 +28,7 @@ def build_requirement_text(req_data: Dict[str, Any]) -> str:
 def main() -> None:
     params = load_params()
     vect_params = params["vectorization"]
+    precompute_params = params.get("precompute", {})
     ingest_params = params["ingestion"]
 
     processed_dir = ingest_params["processed_data_dir"]  # e.g. data/processed
@@ -54,10 +55,9 @@ def main() -> None:
     client = QdrantClient(path=vector_index_path)
     collection_name = vect_params["collection_name"]
 
-    top_k = int(vect_params.get("top_k", 3))
+    top_k = int(precompute_params.get("top_k", 3))
     print(f"Using collection '{collection_name}' with top_k={top_k} per requirement")
 
-    requirement_embeddings: Dict[str, List[float]] = {}
     requirement_chunks: Dict[str, List[Dict[str, Any]]] = {}
 
     for req_name, req_data in mapping.items():
@@ -67,7 +67,6 @@ def main() -> None:
         # Build full requirement text and encode
         req_text = build_requirement_text(req_data)
         req_vector = model.encode(req_text).tolist()
-        requirement_embeddings[req_name] = req_vector
 
         # Query Qdrant for normative chunks
         response = client.query_points(
@@ -102,14 +101,10 @@ def main() -> None:
 
         requirement_chunks[req_name] = chunks_for_req
 
-    # Save embeddings
-    embeddings_path = os.path.join(processed_dir, "requirement_embeddings.json")
-    with open(embeddings_path, "w", encoding="utf-8") as f:
-        json.dump(requirement_embeddings, f)
-    print(f"Saved requirement embeddings to {embeddings_path}")
-
     # Save chunks
-    chunks_path = os.path.join(processed_dir, "requirement_chunks.json")
+    chunks_path = precompute_params.get(
+        "chunks_output", os.path.join(processed_dir, "requirement_chunks.json")
+    )
     with open(chunks_path, "w", encoding="utf-8") as f:
         json.dump(requirement_chunks, f)
     print(f"Saved requirement chunks to {chunks_path}")

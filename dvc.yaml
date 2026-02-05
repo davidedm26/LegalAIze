@@ -33,5 +33,4 @@ stages:
       - vectorization
       - ingestion
     outs:
-      - data/processed/requirement_embeddings.json
       - data/processed/requirement_chunks.json
