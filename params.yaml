@@ -1,7 +1,7 @@
 # Parameters for LegalAIze Project (Audit & Search)
 
 ingestion:
-  chunk_size: 4000
+  chunk_size: 4005
   chunk_overlap: 500
   raw_data_dir: "data"
   processed_data_dir: "data/processed"
