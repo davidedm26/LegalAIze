@@ -16,7 +16,6 @@ mlartifacts/
 # DVC
 /data/*.csv
 /data/*.pdf
-/data/ground_truth/*
 
 /models/*.pkl
 .dvc/cache
@@ -40,3 +39,5 @@ Thumbs.db
 
 # Token
 dagshub_token.txt
+
+backend/debug_responses/
