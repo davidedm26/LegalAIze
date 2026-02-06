@@ -112,8 +112,8 @@ stages:
       size: 1219
     - path: precompute_rag.py
       hash: md5
-      md5: 1d536e836d877e6146bfe48a42da0303
-      size: 4261
+      md5: 3f180b328769e28463de52ecfc462072
+      size: 4507
     params:
       params.yaml:
         ingestion:
@@ -130,5 +130,5 @@ stages:
     outs:
     - path: data/processed/requirement_chunks.json
       hash: md5
-      md5: 0186c9aaec3ae0ddefe1692f7d0f45fc
-      size: 187084
+      md5: 6d79b7dc3da114278f2bad9e630ebdb2
+      size: 188715
