@@ -51,31 +51,31 @@ stages:
       size: 3447
     - path: params.yaml
       hash: md5
-      md5: c0f84a174e2f4e5202125b840ddb1311
-      size: 1436
+      md5: 905a0a299cfdeac21ced9beb26c717ae
+      size: 1609
     params:
       params.yaml:
         ingestion:
-          chunk_size: 4000
-          chunk_overlap: 500
+          chunk_size: 1000
+          chunk_overlap: 150
           raw_data_dir: data
           processed_data_dir: data/processed
     outs:
     - path: data/processed/chunks.json
       hash: md5
-      md5: 79973c7829bfeb716d2115ed8bdc4c5e
-      size: 815917
+      md5: 30dbdcf19f8e7e4d30d649432a56b451
+      size: 919736
   vectorize:
     cmd: python vectorize_data.py
     deps:
     - path: data/processed/chunks.json
       hash: md5
-      md5: 79973c7829bfeb716d2115ed8bdc4c5e
-      size: 815917
+      md5: 30dbdcf19f8e7e4d30d649432a56b451
+      size: 919736
     - path: params.yaml
       hash: md5
-      md5: c0f84a174e2f4e5202125b840ddb1311
-      size: 1436
+      md5: 905a0a299cfdeac21ced9beb26c717ae
+      size: 1609
     - path: vectorize_data.py
       hash: md5
       md5: af01fbe91f97d2b288ba81fa052acfb8
@@ -91,8 +91,8 @@ stages:
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: 09dc35005adece46eb1c13aa60d026d5.dir
-      size: 2142766
+      md5: 8f18fb81eb9bac57752a8a53d1755b29.dir
+      size: 5136943
       nfiles: 4
   precompute_rag:
     cmd: python precompute_rag.py
@@ -103,13 +103,13 @@ stages:
       size: 13552
     - path: data/processed/vector_index
       hash: md5
-      md5: 09dc35005adece46eb1c13aa60d026d5.dir
-      size: 2142766
+      md5: 8f18fb81eb9bac57752a8a53d1755b29.dir
+      size: 5136943
       nfiles: 4
     - path: params.yaml
       hash: md5
-      md5: c0f84a174e2f4e5202125b840ddb1311
-      size: 1436
+      md5: 905a0a299cfdeac21ced9beb26c717ae
+      size: 1609
     - path: precompute_rag.py
       hash: md5
       md5: af7142c520a7853e170df3f38f029525
@@ -117,8 +117,8 @@ stages:
     params:
       params.yaml:
         ingestion:
-          chunk_size: 4000
-          chunk_overlap: 500
+          chunk_size: 1000
+          chunk_overlap: 150
           raw_data_dir: data
           processed_data_dir: data/processed
         vectorization:
@@ -130,8 +130,8 @@ stages:
     outs:
     - path: data/processed/requirement_chunks.json
       hash: md5
-      md5: 6d79b7dc3da114278f2bad9e630ebdb2
-      size: 188715
+      md5: 7002ab79e690834c180b59e899d41bd6
+      size: 100985
   evaluate_rag:
     cmd: python evaluate_rag.py
     deps:

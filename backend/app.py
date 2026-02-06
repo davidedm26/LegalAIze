@@ -173,7 +173,7 @@ Relevant regulatory references (extracted from legal corpus):
 Instructions:
 - Score: An integer from 0 to 5 (0 = no compliance, 5 = maximum compliance).
 - Auditor Notes: A concise note (max 100 words) explaining the evaluation, citing evidence from the document and references.
-
+- If you cannot determine a score, return N/A for the score and explain in the notes.
 Respond exclusively in valid JSON format:
 {{
     "score": integer from 0 to 5,
@@ -185,20 +185,23 @@ Respond exclusively in valid JSON format:
             
             # Parse LLM response
             try:
-                response_json = json.loads(llm_response) # Parse JSON response
-                score_0_5 = int(response_json["score"]) # Score from 0 to 5
-                auditor_notes = response_json["auditor_notes"] # Auditor notes
-                req_score = score_0_5 / 5.0  # Convert to 0-1 for overall (if needed)
+                # Remove markdown code blocks if present
+                cleaned_response = llm_response.replace("```json", "").replace("```", "").strip()
+                response_json = json.loads(cleaned_response)
+                    
+                score_0_5 = int(response_json["score"])
+                auditor_notes = response_json["auditor_notes"]
+                req_score = score_0_5 / 5.0
             except:
                 score_0_5 = 0
-                auditor_notes = "Error in LLM analysis"
+                auditor_notes = "LLM response parsing failed. Response was: " + llm_response
                 req_score = 0.0
             all_scores.append(req_score)
             
             requirements_reports.append(RequirementReport(
                 Mapped_ID=req_data["id"],
                 Requirement_Name=req_name,
-                Score=score_0_5 if score_0_5 != 0 else 'N/A',
+                Score=score_0_5 if isinstance(score_0_5, int) else "N/A",
                 Auditor_Notes=auditor_notes
             ))
         
