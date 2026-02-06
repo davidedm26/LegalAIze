@@ -99,8 +99,8 @@ stages:
     deps:
     - path: data/mapping.json
       hash: md5
-      md5: 4c63c54de8ec8b0880eca0b5fb87bccf
-      size: 13551
+      md5: 69351bcd3ca7db431ca50d43bd2a6820
+      size: 13552
     - path: data/processed/vector_index
       hash: md5
       md5: 09dc35005adece46eb1c13aa60d026d5.dir
@@ -157,20 +157,18 @@ stages:
       size: 188715
     - path: evaluate_rag.py
       hash: md5
-      md5: bd9be544a70b36700770f0e379f735da
-      size: 7459
+      md5: 76f368b70b63e4b134edcb655ac30eab
+      size: 8840
     - path: params.yaml
       hash: md5
-      md5: d93e10cfd933e5ff36707bf4e3fe352e
-      size: 1217
+      md5: c0f84a174e2f4e5202125b840ddb1311
+      size: 1436
     params:
       params.yaml:
         evaluation:
-          backend_url: http://localhost:8000
           random_seed: 42
           llm_model: gpt-4o-mini
           llm_temperature: 0.1
-          mlflow_tracking_uri:
           mlflow_experiment: rag_evaluation
           metrics_output: metrics/rag_eval.json
           ground_truth:
@@ -182,8 +180,16 @@ stages:
             document_path: 
               data/ground_truth/raw_data/Evaluation2/documentation.txt
             report_path: data/ground_truth/raw_data/Evaluation2/report.CSV
+          - name: Evaluation3
+            document_path: 
+              data/ground_truth/raw_data/Evaluation3/documentation.txt
+            report_path: data/ground_truth/raw_data/Evaluation3/report.CSV
+          - name: Evaluation4
+            document_path: 
+              data/ground_truth/raw_data/Evaluation4/documentation.txt
+            report_path: data/ground_truth/raw_data/Evaluation4/report.CSV
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: 1b7cf38af115b6ea12566281ef8fdf13
-      size: 312
+      md5: acf496dca3e524634f518cf153815fa9
+      size: 575
