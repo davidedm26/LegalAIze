@@ -51,8 +51,8 @@ stages:
       size: 3447
     - path: params.yaml
       hash: md5
-      md5: f815805619020f940d526b419654304f
-      size: 1219
+      md5: c0f84a174e2f4e5202125b840ddb1311
+      size: 1436
     params:
       params.yaml:
         ingestion:
@@ -74,8 +74,8 @@ stages:
       size: 815917
     - path: params.yaml
       hash: md5
-      md5: f815805619020f940d526b419654304f
-      size: 1219
+      md5: c0f84a174e2f4e5202125b840ddb1311
+      size: 1436
     - path: vectorize_data.py
       hash: md5
       md5: af01fbe91f97d2b288ba81fa052acfb8
@@ -91,7 +91,7 @@ stages:
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: 913ea22666dc1dd7340782612008c46f.dir
+      md5: 09dc35005adece46eb1c13aa60d026d5.dir
       size: 2142766
       nfiles: 4
   precompute_rag:
@@ -103,17 +103,17 @@ stages:
       size: 13551
     - path: data/processed/vector_index
       hash: md5
-      md5: 913ea22666dc1dd7340782612008c46f.dir
+      md5: 09dc35005adece46eb1c13aa60d026d5.dir
       size: 2142766
       nfiles: 4
     - path: params.yaml
       hash: md5
-      md5: f815805619020f940d526b419654304f
-      size: 1219
+      md5: c0f84a174e2f4e5202125b840ddb1311
+      size: 1436
     - path: precompute_rag.py
       hash: md5
-      md5: 3f180b328769e28463de52ecfc462072
-      size: 4507
+      md5: af7142c520a7853e170df3f38f029525
+      size: 4701
     params:
       params.yaml:
         ingestion:
@@ -132,3 +132,58 @@ stages:
       hash: md5
       md5: 6d79b7dc3da114278f2bad9e630ebdb2
       size: 188715
+  evaluate_rag:
+    cmd: python evaluate_rag.py
+    deps:
+    - path: data/ground_truth/raw_data/Evaluation1/documentation.txt
+      hash: md5
+      md5: cb7a14d8bd9987a886e7e959fffe4bfc
+      size: 5239
+    - path: data/ground_truth/raw_data/Evaluation1/report.CSV
+      hash: md5
+      md5: 47bb23530f6741de60825ed7c1a1029a
+      size: 2640
+    - path: data/ground_truth/raw_data/Evaluation2/documentation.txt
+      hash: md5
+      md5: 700d11079b99b2c0c973fb804face8a1
+      size: 3136
+    - path: data/ground_truth/raw_data/Evaluation2/report.CSV
+      hash: md5
+      md5: 6af16851b9a9a7293699a90ce8879ceb
+      size: 2655
+    - path: data/processed/requirement_chunks.json
+      hash: md5
+      md5: 6d79b7dc3da114278f2bad9e630ebdb2
+      size: 188715
+    - path: evaluate_rag.py
+      hash: md5
+      md5: bd9be544a70b36700770f0e379f735da
+      size: 7459
+    - path: params.yaml
+      hash: md5
+      md5: d93e10cfd933e5ff36707bf4e3fe352e
+      size: 1217
+    params:
+      params.yaml:
+        evaluation:
+          backend_url: http://localhost:8000
+          random_seed: 42
+          llm_model: gpt-4o-mini
+          llm_temperature: 0.1
+          mlflow_tracking_uri:
+          mlflow_experiment: rag_evaluation
+          metrics_output: metrics/rag_eval.json
+          ground_truth:
+          - name: Evaluation1
+            document_path: 
+              data/ground_truth/raw_data/Evaluation1/documentation.txt
+            report_path: data/ground_truth/raw_data/Evaluation1/report.CSV
+          - name: Evaluation2
+            document_path: 
+              data/ground_truth/raw_data/Evaluation2/documentation.txt
+            report_path: data/ground_truth/raw_data/Evaluation2/report.CSV
+    outs:
+    - path: metrics/rag_eval.json
+      hash: md5
+      md5: 1b7cf38af115b6ea12566281ef8fdf13
+      size: 312

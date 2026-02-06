@@ -8,3 +8,4 @@
 .lock
 /vector_index/
 /requirement_chunks.json
+/vector_index

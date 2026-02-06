@@ -18,11 +18,9 @@ precompute:
   chunks_output: "data/processed/requirement_chunks.json"
 
 evaluation:
-  backend_url: "http://localhost:8000"  # FastAPI audit endpoint base URL
   random_seed: 42
-  llm_model: "gpt-3.5-turbo"  # documented for reproducibility
+  llm_model: "gpt-4o-mini"  # documented for reproducibility
   llm_temperature: 0.1
-  mlflow_tracking_uri: # use the MLFLOW_TRACKING_URI from .env
   mlflow_experiment: "rag_evaluation"
   metrics_output: "metrics/rag_eval.json"
   ground_truth:
@@ -32,3 +30,9 @@ evaluation:
     - name: "Evaluation2"
       document_path: "data/ground_truth/raw_data/Evaluation2/documentation.txt"
       report_path: "data/ground_truth/raw_data/Evaluation2/report.CSV"
+    - name: "Evaluation3"
+      document_path: "data/ground_truth/raw_data/Evaluation3/documentation.txt"
+      report_path: "data/ground_truth/raw_data/Evaluation3/report.CSV"
+    - name: "Evaluation4"
+      document_path: "data/ground_truth/raw_data/Evaluation4/documentation.txt"
+      report_path: "data/ground_truth/raw_data/Evaluation4/report.CSV"

@@ -1,6 +1,7 @@
 import os
 import yaml
 import json
+from typing import Union
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -35,6 +36,7 @@ def load_params():
 
 params = load_params() # Load parameters
 vect_params = params.get('vectorization', {}) # Vectorization parameters
+eval_params = params.get('evaluation', {}) # Evaluation / LLM parameters
 
 # Global variables for RAG components
 embedding_model = None # Renamed to avoid conflicts with the module
@@ -80,9 +82,11 @@ def init_rag(): # Initialize RAG components
         else:
             print("⚠ Requirement chunks file not found! Run DVC stage 'precompute_rag'.")
         
-        # Initialize LLM
-        llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.1, request_timeout=30)  # Aggiunto timeout
-        print("✓ LLM Initialized")
+        # Initialize LLM using configuration parameters
+        llm_model_name = eval_params.get("llm_model")
+        llm_temperature = float(eval_params.get("llm_temperature"))
+        llm = ChatOpenAI(model=llm_model_name, temperature=llm_temperature, request_timeout=30)
+        print(f"✓ LLM Initialized ({llm_model_name}, temp={llm_temperature})")
     except Exception as e:
         print(f"⚠ Init Error: {e}")
 
@@ -98,7 +102,7 @@ class SearchResult(BaseModel):  # Chunk found in vector DB
 class RequirementReport(BaseModel): # Report for each requirement
     Mapped_ID: str # Requirement ID
     Requirement_Name: str # Requirement Name
-    Score: int # Score from 1 to 5
+    Score: Union[int, str] # Score from 0 to 5 or 'N/A'
     Auditor_Notes: str # Notes from LLM evaluation
     
 
@@ -131,7 +135,7 @@ async def audit(document_text: str = Body(..., embed=True)): # Audit endpoint
         requirements_reports = [] # To store reports for each requirement
         all_scores = [] # To store all compliance scores
         
-        limited_mapping = dict(list(mapping.items())[:3]) # Limit to first 3 requirements for performance
+        limited_mapping = dict(list(mapping.items())[:20]) # Limit to first 20 requirements for performance
         
         for req_name, req_data in limited_mapping.items(): # For each requirement
             
@@ -167,12 +171,12 @@ Relevant regulatory references (extracted from legal corpus):
 {chunks_joined}
 
 Instructions:
-- Score: An integer from 1 to 5 (1 = minimal compliance, 5 = maximum compliance).
+- Score: An integer from 0 to 5 (0 = no compliance, 5 = maximum compliance).
 - Auditor Notes: A concise note (max 100 words) explaining the evaluation, citing evidence from the document and references.
 
 Respond exclusively in valid JSON format:
 {{
-  "score": integer from 1 to 5,
+    "score": integer from 0 to 5,
   "auditor_notes": "note text"
 }}
 """
@@ -182,11 +186,11 @@ Respond exclusively in valid JSON format:
             # Parse LLM response
             try:
                 response_json = json.loads(llm_response) # Parse JSON response
-                score_1_5 = int(response_json["score"]) # Score from 1 to 5
+                score_0_5 = int(response_json["score"]) # Score from 0 to 5
                 auditor_notes = response_json["auditor_notes"] # Auditor notes
-                req_score = (score_1_5 - 1) / 4.0  # Convert to 0-1 for overall (if needed)
+                req_score = score_0_5 / 5.0  # Convert to 0-1 for overall (if needed)
             except:
-                score_1_5 = 0
+                score_0_5 = 0
                 auditor_notes = "Error in LLM analysis"
                 req_score = 0.0
             all_scores.append(req_score)
@@ -194,7 +198,7 @@ Respond exclusively in valid JSON format:
             requirements_reports.append(RequirementReport(
                 Mapped_ID=req_data["id"],
                 Requirement_Name=req_name,
-                Score=score_1_5 if score_1_5 != 0 else 'N/A',
+                Score=score_0_5 if score_0_5 != 0 else 'N/A',
                 Auditor_Notes=auditor_notes
             ))
         
