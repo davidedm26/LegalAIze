@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - develop
-      - feat/**
+      - feat/** # Added for testing, to be removed afterwards
 
 permissions:
   contents: read
@@ -42,6 +42,10 @@ jobs:
           pip install -r requirements.txt
           pip install dvc[http]
           pip install mlflow
+
+      - name: Clean Docker cache
+        run: |
+          docker system prune -af || true
 
       - name: Build backend image
         run: |
