@@ -1,0 +1,148 @@
+name: Develop Merge Pipeline
+
+on:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  build-train:
+    name: Build Containers & Run DVC
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install dvc[http]
+          pip install mlflow
+
+      - name: Configure DVC remote
+        env:
+          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          dvc remote list | grep -q '^origin' || dvc remote add -d origin https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/${{ github.event.repository.name }}.dvc
+          dvc remote default origin
+          dvc remote modify origin --local auth basic
+          dvc remote modify origin --local user ${{ secrets.DAGSHUB_USERNAME }}
+          dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
+
+      - name: Pull data from DVC
+        run: |
+          dvc pull
+        continue-on-error: true
+
+      - name: Build backend image
+        run: |
+          docker build -t legalaize-backend:${{ github.sha }} ./backend
+
+      - name: Build frontend image
+        run: |
+          docker build -t legalaize-frontend:${{ github.sha }} ./frontend
+
+      - name: Smoke test backend container
+        run: |
+          docker run -d --name backend-smoke -p 8000:8000 legalaize-backend:${{ github.sha }}
+          for i in {1..10}; do
+            if curl -fsS http://127.0.0.1:8000/health > /dev/null; then
+              echo "Backend health endpoint responded"
+              docker stop backend-smoke >/dev/null
+              docker rm backend-smoke >/dev/null
+              exit 0
+            fi
+            echo "Waiting for backend container..."
+            sleep 3
+          done
+          echo "Backend container smoke test failed"
+          docker logs backend-smoke || true
+          docker stop backend-smoke || true
+          docker rm backend-smoke || true
+          exit 1
+
+      - name: Smoke test frontend container
+        run: |
+          docker run -d --name frontend-smoke -p 8501:8501 legalaize-frontend:${{ github.sha }}
+          for i in {1..10}; do
+            if curl -fsS http://127.0.0.1:8501 > /dev/null; then
+              echo "Frontend responded"
+              docker stop frontend-smoke >/dev/null
+              docker rm frontend-smoke >/dev/null
+              exit 0
+            fi
+            echo "Waiting for frontend container..."
+            sleep 3
+          done
+          echo "Frontend container smoke test failed"
+          docker logs frontend-smoke || true
+          docker stop frontend-smoke || true
+          docker rm frontend-smoke || true
+          exit 1
+
+      - name: Run DVC pipeline (logs to MLflow)
+        env:
+          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+          MLFLOW_TRACKING_URI: https://dagshub.com/${{ github.repository }}.mlflow
+        run: |
+          dvc repro
+
+      - name: Push artifacts to DVC
+        run: |
+          dvc push
+        continue-on-error: true
+
+      - name: Commit DVC metadata
+        env:
+          GIT_AUTHOR_NAME: github-actions
+          GIT_AUTHOR_EMAIL: actions@github.com
+        run: |
+          git config --local user.name "${GIT_AUTHOR_NAME}"
+          git config --local user.email "${GIT_AUTHOR_EMAIL}"
+          git add dvc.lock .dvc/config
+          git commit -m "Update DVC artifacts" || echo "No DVC changes to commit"
+          git push
+
+      - name: Show latest MLflow metrics
+        env:
+          MLFLOW_TRACKING_URI: https://dagshub.com/${{ github.repository }}.mlflow
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import mlflow
+          runs = mlflow.search_runs(max_results=1, order_by=["start_time DESC"])
+          if runs.empty:
+              print("No MLflow runs found")
+          else:
+              row = runs.iloc[0]
+              print(f"Latest run: {row.run_id} (status={row.status})")
+              for col in runs.columns:
+                  if col.startswith("metrics."):
+                      print(f"{col}: {row[col]}")
+          PY
