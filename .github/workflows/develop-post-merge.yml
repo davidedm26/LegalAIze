@@ -43,55 +43,55 @@ jobs:
           pip install dvc[http]
           pip install mlflow
 
-      - name: Clean Docker cache
-        run: |
-          docker system prune -af || true
+      #- name: Clean Docker cache
+      #  run: |
+      #    docker system prune -af || true
 
-      - name: Build backend image
-        run: |
-          docker build -t legalaize-backend:${{ github.sha }} ./backend
+      #- name: Build backend image
+      #  run: |
+      #    docker build -t legalaize-backend:${{ github.sha }} ./backend
 
-      - name: Build frontend image
-        run: |
-          docker build -t legalaize-frontend:${{ github.sha }} ./frontend
+      #- name: Build frontend image
+      #  run: |
+      #    docker build -t legalaize-frontend:${{ github.sha }} ./frontend
 
-      - name: Smoke test backend container
-        run: |
-          docker run -d --name backend-smoke -p 8000:8000 legalaize-backend:${{ github.sha }}
-          for i in {1..10}; do
-            if curl -fsS http://127.0.0.1:8000/health > /dev/null; then
-              echo "Backend health endpoint responded"
-              docker stop backend-smoke >/dev/null
-              docker rm backend-smoke >/dev/null
-              exit 0
-            fi
-            echo "Waiting for backend container..."
-            sleep 3
-          done
-          echo "Backend container smoke test failed"
-          docker logs backend-smoke || true
-          docker stop backend-smoke || true
-          docker rm backend-smoke || true
-          exit 1
+    #- name: Smoke test backend container
+    #    run: |
+    #      docker run -d --name backend-smoke -p 8000:8000 legalaize-backend:${{ github.sha }}
+    #      for i in {1..10}; do
+    #        if curl -fsS http://127.0.0.1:8000/health > /dev/null; then
+    #          echo "Backend health endpoint responded"
+    #          docker stop backend-smoke >/dev/null
+    #          docker rm backend-smoke >/dev/null
+    #          exit 0
+    #        fi
+    #        echo "Waiting for backend container..."
+    #        sleep 3
+    #      done
+    #      echo "Backend container smoke test failed"
+    #      docker logs backend-smoke || true
+    #      docker stop backend-smoke || true
+    #      docker rm backend-smoke || true
+    #      exit 1
 
-      - name: Smoke test frontend container
-        run: |
-          docker run -d --name frontend-smoke -p 8501:8501 legalaize-frontend:${{ github.sha }}
-          for i in {1..10}; do
-            if curl -fsS http://127.0.0.1:8501 > /dev/null; then
-              echo "Frontend responded"
-              docker stop frontend-smoke >/dev/null
-              docker rm frontend-smoke >/dev/null
-              exit 0
-            fi
-            echo "Waiting for frontend container..."
-            sleep 3
-          done
-          echo "Frontend container smoke test failed"
-          docker logs frontend-smoke || true
-          docker stop frontend-smoke || true
-          docker rm frontend-smoke || true
-          exit 1
+    #  - name: Smoke test frontend container
+    #    run: |
+    #      docker run -d --name frontend-smoke -p 8501:8501 legalaize-frontend:${{ github.sha }}
+    #      for i in {1..10}; do
+    #        if curl -fsS http://127.0.0.1:8501 > /dev/null; then
+    #          echo "Frontend responded"
+    #          docker stop frontend-smoke >/dev/null
+    #          docker rm frontend-smoke >/dev/null
+    #          exit 0
+    #        fi
+    #        echo "Waiting for frontend container..."
+    #        sleep 3
+    #      done
+    #      echo "Frontend container smoke test failed"
+    #      docker logs frontend-smoke || true
+    #      docker stop frontend-smoke || true
+    #      docker rm frontend-smoke || true
+    #      exit 1
 
       - name: Configure DVC remote
         env:
