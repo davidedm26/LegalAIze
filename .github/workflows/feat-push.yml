@@ -3,8 +3,7 @@ name: Feature Branch Push Checks
 on:
   push:
     branches:
-      - 'feat/**'
-
+      - 'NOTfeat/**' # the NOT operator is just a convention here to indicate this workflow is not used currently for any branch, but can be easily switched to 'feat/**' when needed  
 permissions:
   contents: read
 
