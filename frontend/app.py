@@ -1,128 +1,143 @@
-"""
-Streamlit Frontend - LegalAIze Audit UI
-"""
 import streamlit as st
-import requests
-import json
 
-# Configurazione
-BACKEND_URL = "http://backend:8000"  # Docker
-
+# ==============================================================================
+# CONFIGURAZIONE PAGINA
+# ==============================================================================
 st.set_page_config(
-    page_title="LegalAIze Audit Tool",
+    page_title="LegalAIze - AI Act & ISO Compliance",
     page_icon="⚖️",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
-st.title("⚖️ LegalAIze: Strumento di Audit Normativo")
-st.markdown("Verifica la compliance della tua documentazione rispetto a **AI Act**, **GDPR** e standard **ISO**.")
-st.markdown("---")
+# ==============================================================================
+# CSS CUSTOM
+# ==============================================================================
+st.markdown("""
+<style>
+    /* SPAZIO SUPERIORE */
+    .block-container { 
+        padding-top: 5rem; 
+        padding-bottom: 2rem; 
+    }
+    
+    /* Allineamento verticale elementi nelle colonne */
+    div[data-testid="stColumn"] {
+        display: flex;
+        align-items: center;
+    }
 
-# Sidebar
-with st.sidebar:
-    st.header("⚙️ Configurazione")
-    backend_url = st.text_input("Backend URL", BACKEND_URL)
-    st.markdown("---")
-    st.markdown("### Info Progetto")
-    st.markdown("- **Pipeline**: DVC")
-    st.markdown("- **Database**: Qdrant")
-    st.markdown("- **Modello**: all-MiniLM-L6-v2")
+    /* Stile del Titolo */
+    .hero-title-text {
+        font-family: 'Helvetica Neue', sans-serif;
+        font-weight: 800;
+        font-size: 3.5rem;
+        color: #1e3a8a;
+        margin: 0;
+        padding: 0;
+        line-height: 1.2;
+        white-space: nowrap; 
+    }
 
-# Check backend health
-try:
-    response = requests.get(f"{backend_url}/health", timeout=2)
-    if response.status_code == 200:
-        st.success("✅ Backend connesso")
-        health_data = response.json()
-        rag_status = "✅ Pronta" if health_data.get("rag_ready") else "❌ Non inizializzata"
-        st.metric("Ricerca Normativa", rag_status)
-    else:
-        st.error("❌ Backend non disponibile")
-except Exception as e:
-    st.error(f"❌ Errore connessione backend: {str(e)}")
+    /* Sottotitolo */
+    .hero-subtitle {
+        font-size: 1.2rem;
+        color: #4b5563;
+        font-weight: 400;
+        text-align: center;
+        margin-top: 10px;
+        margin-bottom: 40px;
+    }
+    
+    /* AUDIT CARD */
+    .audit-card {
+        background-color: white;
+        padding: 40px;
+        border-radius: 15px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        border: 1px solid #e5e7eb;
+        text-align: center;
+        transition: transform 0.2s;
+        margin-bottom: 20px;
+    }
+    .audit-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    }
+    .card-icon { font-size: 3rem; margin-bottom: 15px; }
+    .card-title { font-size: 1.5rem; font-weight: 700; color: #111827; margin-bottom: 10px; }
+    .card-text { font-size: 1rem; color: #6b7280; margin-bottom: 25px; }
 
-st.markdown("---")
+    /* FOOTER */
+    .footer {
+        text-align: center;
+        margin-top: 80px;
+        color: #9ca3af;
+        font-size: 0.8rem;
+        border-top: 1px solid #e5e7eb;
+        padding-top: 20px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Audit Section
-st.header("🔍 Avvia Audit Compliance")
+# ==============================================================================
+# HEADER (LOGO + TITOLO)
+# ==============================================================================
 
-# Scelta input
-input_mode = st.radio("Metodo di input:", ["Inserimento Testo", "Caricamento Documento (Simulato)"])
+# 1. GABBIA ESTERNA (Posizione generale)
+# Ho messo [1, 3, 1]. Il "3" centrale dà molto più spazio.
+# Se vuoi spostare tutto a DESTRA, aumenta il primo numero (es. [1.5, 3, 0.5])
+# Se vuoi spostare tutto a SINISTRA, diminuisci il primo numero (es. [0.5, 3, 1.5])
+col_spacer_L, col_center, col_spacer_R = st.columns([1, 3, 1]) # <--- MODIFICA QUI PER SPOSTARE TUTTO IL BLOCCO
 
-if input_mode == "Inserimento Testo":
-    doc_text = st.text_area("Incolla qui la descrizione del sistema o la documentazione tecnica:", height=200, placeholder="Esempio: Il sistema utilizza algoritmi di riconoscimento facciale per l'identificazione in tempo reale in spazi pubblici...")
-else:
-    uploaded_file = st.file_uploader("Carica specifica tecnica (PDF, TXT)", type=["pdf", "txt"])
-    doc_text = "Contenuto del file caricato..." if uploaded_file else ""
+with col_center:
+    # 2. GABBIA INTERNA (Spazio tra Logo e Testo)
+    # [1.2, 3] dà un po' più di spazio alla colonna del logo così non lo taglia
+    c_logo, c_text = st.columns([1.2, 3]) # <--- MODIFICA QUI SE IL TESTO E' TROPPO VICINO O LONTANO
+    
+    with c_logo:
+        # 3. DIMENSIONE LOGO
+        # Qui decidi quanto è grande l'immagine.
+        # Se aumenti questo numero, devi assicurarti che la colonna "c_logo" (punto 2) sia abbastanza larga.
+        st.image("assets/logo.png", width=120) # <--- MODIFICA QUI PER INGRANDIRE/RIMPICCIOLIRE
+        
+    with c_text:
+        st.markdown('<div class="hero-title-text">LegalAIze</div>', unsafe_allow_html=True)
 
-if st.button("🚀 Esegui Audit", type="primary"):
-    if not doc_text or doc_text == "Contenuto del file caricato...":
-        st.warning("Ehi, inserisci del testo per l'analisi!")
-    else:
-        try:
-            with st.spinner("Analisi della compliance in corso..."):
-                # Chiamata all'endpoint audit
-                payload = {"document_text": doc_text}
-                response = requests.post(
-                    f"{backend_url}/audit",
-                    json=payload,
-                    timeout=20
-                )
-            
-            if response.status_code == 200:
-                result = response.json()
-                
-                # Visualizzazione Risultati
-                col1, col2 = st.columns([1, 2])
-                
-                with col1:
-                    score = result["compliance_score"]
-                    st.metric("Compliance Score", f"{score*100:.1f}%")
-                    if score > 0.7:
-                        st.success("Altà conformità rilevata")
-                    elif score > 0.5:
-                        st.warning("Conformità parziale")
-                    else:
-                        st.error("Possibili criticità rilevate")
-                
-                with col2:
-                    st.subheader("💡 Raccomandazioni")
-                    st.info(result["recommendations"])
-                
-                st.markdown("---")
-                st.subheader("📄 Riferimenti Normativi Trovati")
-                
-                # Mostra findings aggregati dai requisiti
-                all_findings = []
-                for req in result.get("requirements", []):
-                    all_findings.extend(req.get("findings", []))
-                
-                for i, finding in enumerate(all_findings):
-                    with st.expander(f"Rif {i+1}: {finding['source']} (Score: {finding['score']:.4f})"):
-                        st.write(finding['content'])
-                
-                # Sezione dettagliata per requisiti
-                if "requirements" in result and result["requirements"]:
-                    st.markdown("---")
-                    st.subheader("📋 Dettagli per Requisito")
-                    
-                    for req in result["requirements"]:
-                        with st.expander(f"{req['name']} (Score: {req['compliance_score']:.2f}) - {req['id']}"):
-                            st.write(f"**ISO Ref:** {req['iso_ref']}")
-                            st.write("**Articoli AI Act:**")
-                            for art in req['ai_act_articles']:
-                                st.write(f"- {art['ref']}: {art['text'][:100]}...")
-                            if req['findings']:
-                                st.write("**Findings specifici:**")
-                                for finding in req['findings']:
-                                    st.write(f"- {finding['content'][:100]}... (Score: {finding['score']:.4f})")
-                            else:
-                                st.write("Nessun finding specifico trovato.")
-            else:
-                st.error(f"Errore API: {response.status_code}")
-                st.write(response.text)
-        except Exception as e:
-            st.error(f"Errore durante l'audit: {str(e)}")
+# Sottotitolo
+st.markdown("""
+<div class="hero-subtitle">
+    Il tuo consulente intelligente per la conformità <b>AI Act</b> e standard <b>ISO</b>.<br>
+    Naviga le complessità normative con sicurezza e precisione.
+</div>
+""", unsafe_allow_html=True)
 
-st.markdown("---")
-st.caption("LegalAIze Audit Tool - AISE MSc Unina")
+# ==============================================================================
+# SEZIONE PRINCIPALE (Audit Compliance)
+# ==============================================================================
+st.write("") 
+
+col_left, col_mid, col_right = st.columns([1, 1.5, 1])
+
+with col_mid:
+    st.markdown("""
+    <div class="audit-card">
+        <div class="card-icon">🔍</div>
+        <div class="card-title">Compliance Audit</div>
+        <div class="card-text">
+            Carica la documentazione tecnica o la Privacy Policy.
+            L'IA analizzerà i rischi e genererà un report dettagliato.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.page_link("pages/🔍Audit_Compliance.py", label="Avvia Audit", icon="🚀", use_container_width=True)
+
+# ==============================================================================
+# FOOTER
+# ==============================================================================
+st.markdown("""
+<div class="footer">
+    LegalAIze Project • AISE MSc Unina • Powered by RAG & LLMs
+</div>
+""", unsafe_allow_html=True)

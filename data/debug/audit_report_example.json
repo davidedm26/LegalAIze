@@ -2,115 +2,115 @@
     {
         "Mapped_ID": "TECH_ROB_01",
         "Requirement_Name": "Robustness and Predictability",
-        "Score": 0,
-        "Auditor_Notes": "The document does not provide any information regarding the definition and documentation of verification and validation measures for the AI system, nor does it specify criteria for their use. There is no mention of accuracy, robustness, cybersecurity, or resilience against errors, which are critical requirements outlined in Article 15 of the AI Act. Therefore, it fails to meet the compliance requirements for high-risk AI systems."
+        "Score": 4,
+        "Auditor_Notes": "The document demonstrates a strong commitment to accuracy, robustness, and cybersecurity, with measures like adversarial testing and redundancy solutions. However, it lacks comprehensive documentation of verification and validation measures, particularly regarding the criteria for accuracy and robustness metrics. The identified bias issue in route allocation remains unresolved, which could impact performance consistency. Overall, while the system meets many requirements, the absence of fully documented validation measures and unresolved bias affects the score."
     },
     {
         "Mapped_ID": "TECH_ROB_02",
         "Requirement_Name": "Cyberattack Resilience",
-        "Score": 0,
-        "Auditor_Notes": "The document does not provide any information regarding the design and development of an AI system, nor does it address organizational objectives, documented requirements, or cybersecurity measures against unauthorized access or adversarial attacks. It lacks the necessary details to demonstrate compliance with the specified requirements and regulatory references."
+        "Score": 4,
+        "Auditor_Notes": "The document demonstrates strong cybersecurity measures, including adversarial testing and input validation, aligning with the requirement for resilience against unauthorized alterations. However, the issue of linking driver IDs to optimization logs raises concerns about data minimization and potential vulnerabilities. While the system is robust, the unresolved bias issue in route allocation could lead to biased outputs, which is a risk factor. Overall, the system meets most compliance criteria but has areas needing improvement."
     },
     {
         "Mapped_ID": "TECH_ROB_03",
         "Requirement_Name": "Corrigibility",
-        "Score": 0,
-        "Auditor_Notes": "The provided document does not contain any information regarding the identification or documentation of objectives for the responsible use of AI systems. It lacks references to the necessary criteria for evaluating AI system outcomes, such as corrigibility or reversibility, as outlined in the regulatory references. Therefore, it does not meet the compliance requirement."
+        "Score": 2,
+        "Auditor_Notes": "The document identifies some objectives related to responsible AI use, such as human oversight and data management. However, it lacks comprehensive documentation of objectives guiding responsible development, particularly regarding fairness and bias mitigation. The unresolved bias issue in route allocation indicates insufficient integration of fairness objectives. Additionally, the lack of explainability for route suggestions undermines transparency and accountability, which are critical objectives. Overall, while some measures are in place, significant gaps remain in fully addressing the documented criteria for responsible AI use."
     },
     {
         "Mapped_ID": "PRIV_DATA_01",
         "Requirement_Name": "Training Data Suitability",
-        "Score": 0,
-        "Auditor_Notes": "The document does not provide any information regarding data quality requirements, data provenance, or measures to detect biases. It lacks documentation on how data was obtained and selected, which is essential for compliance with the AI Act and ISO/IEC 42001 standards. The absence of these critical elements indicates a complete lack of compliance with the specified requirement."
+        "Score": 3,
+        "Auditor_Notes": "The document outlines data sources and cleansing processes, indicating some adherence to data quality requirements. However, it fails to address the identified bias in route allocation based on age, which could negatively impact fairness and fundamental rights. Additionally, while data provenance is mentioned, the documentation lacks comprehensive details on how data was selected and potential biases were examined, as required by the regulatory references."
     },
     {
         "Mapped_ID": "PRIV_DATA_02",
         "Requirement_Name": "No Copyright Infringement",
-        "Score": 0,
-        "Auditor_Notes": "The document does not provide any details about the acquisition and selection of data used in AI systems, nor does it mention a policy to respect Union copyright law or the identification of rights reservations as required by Article 4(3) of Directive (EU) 2019/790. Therefore, it fails to meet the compliance requirement."
+        "Score": 4,
+        "Auditor_Notes": "The document outlines the acquisition of data, including licensed mapping data and historical telemetry, adhering to copyright laws. However, it lacks a clear policy to identify and respect reservations of rights as per Article 4(3) of Directive (EU) 2019/790. While it mentions compliance with licenses, it does not explicitly address the need for authorization from rightsholders for text and data mining, which is a critical aspect of the requirement."
     },
     {
         "Mapped_ID": "PRIV_DATA_03",
         "Requirement_Name": "User Privacy Protection",
-        "Score": 0,
-        "Auditor_Notes": "The document provided does not address any aspects of data management processes related to the development of AI systems, nor does it mention compliance with Union law on personal data protection. It lacks documentation or implementation details, failing to meet the requirement for defining and documenting data management processes as mandated by the AI Act and relevant regulatory references."
+        "Score": 2,
+        "Auditor_Notes": "The document outlines some data management processes, such as data encryption and validation. However, it fails to adhere to data minimization principles, as it links driver IDs to optimization logs, violating privacy regulations (Ref: 69). Additionally, the unresolved bias issue in route allocation raises concerns about compliance with fairness and discrimination laws (Ref: 70). Overall, while some measures are in place, significant gaps remain in ensuring full compliance with data protection requirements."
     },
     {
         "Mapped_ID": "TRANSP_01",
         "Requirement_Name": "Capabilities, Performance, and Limitations",
-        "Score": 0,
-        "Auditor_Notes": "The provided document does not contain any information regarding verification and validation measures for the AI system, evaluation criteria, or results of evaluations. It lacks documentation on accuracy metrics and understanding of the model's capabilities and limitations, which are essential as per the AI Act and ISO/IEC 42001 standards."
+        "Score": 3,
+        "Auditor_Notes": "The document outlines some verification and validation measures, including performance metrics like MAE and uptime. However, it lacks comprehensive evaluation criteria and detailed documentation of the model's capabilities and limitations, particularly regarding the impact on individuals and groups. The absence of a clear plan for ongoing monitoring and evaluation further limits compliance with the specified requirements."
     },
     {
         "Mapped_ID": "TRANSP_02",
         "Requirement_Name": "Interpretability",
-        "Score": 0,
-        "Auditor_Notes": "The document provided ('Questo è un semplice test') does not contain any information regarding the necessary transparency, interpretation tools, or user guidance for high-risk AI systems as required by the AI Act. There is no evidence of measures to ensure users can understand the system's output or its limitations, which is essential for compliance with the specified requirements."
+        "Score": 2,
+        "Auditor_Notes": "The system lacks sufficient transparency for users to interpret outputs effectively. While it provides a 'System Generated' watermark, it fails to explain counter-intuitive routing decisions, leading to low trust and frequent overrides. This violates the requirement for high-risk AI systems to enable human oversight and understanding of outputs, as outlined in the regulatory references. The identified bias in workload allocation further complicates the interpretability of the system's decisions."
     },
     {
         "Mapped_ID": "TRANSP_03",
         "Requirement_Name": "Disclosure of AI",
-        "Score": 0,
-        "Auditor_Notes": "The document provided does not contain any information regarding the necessary disclosures to users about interacting with an AI system. It lacks details on how users are informed that they are engaging with an AI, which is a requirement under Article 50 of the AI Act. Therefore, it does not meet the compliance requirement."
+        "Score": 3,
+        "Auditor_Notes": "The document indicates that drivers are informed about AI monitoring through their employment contracts and that AI-generated schedules are marked as 'System Generated.' However, it lacks comprehensive explanations for AI decisions, which may hinder user understanding. The absence of rationale for counter-intuitive routes could lead to distrust, violating transparency obligations under Article 50. While some disclosure is present, the lack of detailed explanations reduces overall compliance."
     },
     {
         "Mapped_ID": "TRANSP_04",
         "Requirement_Name": "Traceability",
-        "Score": 0,
-        "Auditor_Notes": "The document does not provide any information regarding the marking of outputs from the AI system as required by the AI Act. There is no mention of machine-readable formats or detection of artificially generated content, which is a clear violation of the specified requirement."
+        "Score": 2,
+        "Auditor_Notes": "The system outputs are marked with a 'System Generated' watermark, but this does not meet the requirement for machine-readable format as specified in the regulatory references. The lack of explainability for route suggestions further undermines transparency, as users cannot discern the rationale behind AI decisions. Additionally, the system does not generate synthetic content like audio or video, which may exempt it from some obligations, but it still falls short in providing adequate information to users."
     },
     {
         "Mapped_ID": "TRANSP_05",
         "Requirement_Name": "Explainability",
-        "Score": 0,
-        "Auditor_Notes": "The provided document does not contain any relevant technical documentation or information regarding the AI system's capabilities, characteristics, or intended purpose. It fails to address the requirements for traceability and explainability as outlined in the regulatory references, which specify the need for detailed documentation to inform interested parties about the AI system's operation and risks."
+        "Score": 3,
+        "Auditor_Notes": "The document provides a general description of the AI system, its intended purpose, and some technical capabilities. However, it lacks comprehensive details on technical limitations, monitoring capabilities, and specific design choices. The explainability issue regarding route suggestions also undermines transparency. While there is some traceability through logging, the lack of rationale for decisions affects user understanding, which is critical for compliance with the AI Act and ISO/IEC 42001 standards."
     },
     {
         "Mapped_ID": "TRANSP_06",
         "Requirement_Name": "Risks",
-        "Score": 0,
-        "Auditor_Notes": "The document provided does not address any of the requirements for establishing a risk management process for AI systems. It lacks any mention of assessing potential consequences for individuals or societies, nor does it outline a risk management system as required by the AI Act and ISO/IEC 42001 standards. Therefore, it is non-compliant."
+        "Score": 3,
+        "Auditor_Notes": "The document outlines a risk assessment process and identifies risks, such as driver fatigue and age-based discrimination. However, it lacks a comprehensive AI system impact assessment and does not fully evaluate the potential consequences for individuals or society, particularly regarding the unresolved bias issue. The risk management system is mentioned but needs clearer documentation and maintenance details to meet the requirements fully."
     },
     {
         "Mapped_ID": "TRANSP_07",
         "Requirement_Name": "Evaluations",
-        "Score": 0,
-        "Auditor_Notes": "The document provided does not contain any information regarding verification and validation measures for the AI system, nor does it specify criteria for their use. It lacks technical documentation, evaluation strategies, and results as required by the AI Act and ISO/IEC 42001 standards. There is no evidence of compliance with the requirements for testing methodologies, evaluation plans, or transparency measures outlined in the regulatory references."
+        "Score": 3,
+        "Auditor_Notes": "The document outlines some verification and validation measures, such as performance metrics and risk assessments. However, it lacks comprehensive documentation of evaluation strategies and results, particularly regarding the standardized protocols mentioned in the regulatory references. The issue of bias in route allocation remains unresolved, indicating a gap in evaluating impacts on individuals. More detailed technical documentation and evaluation criteria are needed to fully comply with the requirements."
     },
     {
         "Mapped_ID": "TRANSP_08",
         "Requirement_Name": "General Description",
-        "Score": 0,
-        "Auditor_Notes": "The provided document does not contain any relevant technical documentation regarding the AI system, such as its intended purpose, provider name, or version information. It fails to meet the requirements outlined in Article 11 and Annex IV, which specify the necessary elements for technical documentation. Therefore, it is non-compliant."
+        "Score": 4,
+        "Auditor_Notes": "The document provides a general description of the AI system, including its intended purpose, provider, and version. However, it lacks detailed information on technical limitations, monitoring capabilities, and how the system interacts with other hardware or software, which are required by the regulatory references. The absence of these elements prevents a full score."
     },
     {
         "Mapped_ID": "FAIR_01",
         "Requirement_Name": "Representation — Absence of Bias",
-        "Score": 0,
-        "Auditor_Notes": "The provided document does not address any requirements for data quality or safeguards against biased outputs as specified in the requirement. There is no evidence of defined and documented data quality requirements or measures to mitigate risks associated with feedback loops in high-risk AI systems, as mandated by Article 8 and ISO/IEC 42001."
+        "Score": 2,
+        "Auditor_Notes": "The document outlines data sources and quality measures, but it fails to adequately address the requirement for data quality safeguards against biased outputs. The identified bias in route allocation based on driver age remains unresolved, indicating a lack of effective mitigation measures. Additionally, while data cleansing is mentioned, the direct linking of Driver IDs to optimization logs violates data minimization principles, further compromising data quality."
     },
     {
         "Mapped_ID": "FAIR_02",
         "Requirement_Name": "Fairness — Absence of Discrimination",
-        "Score": 0,
-        "Auditor_Notes": "The provided document does not address the requirement to assess and document the potential impacts of AI systems on individuals or groups throughout their life cycle. There is no mention of an impact assessment process or documentation of potentially discriminatory impacts, as required by A.5.4 and A.5.3. The document lacks any relevant content related to the assessment of societal impacts or specific considerations for vulnerable groups."
+        "Score": 2,
+        "Auditor_Notes": "The document identifies a significant fairness issue regarding age-based discrimination in route allocation but lacks a comprehensive assessment of potential impacts on individuals or groups throughout the system's life cycle. While it mentions the issue, it does not provide a documented process for assessing societal impacts or the consequences of the AI system's deployment, as required by A.5.2 and A.5.4. The mitigation status remains open and unresolved, indicating insufficient compliance with the regulatory requirements."
     },
     {
         "Mapped_ID": "SOC_ENV_01",
         "Requirement_Name": "Environmental Impact",
-        "Score": 0,
-        "Auditor_Notes": "The document does not address the requirement to assess and document the potential societal impacts of AI systems throughout their life cycle. It lacks any mention of energy consumption, computational resources, or societal impacts as outlined in ISO/IEC 42001:2023. There is no evidence of compliance with the specified standards or regulatory references."
+        "Score": 4,
+        "Auditor_Notes": "The document assesses societal impacts, particularly environmental sustainability, by reporting a 12% fuel reduction and CO2 savings. However, it lacks comprehensive documentation on the computational resources used for training the model and their energy consumption, which is required by ISO/IEC 42001:2023. While it mentions energy costs, it does not fully meet the requirement for detailed resource identification and impact assessment."
     },
     {
         "Mapped_ID": "SOC_ENV_02",
         "Requirement_Name": "Harmful Content and Toxicity",
-        "Score": 0,
-        "Auditor_Notes": "The document does not provide any information or processes related to assessing the potential consequences of the AI system for individuals or societies, nor does it mention any technical solutions to prevent or minimize harmful behavior. There is no evidence of an AI risk assessment process or an AI system impact assessment as required by ISO/IEC 42001 standards."
+        "Score": 2,
+        "Auditor_Notes": "The document outlines a risk assessment process but lacks a comprehensive AI system impact assessment as required by 6.1.4. While it identifies some risks (e.g., driver fatigue), it does not fully assess potential consequences for individuals or society, particularly regarding the age-based discrimination issue. The mitigation status for this bias is currently unresolved, indicating insufficient measures to prevent undesirable behavior, which is a requirement under the AI Act and ISO/IEC 42001 standards."
     },
     {
         "Mapped_ID": "HUM_AGENCY_01",
         "Requirement_Name": "Human Agency & Oversight",
-        "Score": 0,
-        "Auditor_Notes": "The provided document does not contain any information regarding the identification or documentation of objectives for the responsible use of AI systems. It lacks references to fairness, accountability, transparency, or any other relevant objectives as outlined in ISO/IEC 42001:2023, specifically section B.9.3. Therefore, it does not meet the compliance requirement."
+        "Score": 3,
+        "Auditor_Notes": "The document outlines a 'Human-in-the-Loop' approach, ensuring human oversight in route approval, which aligns with the requirement for human agency. However, it lacks documented objectives for responsible AI use, such as fairness and accountability, particularly regarding the identified age-based discrimination in route allocation. The absence of mechanisms to address this bias and the lack of explanations for counter-intuitive routes further detract from compliance with ISO/IEC 42001 objectives for responsible AI use."
     }
 ]
