@@ -205,6 +205,12 @@ Respond exclusively in valid JSON format:
                 Auditor_Notes=auditor_notes
             ))
         
+        # Store the AuditResponse before returning, for potential future use (e.g., in-memory cache, database, etc.)
+        debug_dir_path = os.path.join("..", "data", "debug")
+        os.makedirs(debug_dir_path, exist_ok=True)
+        with open(os.path.join(debug_dir_path, "audit_report_example.json"), "w", encoding="utf-8") as f:
+            json.dump([r.dict() for r in requirements_reports], f, ensure_ascii=False, indent=4)
+        
         # Return the report as a list of requirements
         return AuditResponse(
             requirements=requirements_reports
