@@ -6,6 +6,6 @@
 # Escludi i file di stato SQLite se presenti
 *.sqlite
 .lock
-/vector_index
-/requirement_embeddings.json
+/vector_index/
 /requirement_chunks.json
+/vector_index

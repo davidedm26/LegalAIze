@@ -1,0 +1,116 @@
+[
+    {
+        "Mapped_ID": "TECH_ROB_01",
+        "Requirement_Name": "Robustness and Predictability",
+        "Score": 3,
+        "Auditor_Notes": "The document outlines some verification and validation measures, including accuracy metrics (Sensitivity 99.2%, Specificity 94.5%) and logging of inferences. However, it lacks comprehensive adversarial testing and technical redundancy solutions, which are critical for high-risk AI systems as per Article 15. The absence of specific measures against adversarial attacks and the reliance on standard firewalls indicate potential vulnerabilities. Additionally, while the user manual warns against pediatric use, it does not prevent processing, which could lead to risks."
+    },
+    {
+        "Mapped_ID": "TECH_ROB_02",
+        "Requirement_Name": "Cyberattack Resilience",
+        "Score": 2,
+        "Auditor_Notes": "The document outlines some cybersecurity measures, such as running on an on-premise server and logging inferences. However, it lacks adequate testing against adversarial attacks and does not prioritize specific hardening against model manipulation, which is crucial for high-risk AI systems. The absence of comprehensive measures to prevent, detect, and respond to potential cybersecurity threats indicates insufficient compliance with the regulatory requirements for resilience against unauthorized alterations."
+    },
+    {
+        "Mapped_ID": "TECH_ROB_03",
+        "Requirement_Name": "Corrigibility",
+        "Score": 3,
+        "Auditor_Notes": "The document outlines some objectives for responsible AI use, such as accuracy and data privacy, but lacks comprehensive documentation of specific objectives guiding the development and use of the AI system. While it addresses issues like fairness and risk management, it does not fully integrate these objectives into the design and development processes as required by B.6.1.2 and B.9.3. The absence of explicit mechanisms for human oversight and evaluation criteria further limits compliance."
+    },
+    {
+        "Mapped_ID": "PRIV_DATA_01",
+        "Requirement_Name": "Training Data Suitability",
+        "Score": 4,
+        "Auditor_Notes": "The document outlines data governance practices, including anonymization and demographic representation. However, it lacks a comprehensive process for detecting biases and does not prevent processing of pediatric patients despite known accuracy drops. While data acquisition is well-documented, the absence of explicit measures to ensure data suitability and bias detection limits full compliance with the requirements outlined in the AI Act and ISO/IEC 42001."
+    },
+    {
+        "Mapped_ID": "PRIV_DATA_02",
+        "Requirement_Name": "No Copyright Infringement",
+        "Score": 4,
+        "Auditor_Notes": "The document outlines data acquisition and selection processes, including exclusive rights under the 'NV-Academic-Collab-2024' agreement. However, it lacks explicit mention of compliance with Article 4(3) of Directive (EU) 2019/790 regarding the identification and respect of rights reservations. While the data was acquired legally, the absence of a clear policy on copyright compliance diminishes full adherence to the requirement."
+    },
+    {
+        "Mapped_ID": "PRIV_DATA_03",
+        "Requirement_Name": "User Privacy Protection",
+        "Score": 4,
+        "Auditor_Notes": "The document outlines robust data governance processes, including anonymization and data acquisition protocols compliant with GDPR. However, while the data is de-identified, the lack of explicit patient disclosure regarding AI prioritization may raise concerns about transparency and informed consent. The system's reliance on auto-referral without human confirmation also poses potential risks to privacy and data protection principles."
+    },
+    {
+        "Mapped_ID": "TRANSP_01",
+        "Requirement_Name": "Capabilities, Performance, and Limitations",
+        "Score": 4,
+        "Auditor_Notes": "The document outlines verification and validation measures, including accuracy metrics (Sensitivity 99.2%, Specificity 94.5%) and a risk management file. However, it lacks detailed evaluation criteria for the AI system's components and does not specify release criteria requirements. While it provides a good understanding of capabilities, the absence of comprehensive evaluation protocols for risks related to impacts on individuals and groups limits full compliance."
+    },
+    {
+        "Mapped_ID": "TRANSP_02",
+        "Requirement_Name": "Interpretability",
+        "Score": 3,
+        "Auditor_Notes": "The NeuroScan-Assist system provides some transparency through features like the heatmap visualization and logging of inferences, which aids in understanding its output. However, it lacks comprehensive user information regarding limitations, particularly for pediatric use, and does not explicitly inform patients about AI involvement in their scans. This could lead to automation bias and misinterpretation of the system's capabilities, as highlighted in the regulatory references."
+    },
+    {
+        "Mapped_ID": "TRANSP_03",
+        "Requirement_Name": "Disclosure of AI",
+        "Score": 2,
+        "Auditor_Notes": "The document lacks explicit disclosure to patients that their scans are prioritized by AI, which is a requirement under Article 50. While radiologists are trained on the AI system, patients are only informed generically about 'automated data processing.' This does not meet the obligation to ensure that natural persons are informed they are interacting with an AI system, as required for systems directly interacting with individuals."
+    },
+    {
+        "Mapped_ID": "TRANSP_04",
+        "Requirement_Name": "Traceability",
+        "Score": 3,
+        "Auditor_Notes": "The NeuroScan-Assist system includes a metadata tag (AI_PRIORITY: TRUE) to indicate AI involvement, which aligns with marking requirements. However, patients are not explicitly informed that their scans are prioritized by AI, which falls short of full transparency obligations. The system's assistive nature may exempt it from some marking requirements, but the lack of clear patient disclosure limits compliance."
+    },
+    {
+        "Mapped_ID": "TRANSP_05",
+        "Requirement_Name": "Explainability",
+        "Score": 3,
+        "Auditor_Notes": "The document provides a general description of the AI system and its intended purpose, along with usage instructions and some technical details. However, it lacks comprehensive information on technical limitations, monitoring capabilities, and specific user notifications about interacting with an AI system. While there is some traceability through logging, the absence of explicit patient disclosure and limited information on pediatric use raises concerns about transparency and user understanding."
+    },
+    {
+        "Mapped_ID": "TRANSP_06",
+        "Requirement_Name": "Risks",
+        "Score": 3,
+        "Auditor_Notes": "The document outlines a risk management system and identifies key risks, such as 'Alert Fatigue.' However, it lacks a comprehensive AI risk assessment process as required by ISO/IEC 42001, particularly in evaluating potential consequences for individuals and societies. While some risk mitigation strategies are mentioned, the absence of a systematic approach to assess foreseeable misuse and document the AI system impact assessment limits compliance."
+    },
+    {
+        "Mapped_ID": "TRANSP_07",
+        "Requirement_Name": "Evaluations",
+        "Score": 4,
+        "Auditor_Notes": "The document outlines verification and validation measures, including evaluation against standardized protocols (MICCAI-Stroke-Benchmark) and logging of inference results. However, while it mentions a risk management file and mitigation strategies, it lacks detailed criteria for evaluating risks related to impacts on individuals and groups, as required by the regulations. The absence of explicit release criteria and comprehensive evaluation strategies limits full compliance."
+    },
+    {
+        "Mapped_ID": "TRANSP_08",
+        "Requirement_Name": "General Description",
+        "Score": 4,
+        "Auditor_Notes": "The document provides a general description of the AI system, its intended purpose, provider name, and version. However, it lacks detailed information on technical limitations, monitoring capabilities, and how the system interacts with other hardware/software. While it meets many requirements, the absence of comprehensive technical documentation elements as outlined in Article 11 and Annex IV results in a score of 4."
+    },
+    {
+        "Mapped_ID": "FAIR_01",
+        "Requirement_Name": "Representation â€” Absence of Bias",
+        "Score": 4,
+        "Auditor_Notes": "The document outlines data quality requirements, including demographic stratification and quality checks for training data. However, while it mentions a warning for pediatric use, it does not prevent processing of underage patients, which could lead to biased outputs. The lack of safeguards for continually learning systems is a concern, as it may influence future operations. Overall, the organization demonstrates a strong commitment to data quality but needs to address the risk of bias more effectively."
+    },
+    {
+        "Mapped_ID": "FAIR_02",
+        "Requirement_Name": "Fairness â€” Absence of Discrimination",
+        "Score": 3,
+        "Auditor_Notes": "The document discusses fairness and bias testing, noting a 12% accuracy drop for pediatric patients and includes a warning in the user manual. However, it lacks comprehensive documentation on the potential discriminatory impacts throughout the system's life cycle, particularly regarding the processing of patients under 12. While some risk management is in place, a more thorough assessment of impacts on various demographic groups is needed to achieve full compliance."
+    },
+    {
+        "Mapped_ID": "SOC_ENV_01",
+        "Requirement_Name": "Environmental Impact",
+        "Score": 3,
+        "Auditor_Notes": "The document provides some information on energy consumption (0.5g CO2 per scan) and mentions optimization for low-power GPUs, but lacks comprehensive documentation on societal impacts and detailed computational resource usage as required by ISO/IEC 42001:2023. It does not fully assess potential societal impacts beyond environmental sustainability, nor does it document all system and computing resources utilized."
+    },
+    {
+        "Mapped_ID": "SOC_ENV_02",
+        "Requirement_Name": "Harmful Content and Toxicity",
+        "Score": 3,
+        "Auditor_Notes": "The document outlines some risk assessment processes, including a dedicated ISO 14971 Risk Management file and a warning for pediatric use. However, it lacks a comprehensive AI system impact assessment that evaluates potential consequences for individuals and societies throughout the AI system's life cycle, as required by ISO/IEC 42001. The absence of detailed documentation on the impact assessment process limits compliance."
+    },
+    {
+        "Mapped_ID": "HUM_AGENCY_01",
+        "Requirement_Name": "Human Agency & Oversight",
+        "Score": 3,
+        "Auditor_Notes": "The document outlines the intended use of NeuroScan-Assist and includes some elements of human oversight, such as the ability for radiologists to reject AI findings. However, it lacks comprehensive documentation of objectives for responsible AI use, particularly in terms of fairness and accountability. The 'Auto-Referral' feature raises concerns about bypassing human confirmation, which could undermine personal autonomy. While there are mechanisms for transparency and data governance, the absence of explicit objectives limits compliance with ISO/IEC 42001 requirements."
+    }
+]

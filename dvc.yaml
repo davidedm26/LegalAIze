@@ -34,3 +34,18 @@ stages:
       - ingestion
     outs:
       - data/processed/requirement_chunks.json
+
+  evaluate_rag:
+    cmd: python evaluate_rag.py
+    deps:
+      - evaluate_rag.py
+      - params.yaml
+      - data/processed/requirement_chunks.json
+      - data/ground_truth/raw_data/Evaluation1/documentation.txt
+      - data/ground_truth/raw_data/Evaluation1/report.CSV
+      - data/ground_truth/raw_data/Evaluation2/documentation.txt
+      - data/ground_truth/raw_data/Evaluation2/report.CSV
+    params:
+      - evaluation
+    outs:
+      - metrics/rag_eval.json
