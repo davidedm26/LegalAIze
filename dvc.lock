@@ -153,16 +153,16 @@ stages:
       size: 2655
     - path: data/processed/requirement_chunks.json
       hash: md5
-      md5: 6d79b7dc3da114278f2bad9e630ebdb2
-      size: 188715
+      md5: 7002ab79e690834c180b59e899d41bd6
+      size: 100985
     - path: evaluate_rag.py
       hash: md5
-      md5: 76f368b70b63e4b134edcb655ac30eab
-      size: 8840
+      md5: 1b0a0a8fa0242c72d5a4b427a00f002e
+      size: 16198
     - path: params.yaml
       hash: md5
-      md5: c0f84a174e2f4e5202125b840ddb1311
-      size: 1436
+      md5: 905a0a299cfdeac21ced9beb26c717ae
+      size: 1609
     params:
       params.yaml:
         evaluation:
@@ -171,6 +171,7 @@ stages:
           llm_temperature: 0.1
           mlflow_experiment: rag_evaluation
           metrics_output: metrics/rag_eval.json
+          case_selector: 4
           ground_truth:
           - name: Evaluation1
             document_path: 
@@ -191,5 +192,5 @@ stages:
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: acf496dca3e524634f518cf153815fa9
-      size: 575
+      md5: 5ce69737380db15c7646341959a9e772
+      size: 543
