@@ -5,13 +5,28 @@ import csv
 import random
 import re
 import tempfile
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 from dotenv import load_dotenv
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 import mlflow
+
+try:
+    from datasets import Dataset
+except ImportError:
+    Dataset = None  # type: ignore
+
+try:
+    from ragas import evaluate as ragas_evaluate
+    from ragas.metrics import Groundedness
+except ImportError:
+    ragas_evaluate = None  # type: ignore
+    Groundedness = None  # type: ignore
+
+RAGAS_AVAILABLE = Dataset is not None and ragas_evaluate is not None and Groundedness is not None
 
 try:
     from backend import rag_engine
@@ -146,12 +161,88 @@ def log_case_input_artifacts(case_name: str, doc_path: str, report_path: str) ->
         os.remove(report_json_path)
 
 
+def split_document_for_groundedness(
+    document_text: str,
+    chunk_size: int,
+    chunk_overlap: int,
+) -> List[str]:
+    if not document_text:
+        return []
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
+    return splitter.split_text(document_text)
+
+
+def build_requirement_question(mapped_id: Optional[str], requirement_name: Optional[str]) -> str:
+    identifier = mapped_id or "Unknown requirement"
+    title = requirement_name or identifier
+    mapping_data = getattr(rag_engine, "mapping", None) or {}
+    req_metadata = mapping_data.get(requirement_name or "", {}) if mapping_data else {}
+    iso_ref = req_metadata.get("iso_ref")
+    iso_text = req_metadata.get("iso_control_text")
+    suffix_parts = [part for part in (iso_ref, iso_text) if part]
+    if suffix_parts:
+        suffix = " | ".join(suffix_parts)
+        return f"{title} ({identifier}) — {suffix}"
+    return f"{title} ({identifier})"
+
+
+def select_relevant_contexts(
+    reference_text: str,
+    chunk_texts: List[str],
+    chunk_embeddings: Optional[np.ndarray],
+    chunk_norms: Optional[np.ndarray],
+    top_k: int,
+) -> List[str]:
+    if not chunk_texts:
+        return []
+    if top_k <= 0:
+        return []
+    if (
+        not reference_text
+        or chunk_embeddings is None
+        or chunk_norms is None
+        or rag_engine is None
+        or rag_engine.embedding_model is None
+    ):
+        return chunk_texts[:top_k]
+
+    note_vec = rag_engine.embedding_model.encode(
+        [reference_text],
+        convert_to_numpy=True,
+    )[0]
+    note_norm = np.linalg.norm(note_vec)
+    if not note_norm:
+        return chunk_texts[:top_k]
+
+    denom = (chunk_norms * note_norm) + 1e-8
+    similarities = np.dot(chunk_embeddings, note_vec) / denom
+    ranked_indices = np.argsort(similarities)[::-1]
+    selected: List[str] = []
+    for idx in ranked_indices[:top_k]:
+        selected.append(chunk_texts[idx])
+    return selected or chunk_texts[:top_k]
+
+
+def extract_ground_truth_note(row: Dict[str, Any]) -> Optional[str]:
+    return (
+        row.get("Auditor Notes")
+        or row.get("auditor_notes")
+        or row.get("Auditor_Notes")
+    )
+
 def evaluate_single_case(
+    *,
+    case_name: str,
     gt_path: str,
     doc_path: str,
-    *, 
+    chunk_size: int,
+    chunk_overlap: int,
+    groundedness_top_k: int,
     case_artifact_dir: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """Evaluate one ground-truth/report pair using the local RAG engine."""
     ground_truth = load_ground_truth_csv(gt_path) # Load GT as dict keyed by Mapped_ID
     document_text = load_text(doc_path) # Load document text to audit
@@ -161,6 +252,20 @@ def evaluate_single_case(
 
     audit_response = rag_engine.audit_document(document_text)
     predictions = [report.model_dump() for report in audit_response.requirements]
+
+    document_chunks = split_document_for_groundedness(
+        document_text,
+        chunk_size,
+        chunk_overlap,
+    )
+    chunk_embeddings: Optional[np.ndarray] = None
+    chunk_norms: Optional[np.ndarray] = None
+    if document_chunks and rag_engine.embedding_model is not None:
+        chunk_embeddings = rag_engine.embedding_model.encode(
+            document_chunks,
+            convert_to_numpy=True,
+        )
+        chunk_norms = np.linalg.norm(chunk_embeddings, axis=1)
 
     artifacts: Dict[str, str] = {}
     if case_artifact_dir:
@@ -173,6 +278,7 @@ def evaluate_single_case(
     gt_scores: List[float] = [] # Ground truth numeric scores
     pred_scores: List[float] = [] # Predicted numeric scores
     note_similarities: List[float] = [] # Cosine similarity between GT and predicted notes
+    groundedness_records: List[Dict[str, Any]] = []
 
     for pred in predictions: # Each predicted requirement report
         mapped_id = pred.get("Mapped_ID")
@@ -203,11 +309,7 @@ def evaluate_single_case(
         gt_scores.append(gt_score)
         pred_scores.append(pred_score)
 
-        gt_note = (
-            gt_row.get("Auditor Notes")
-            or gt_row.get("auditor_notes")
-            or gt_row.get("Auditor_Notes")
-        )
+        gt_note = extract_ground_truth_note(gt_row)
         pred_note = pred.get("Auditor_Notes") or pred.get("auditor_notes")
         if gt_note and pred_note:
             try:
@@ -215,6 +317,25 @@ def evaluate_single_case(
                 note_similarities.append(similarity)
             except Exception as exc:
                 print(f"⚠ Failed to compute note similarity for {mapped_id}: {exc}")
+
+        contexts = select_relevant_contexts(
+            reference_text=pred_note or "",
+            chunk_texts=document_chunks,
+            chunk_embeddings=chunk_embeddings,
+            chunk_norms=chunk_norms,
+            top_k=groundedness_top_k,
+        )
+        question_text = build_requirement_question(mapped_id, pred.get("Requirement_Name"))
+        groundedness_records.append(
+            {
+                "question": question_text,
+                "answer": pred_note or "",
+                "contexts": contexts,
+                "ground_truth": gt_note or "",
+                "requirement_id": mapped_id,
+                "case": case_name,
+            }
+        )
 
     mae = compute_mae(gt_scores, pred_scores) # Compute MAE for this particular case
 
@@ -224,13 +345,16 @@ def evaluate_single_case(
         else 0.0
     )
 
-    return {
-        "num_pairs": len(gt_scores),
-        "mae_score": mae,
-        "artifacts": artifacts,
-        "note_similarity_count": len(note_similarities),
-        "mean_note_similarity": mean_note_similarity,
-    }
+    return (
+        {
+            "num_pairs": len(gt_scores),
+            "mae_score": mae,
+            "artifacts": artifacts,
+            "note_similarity_count": len(note_similarities),
+            "mean_note_similarity": mean_note_similarity,
+        },
+        groundedness_records,
+    )
 
 
 def main() -> None:
@@ -238,6 +362,7 @@ def main() -> None:
     eval_params = params.get("evaluation", {})
     precompute_params = params.get("precompute", {})
     ingestion_params = params.get("ingestion", {})
+    groundedness_params = eval_params.get("groundedness", {})
 
     random_seed = int(eval_params.get("random_seed", 42))
 
@@ -246,6 +371,21 @@ def main() -> None:
     metrics_output = eval_params.get("metrics_output", "metrics/rag_eval.json")
     gt_cases = eval_params.get("ground_truth", [])
     case_selector = normalize_case_selector(eval_params.get("case_selector"))
+
+    groundedness_top_k = int(groundedness_params.get("top_k", 3))
+    groundedness_threshold = float(groundedness_params.get("threshold", 0.75))
+    groundedness_chunk_size = int(
+        groundedness_params.get(
+            "chunk_size",
+            ingestion_params.get("chunk_size", 800),
+        )
+    )
+    groundedness_chunk_overlap = int(
+        groundedness_params.get(
+            "chunk_overlap",
+            ingestion_params.get("chunk_overlap", 100),
+        )
+    )
 
     # Set seed for reproducibility where possible
     random.seed(random_seed)
@@ -257,6 +397,7 @@ def main() -> None:
 
     # Aggregate metrics across all cases
     all_results: List[Dict[str, Any]] = []
+    groundedness_samples: List[Dict[str, Any]] = []
 
     # Optional: configure MLflow (env first, then params)
     tracking_uri = os.getenv("MLFLOW_TRACKING_URI")
@@ -322,13 +463,18 @@ def main() -> None:
 
             # Use a temporary directory for any artifacts related to this case (like backend predictions)
             with tempfile.TemporaryDirectory(prefix=f"case_{case_slug}_") as tmpdir:
-                res = evaluate_single_case(
-                    report_path,
-                    doc_path,
+                res, case_groundedness = evaluate_single_case(
+                    case_name=name,
+                    gt_path=report_path,
+                    doc_path=doc_path,
+                    chunk_size=groundedness_chunk_size,
+                    chunk_overlap=groundedness_chunk_overlap,
+                    groundedness_top_k=groundedness_top_k,
                     case_artifact_dir=tmpdir,
                 ) # Evaluate this evaluation case
                 res["name"] = name # Add case name to results
                 all_results.append(res) # Append to all results
+                groundedness_samples.extend(case_groundedness)
 
                 if run_ctx is not None:
                     # Log per-case metrics under a prefix
@@ -382,6 +528,44 @@ def main() -> None:
             "cases": all_results,
         }
 
+        groundedness_summary: Optional[Dict[str, Any]] = None
+        if groundedness_samples:
+            if not RAGAS_AVAILABLE:
+                print("⚠ Ragas dependencies not available. Skipping groundedness metric.")
+            else:
+                try:
+                    assert Dataset is not None
+                    assert ragas_evaluate is not None
+                    assert Groundedness is not None
+
+                    ragas_dataset = Dataset.from_list(
+                        [
+                            {
+                                "question": sample["question"],
+                                "answer": sample["answer"],
+                                "contexts": sample["contexts"],
+                                "ground_truth": sample.get("ground_truth", ""),
+                            }
+                            for sample in groundedness_samples
+                        ]
+                    )
+                    ragas_result = ragas_evaluate(
+                        dataset=ragas_dataset,
+                        metrics=[Groundedness()],
+                        llm=rag_engine.llm,
+                    )
+                    groundedness_score = float(ragas_result["groundedness"])
+                    groundedness_summary = {
+                        "mean_score": groundedness_score,
+                        "sample_count": len(groundedness_samples),
+                        "threshold": groundedness_threshold,
+                    }
+                except Exception as exc:
+                    print(f"⚠ Failed to compute groundedness metric with Ragas: {exc}")
+
+        if groundedness_summary:
+            summary["groundedness"] = groundedness_summary
+
         # Save metrics to JSON (for DVC)
         with open(metrics_output, "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2)
@@ -392,6 +576,9 @@ def main() -> None:
             
             mlflow.log_metric("note_pairs", total_note_pairs)
             mlflow.log_metric("mean_note_similarity", weighted_note_similarity)
+            if groundedness_summary:
+                mlflow.log_metric("groundedness_score", groundedness_summary["mean_score"])
+                mlflow.log_metric("groundedness_samples", groundedness_summary["sample_count"])
             
             # Log the metrics file as artifact
             mlflow.log_artifact(metrics_output)

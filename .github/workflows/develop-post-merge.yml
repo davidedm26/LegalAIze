@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - develop
-      - feat/** # Added for testing, to be removed afterwards
+      #- feat/** # Added for testing, to be removed afterwards
 
 permissions:
   contents: write 
