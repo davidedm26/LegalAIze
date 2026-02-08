@@ -3,7 +3,7 @@ name: Feature → Develop PR Checks
 on:
   pull_request:
     branches:
-      - develop
+      - NOTdevelop # the NOT operator is just a convention here to indicate this workflow is not used currently for any branch, but can be easily switched to 'develop' when needed
     types: [opened, synchronize, reopened]
 
 permissions:
