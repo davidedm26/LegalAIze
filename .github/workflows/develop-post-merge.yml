@@ -7,7 +7,7 @@ on:
       - feat/** # Added for testing, to be removed afterwards
 
 permissions:
-  contents: read
+  contents: write 
 
 env:
   PYTHON_VERSION: '3.11'
