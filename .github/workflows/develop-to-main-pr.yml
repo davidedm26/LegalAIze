@@ -11,6 +11,7 @@ permissions:
 
 env:
   PYTHON_VERSION: '3.11'
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
 jobs:
   release-checks:
