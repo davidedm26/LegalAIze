@@ -1,0 +1,31 @@
+# Escludi file di sistema e cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Escludi file IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Escludi file OS
+.DS_Store
+Thumbs.db
+
+# SICUREZZA: ESCLUDI LE CHIAVI E I SEGRETI
+.env
+dagshub_token.txt
+*.log
+
+# Escludi cartelle dati pesanti (li montiamo come volumi)
+# Nota: Se nel frontend non usi dati, questo aiuta a tenere l'immagine leggera
+data/
+mlruns/
+mlartifacts/

@@ -2,115 +2,115 @@
     {
         "Mapped_ID": "TECH_ROB_01",
         "Requirement_Name": "Robustness and Predictability",
-        "Score": 4,
-        "Auditor_Notes": "The document demonstrates a strong commitment to accuracy, robustness, and cybersecurity, with measures like adversarial testing and redundancy solutions. However, it lacks comprehensive documentation of verification and validation measures, particularly regarding the criteria for accuracy and robustness metrics. The identified bias issue in route allocation remains unresolved, which could impact performance consistency. Overall, while the system meets many requirements, the absence of fully documented validation measures and unresolved bias affects the score."
+        "Score": 3,
+        "Auditor_Notes": "The document outlines accuracy metrics (Sensitivity 99.2%, Specificity 94.5%) and includes a risk management file per ISO 14971. However, it lacks comprehensive adversarial testing and technical redundancy measures, which are crucial for high-risk AI systems as per Article 15. The system's reliance on human confirmation post-flagging raises concerns about robustness and error resilience. While it logs inferences, it does not fully address cybersecurity vulnerabilities, particularly against adversarial attacks."
     },
     {
         "Mapped_ID": "TECH_ROB_02",
         "Requirement_Name": "Cyberattack Resilience",
-        "Score": 4,
-        "Auditor_Notes": "The document demonstrates strong cybersecurity measures, including adversarial testing and input validation, aligning with the requirement for resilience against unauthorized alterations. However, the issue of linking driver IDs to optimization logs raises concerns about data minimization and potential vulnerabilities. While the system is robust, the unresolved bias issue in route allocation could lead to biased outputs, which is a risk factor. Overall, the system meets most compliance criteria but has areas needing improvement."
+        "Score": 3,
+        "Auditor_Notes": "The document outlines some design and development processes, including data governance and risk management. However, it lacks comprehensive cybersecurity measures against adversarial attacks, as it states that specific testing against medical adversarial attacks was not prioritized. This does not fully align with the requirement for resilience against unauthorized alterations and adequate cybersecurity protection."
     },
     {
         "Mapped_ID": "TECH_ROB_03",
         "Requirement_Name": "Corrigibility",
-        "Score": 2,
-        "Auditor_Notes": "The document identifies some objectives related to responsible AI use, such as human oversight and data management. However, it lacks comprehensive documentation of objectives guiding responsible development, particularly regarding fairness and bias mitigation. The unresolved bias issue in route allocation indicates insufficient integration of fairness objectives. Additionally, the lack of explainability for route suggestions undermines transparency and accountability, which are critical objectives. Overall, while some measures are in place, significant gaps remain in fully addressing the documented criteria for responsible AI use."
+        "Score": 3,
+        "Auditor_Notes": "The document outlines some objectives related to responsible AI use, such as accuracy and data privacy, but lacks comprehensive documentation of specific objectives guiding the responsible development of the AI system. While it mentions 'fairness' and 'corrigibility' through features like error logging, it does not fully integrate these objectives into the design and development processes as required by B.6.1.2 and B.9.3. The absence of explicit mechanisms for human oversight and the lack of a clear strategy for addressing performance deficiencies further limit compliance."
     },
     {
         "Mapped_ID": "PRIV_DATA_01",
         "Requirement_Name": "Training Data Suitability",
-        "Score": 3,
-        "Auditor_Notes": "The document outlines data sources and cleansing processes, indicating some adherence to data quality requirements. However, it fails to address the identified bias in route allocation based on age, which could negatively impact fairness and fundamental rights. Additionally, while data provenance is mentioned, the documentation lacks comprehensive details on how data was selected and potential biases were examined, as required by the regulatory references."
+        "Score": 4,
+        "Auditor_Notes": "The document outlines data governance practices, including anonymization and demographic stratification, which align with the requirement for data quality. However, while it mentions testing for bias, the accuracy drop for pediatric patients indicates potential discrimination risks. The lack of a mechanism to block processing for underage patients without age metadata is a concern. Overall, the data acquisition and quality measures are well-documented but could improve in addressing bias mitigation comprehensively."
     },
     {
         "Mapped_ID": "PRIV_DATA_02",
         "Requirement_Name": "No Copyright Infringement",
         "Score": 4,
-        "Auditor_Notes": "The document outlines the acquisition of data, including licensed mapping data and historical telemetry, adhering to copyright laws. However, it lacks a clear policy to identify and respect reservations of rights as per Article 4(3) of Directive (EU) 2019/790. While it mentions compliance with licenses, it does not explicitly address the need for authorization from rightsholders for text and data mining, which is a critical aspect of the requirement."
+        "Auditor_Notes": "The document outlines data acquisition and selection processes, including exclusive rights under the 'NV-Academic-Collab-2024' agreement. However, it lacks explicit mention of compliance with Article 4(3) of Directive (EU) 2019/790 regarding reservations of rights by rightsholders. While the organization has a policy for copyright compliance, it does not detail how it identifies and respects these reservations, which is necessary for full compliance."
     },
     {
         "Mapped_ID": "PRIV_DATA_03",
         "Requirement_Name": "User Privacy Protection",
-        "Score": 2,
-        "Auditor_Notes": "The document outlines some data management processes, such as data encryption and validation. However, it fails to adhere to data minimization principles, as it links driver IDs to optimization logs, violating privacy regulations (Ref: 69). Additionally, the unresolved bias issue in route allocation raises concerns about compliance with fairness and discrimination laws (Ref: 70). Overall, while some measures are in place, significant gaps remain in ensuring full compliance with data protection requirements."
+        "Score": 4,
+        "Auditor_Notes": "The document outlines robust data governance practices, including anonymization and de-identification of training data, aligning with GDPR principles (69). However, while the data acquisition process is compliant, the lack of explicit patient disclosure regarding AI involvement in prioritization may raise concerns about transparency (70). Additionally, the system does not block processing for pediatric patients despite known accuracy issues, which could pose risks (64). Overall, the data management processes are well-documented but could improve in user transparency."
     },
     {
         "Mapped_ID": "TRANSP_01",
         "Requirement_Name": "Capabilities, Performance, and Limitations",
-        "Score": 3,
-        "Auditor_Notes": "The document outlines some verification and validation measures, including performance metrics like MAE and uptime. However, it lacks comprehensive evaluation criteria and detailed documentation of the model's capabilities and limitations, particularly regarding the impact on individuals and groups. The absence of a clear plan for ongoing monitoring and evaluation further limits compliance with the specified requirements."
+        "Score": 4,
+        "Auditor_Notes": "The document outlines verification and validation measures, including accuracy metrics (Sensitivity: 99.2%, Specificity: 94.5%) and testing methodologies. However, it lacks detailed evaluation criteria for risks related to impacts on individuals and does not specify comprehensive release criteria. While it provides a good understanding of the model's capabilities, the absence of explicit risk assessment documentation limits full compliance with the regulatory requirements."
     },
     {
         "Mapped_ID": "TRANSP_02",
         "Requirement_Name": "Interpretability",
-        "Score": 2,
-        "Auditor_Notes": "The system lacks sufficient transparency for users to interpret outputs effectively. While it provides a 'System Generated' watermark, it fails to explain counter-intuitive routing decisions, leading to low trust and frequent overrides. This violates the requirement for high-risk AI systems to enable human oversight and understanding of outputs, as outlined in the regulatory references. The identified bias in workload allocation further complicates the interpretability of the system's decisions."
+        "Score": 3,
+        "Auditor_Notes": "The NeuroScan-Assist system provides some transparency through features like the heatmap visualization and logging of inferences. However, it lacks explicit user disclosure about AI involvement in patient prioritization, which may lead to automation bias. The user manual warns against pediatric use but does not prevent processing without age metadata. Overall, while there are measures for interpretability, the absence of comprehensive user information limits full compliance with the requirement for high-risk AI systems."
     },
     {
         "Mapped_ID": "TRANSP_03",
         "Requirement_Name": "Disclosure of AI",
-        "Score": 3,
-        "Auditor_Notes": "The document indicates that drivers are informed about AI monitoring through their employment contracts and that AI-generated schedules are marked as 'System Generated.' However, it lacks comprehensive explanations for AI decisions, which may hinder user understanding. The absence of rationale for counter-intuitive routes could lead to distrust, violating transparency obligations under Article 50. While some disclosure is present, the lack of detailed explanations reduces overall compliance."
+        "Score": 2,
+        "Auditor_Notes": "The document lacks explicit disclosure to patients that their scans are prioritized by AI, which is a requirement under Article 50. While radiologists are trained on the AI system, patients are only informed generically about 'automated data processing.' This does not meet the obligation to ensure that natural persons are informed they are interacting with an AI system, as required for systems directly interacting with individuals."
     },
     {
         "Mapped_ID": "TRANSP_04",
         "Requirement_Name": "Traceability",
-        "Score": 2,
-        "Auditor_Notes": "The system outputs are marked with a 'System Generated' watermark, but this does not meet the requirement for machine-readable format as specified in the regulatory references. The lack of explainability for route suggestions further undermines transparency, as users cannot discern the rationale behind AI decisions. Additionally, the system does not generate synthetic content like audio or video, which may exempt it from some obligations, but it still falls short in providing adequate information to users."
+        "Score": 3,
+        "Auditor_Notes": "The system outputs are marked with a metadata tag (AI_PRIORITY: TRUE), indicating AI involvement. However, patients are not explicitly informed that their scans were prioritized by AI, which does not fully meet the transparency obligation. The lack of clear disclosure at the point of care and the absence of machine-readable marking for the AI's assistive function limits compliance with the requirement for marking outputs as artificially generated or manipulated."
     },
     {
         "Mapped_ID": "TRANSP_05",
         "Requirement_Name": "Explainability",
         "Score": 3,
-        "Auditor_Notes": "The document provides a general description of the AI system, its intended purpose, and some technical capabilities. However, it lacks comprehensive details on technical limitations, monitoring capabilities, and specific design choices. The explainability issue regarding route suggestions also undermines transparency. While there is some traceability through logging, the lack of rationale for decisions affects user understanding, which is critical for compliance with the AI Act and ISO/IEC 42001 standards."
+        "Auditor_Notes": "The document provides a general description of the AI system, its intended purpose, and some technical details. However, it lacks comprehensive information on technical limitations, monitoring capabilities, and specific user instructions. While there is a heatmap for interpretability, patients are not informed about AI involvement, which affects transparency. The user manual warns against pediatric use but does not block processing, indicating a gap in risk management. Overall, while some documentation exists, it does not fully meet the requirement for comprehensive traceability and explainability."
     },
     {
         "Mapped_ID": "TRANSP_06",
         "Requirement_Name": "Risks",
         "Score": 3,
-        "Auditor_Notes": "The document outlines a risk assessment process and identifies risks, such as driver fatigue and age-based discrimination. However, it lacks a comprehensive AI system impact assessment and does not fully evaluate the potential consequences for individuals or society, particularly regarding the unresolved bias issue. The risk management system is mentioned but needs clearer documentation and maintenance details to meet the requirements fully."
+        "Auditor_Notes": "The document outlines a risk management system and identifies key risks, such as 'Alert Fatigue.' However, it lacks a comprehensive AI system impact assessment process as required by ISO/IEC 42001, particularly in evaluating potential consequences for individuals and societies. While risks are acknowledged, the documentation does not fully demonstrate a systematic approach to continuous risk evaluation and treatment throughout the AI system's lifecycle."
     },
     {
         "Mapped_ID": "TRANSP_07",
         "Requirement_Name": "Evaluations",
-        "Score": 3,
-        "Auditor_Notes": "The document outlines some verification and validation measures, such as performance metrics and risk assessments. However, it lacks comprehensive documentation of evaluation strategies and results, particularly regarding the standardized protocols mentioned in the regulatory references. The issue of bias in route allocation remains unresolved, indicating a gap in evaluating impacts on individuals. More detailed technical documentation and evaluation criteria are needed to fully comply with the requirements."
+        "Score": 4,
+        "Auditor_Notes": "The document outlines verification and validation measures, including evaluation against standardized protocols (MICCAI-Stroke-Benchmark) and logging of inference results. However, while it mentions a risk management file and evaluation strategies, it lacks detailed documentation on specific testing methodologies and criteria for model evaluation. The absence of explicit release criteria and comprehensive evaluation results limits full compliance with the regulatory requirements."
     },
     {
         "Mapped_ID": "TRANSP_08",
         "Requirement_Name": "General Description",
         "Score": 4,
-        "Auditor_Notes": "The document provides a general description of the AI system, including its intended purpose, provider, and version. However, it lacks detailed information on technical limitations, monitoring capabilities, and how the system interacts with other hardware or software, which are required by the regulatory references. The absence of these elements prevents a full score."
+        "Auditor_Notes": "The document provides a general description of the AI system, including its intended purpose, provider name, and version. However, it lacks detailed information on technical limitations, monitoring capabilities, and how the system interacts with other hardware/software. While it meets many requirements, additional details on deployment assumptions and comprehensive technical documentation elements are needed for full compliance."
     },
     {
         "Mapped_ID": "FAIR_01",
         "Requirement_Name": "Representation — Absence of Bias",
-        "Score": 2,
-        "Auditor_Notes": "The document outlines data sources and quality measures, but it fails to adequately address the requirement for data quality safeguards against biased outputs. The identified bias in route allocation based on driver age remains unresolved, indicating a lack of effective mitigation measures. Additionally, while data cleansing is mentioned, the direct linking of Driver IDs to optimization logs violates data minimization principles, further compromising data quality."
+        "Score": 3,
+        "Auditor_Notes": "The document outlines data governance practices, including anonymization and demographic representation, but lacks explicit documentation of defined data quality requirements. While it mentions data suitability and testing for bias, it does not detail safeguards against biased outputs influencing future operations, as required for continually learning high-risk systems. The absence of a comprehensive risk management strategy addressing feedback loops is a notable gap."
     },
     {
         "Mapped_ID": "FAIR_02",
         "Requirement_Name": "Fairness — Absence of Discrimination",
-        "Score": 2,
-        "Auditor_Notes": "The document identifies a significant fairness issue regarding age-based discrimination in route allocation but lacks a comprehensive assessment of potential impacts on individuals or groups throughout the system's life cycle. While it mentions the issue, it does not provide a documented process for assessing societal impacts or the consequences of the AI system's deployment, as required by A.5.2 and A.5.4. The mitigation status remains open and unresolved, indicating insufficient compliance with the regulatory requirements."
+        "Score": 3,
+        "Auditor_Notes": "The document includes some assessment of potential impacts, particularly regarding demographic representation and performance across different age groups. However, it lacks comprehensive documentation of the AI system's impacts on individuals or groups throughout its life cycle, as required by A.5.4 and B.5.2. The warning about pediatric use is insufficient without a broader impact assessment process or documentation of societal impacts."
     },
     {
         "Mapped_ID": "SOC_ENV_01",
         "Requirement_Name": "Environmental Impact",
-        "Score": 4,
-        "Auditor_Notes": "The document assesses societal impacts, particularly environmental sustainability, by reporting a 12% fuel reduction and CO2 savings. However, it lacks comprehensive documentation on the computational resources used for training the model and their energy consumption, which is required by ISO/IEC 42001:2023. While it mentions energy costs, it does not fully meet the requirement for detailed resource identification and impact assessment."
+        "Score": 3,
+        "Auditor_Notes": "The document includes some information on energy consumption (0.5g CO2 per scan) and mentions optimization for low-power GPUs, aligning with ISO/IEC 42001:2023 requirements. However, it lacks a comprehensive assessment of societal impacts and does not detail the computational resources used for training the model, which is necessary for full compliance with the standards."
     },
     {
         "Mapped_ID": "SOC_ENV_02",
         "Requirement_Name": "Harmful Content and Toxicity",
-        "Score": 2,
-        "Auditor_Notes": "The document outlines a risk assessment process but lacks a comprehensive AI system impact assessment as required by 6.1.4. While it identifies some risks (e.g., driver fatigue), it does not fully assess potential consequences for individuals or society, particularly regarding the age-based discrimination issue. The mitigation status for this bias is currently unresolved, indicating insufficient measures to prevent undesirable behavior, which is a requirement under the AI Act and ISO/IEC 42001 standards."
+        "Score": 3,
+        "Auditor_Notes": "The document outlines some risk management processes, including a dedicated ISO 14971 Risk Management file and a warning for pediatric use. However, it lacks a comprehensive AI system impact assessment process as required by ISO/IEC 42001, particularly in assessing potential consequences for individuals and societies throughout the AI system's life cycle. While there is some consideration of risks, the absence of a structured impact assessment limits compliance."
     },
     {
         "Mapped_ID": "HUM_AGENCY_01",
         "Requirement_Name": "Human Agency & Oversight",
         "Score": 3,
-        "Auditor_Notes": "The document outlines a 'Human-in-the-Loop' approach, ensuring human oversight in route approval, which aligns with the requirement for human agency. However, it lacks documented objectives for responsible AI use, such as fairness and accountability, particularly regarding the identified age-based discrimination in route allocation. The absence of mechanisms to address this bias and the lack of explanations for counter-intuitive routes further detract from compliance with ISO/IEC 42001 objectives for responsible AI use."
+        "Auditor_Notes": "The document outlines the intended use of NeuroScan-Assist as a triage tool, emphasizing human oversight in the workflow. However, it lacks explicit documentation of objectives guiding responsible AI use, such as fairness and accountability. The 'Auto-Referral' feature raises concerns about bypassing human confirmation, which may undermine personal autonomy. While there are mechanisms for error logging and retraining, the absence of comprehensive objectives limits compliance with ISO/IEC 42001 requirements for responsible AI development."
     }
 ]
