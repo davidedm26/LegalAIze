@@ -7,17 +7,19 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./models:/app/models:ro
       - ./params.yaml:/app/params.yaml:ro
-      - ./data/processed/vector_index:/app/data/processed/vector_index:ro
     environment:
       - PYTHONUNBUFFERED=1
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    depends_on:
+      - qdrant
 
   frontend:
     build: ./frontend

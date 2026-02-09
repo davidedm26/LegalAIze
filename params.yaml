@@ -14,16 +14,16 @@ vectorization:
   vector_index_path: "data/processed/vector_index"
 
 precompute:
-  top_k: 5  # number of chunks per requirement in precompute_rag
+  top_k: 4  # number of chunks per requirement in precompute_rag
   chunks_output: "data/processed/requirement_chunks.json"
 
 evaluation:
   random_seed: 42
   llm_model: "gpt-4o-mini"  # documented for reproducibility
-  llm_temperature: 0.1
+  llm_temperature: 0
   mlflow_experiment: "rag_evaluation"
   metrics_output: "metrics/rag_eval.json"
-  case_selector: 4  # e.g., 2 or [1,3] to evaluate specific cases; null runs all
+  case_selector: 1  # e.g., 2 or [1,3] to evaluate specific cases; null runs all
   ground_truth:
     - name: "Evaluation1"
       document_path: "data/ground_truth/raw_data/Evaluation1/documentation.txt"
