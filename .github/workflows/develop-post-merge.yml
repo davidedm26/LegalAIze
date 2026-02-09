@@ -142,13 +142,18 @@ jobs:
         run: |
           python - <<'PY'
           import mlflow
-          runs = mlflow.search_runs(max_results=1, order_by=["start_time DESC"])
-          if runs.empty:
-              print("No MLflow runs found")
+          mlflow.set_tracking_uri("https://dagshub.com/${{ github.repository }}.mlflow")
+          exp = mlflow.get_experiment_by_name("rag_evaluation")
+          if not exp:
+              print("Experiment rag_evaluation not found")
           else:
-              row = runs.iloc[0]
-              print(f"Latest run: {row.run_id} (status={row.status})")
-              for col in runs.columns:
-                  if col.startswith("metrics."):
-                      print(f"{col}: {row[col]}")
+              runs = mlflow.search_runs([exp.experiment_id], max_results=5, order_by=["start_time DESC"])
+              if runs.empty:
+                  print("No runs in rag_evaluation")
+              else:
+                  row = runs.iloc[0]
+                  print(f"Latest run: {row.run_id} (status={row.status})")
+                  for col in runs.columns:
+                      if col.startswith("metrics."):
+                          print(f"{col}: {row[col]}")
           PY
