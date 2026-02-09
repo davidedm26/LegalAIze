@@ -7,7 +7,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copia codice frontend
-COPY app.py .
+COPY . .
 
 # Esponi porta Streamlit
 EXPOSE 8501

@@ -91,7 +91,7 @@ stages:
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: 8f18fb81eb9bac57752a8a53d1755b29.dir
+      md5: 48916d3bcca5956acfea84c389e1ae2c.dir
       size: 5136943
       nfiles: 4
   precompute_rag:
@@ -103,7 +103,7 @@ stages:
       size: 13552
     - path: data/processed/vector_index
       hash: md5
-      md5: 8f18fb81eb9bac57752a8a53d1755b29.dir
+      md5: 48916d3bcca5956acfea84c389e1ae2c.dir
       size: 5136943
       nfiles: 4
     - path: params.yaml
@@ -130,7 +130,7 @@ stages:
     outs:
     - path: data/processed/requirement_chunks.json
       hash: md5
-      md5: 7002ab79e690834c180b59e899d41bd6
+      md5: e67989681f95c120ec1e23ae43f5477d
       size: 100985
   evaluate_rag:
     cmd: python evaluate_rag.py
