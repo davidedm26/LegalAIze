@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - develop
-      #- feat/** # Added for testing, to be removed afterwards
+      - feat/** # Added for testing, to be removed afterwards
 
 permissions:
   contents: write 
@@ -118,21 +118,21 @@ jobs:
         run: |
           dvc repro
 
-      - name: Push artifacts to DVC
-        run: |
-          dvc push
-        continue-on-error: true
+      #- name: Push artifacts to DVC
+      #  run: |
+      #    dvc push
+      #  continue-on-error: true
 
-      - name: Commit DVC metadata
-        env:
-          GIT_AUTHOR_NAME: github-actions
-          GIT_AUTHOR_EMAIL: actions@github.com
-        run: |
-          git config --local user.name "${GIT_AUTHOR_NAME}"
-          git config --local user.email "${GIT_AUTHOR_EMAIL}"
-          git add dvc.lock .dvc/config
-          git commit -m "Update DVC artifacts" || echo "No DVC changes to commit"
-          git push
+      # - name: Commit DVC metadata
+      #   env:
+      #     GIT_AUTHOR_NAME: github-actions
+      #     GIT_AUTHOR_EMAIL: actions@github.com
+      #   run: |
+      #     git config --local user.name "${GIT_AUTHOR_NAME}"
+      #     git config --local user.email "${GIT_AUTHOR_EMAIL}"
+      #     git add dvc.lock .dvc/config
+      #     git commit -m "Update DVC artifacts" || echo "No DVC changes to commit"
+      #     git push
 
       - name: Show latest MLflow metrics
         env:
