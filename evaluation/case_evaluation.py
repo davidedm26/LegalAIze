@@ -6,7 +6,12 @@ from typing import Dict, Any, List, Optional, Tuple
 import numpy as np
 
 from evaluation.data_loading import load_ground_truth_csv, load_text
-from evaluation.metrics import compute_mae, compute_note_similarity, compute_groundedness_score
+from evaluation.metrics import (
+    compute_mae,
+    compute_note_similarity,
+    compute_groundedness_score,
+    compute_faithfulness_score,
+)
 from evaluation.preprocessing import (
     split_document_for_groundedness,
     build_requirement_question,
@@ -134,6 +139,7 @@ def evaluate_single_case(
 
     # Compute groundedness for this case
     case_groundedness_score = compute_groundedness_score(groundedness_records)
+    case_faithfulness_score = compute_faithfulness_score(groundedness_records)
 
     return (
         {
@@ -144,6 +150,8 @@ def evaluate_single_case(
             "mean_note_similarity": mean_note_similarity,
             "groundedness_score": case_groundedness_score,
             "groundedness_sample_count": len(groundedness_records),
+            "faithfulness_score": case_faithfulness_score,
+            "faithfulness_sample_count": len(groundedness_records),
         },
         groundedness_records,
     )

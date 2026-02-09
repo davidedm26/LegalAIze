@@ -25,6 +25,33 @@ params = load_params()
 vect_params = params.get("vectorization", {})
 eval_params = params.get("evaluation", {})
 
+
+# Static prompt template (placeholders only, no injected content)
+PROMPT_TEMPLATE = """
+You are an expert auditor in regulatory compliance for AI systems, specialized in AI Act and ISO/IEC 42001 standards.
+
+Evaluate the compliance of the provided document against the specified requirement. Use the extracted regulatory references as additional context to interpret the requirement.
+
+Document to evaluate:
+{document_text}
+
+Requirement to verify:
+{requirement_text}
+
+Relevant regulatory references (extracted from legal corpus):
+{regulatory_references}
+
+Instructions:
+- Score: An integer from 0 to 5 (0 = no compliance, 5 = maximum compliance).
+- Auditor Notes: A concise note (max 100 words) explaining the evaluation, citing evidence from the document and references.
+- If you cannot determine a score, return N/A for the score and explain in the notes.
+Respond exclusively in valid JSON format:
+{{
+    "score": integer from 0 to 5,
+    "auditor_notes": "note text"
+}}
+"""
+
 RequirementScore = Union[int, str]
 
 
@@ -33,6 +60,7 @@ class RequirementReport(BaseModel):
     Requirement_Name: str
     Score: RequirementScore
     Auditor_Notes: str
+    Prompt: str  # static prompt template (no injected chunks/document)
 
 
 class AuditResponse(BaseModel):
@@ -141,30 +169,11 @@ def evaluate_requirement(
     chunks_text = [chunk.get("content", "") for chunk in pre_chunks]
     chunks_joined = "\n".join(chunks_text)
 
-    prompt = f"""
-You are an expert auditor in regulatory compliance for AI systems, specialized in AI Act and ISO/IEC 42001 standards.
-
-Evaluate the compliance of the provided document against the specified requirement. Use the extracted regulatory references as additional context to interpret the requirement.
-
-Document to evaluate:
-{document_text}
-
-Requirement to verify:
-{req_text}
-
-Relevant regulatory references (extracted from legal corpus):
-{chunks_joined}
-
-Instructions:
-- Score: An integer from 0 to 5 (0 = no compliance, 5 = maximum compliance).
-- Auditor Notes: A concise note (max 100 words) explaining the evaluation, citing evidence from the document and references.
-- If you cannot determine a score, return N/A for the score and explain in the notes.
-Respond exclusively in valid JSON format:
-{{
-    "score": integer from 0 to 5,
-    "auditor_notes": "note text"
-}}
-"""
+    prompt = PROMPT_TEMPLATE.format(
+        document_text=document_text,
+        requirement_text=req_text,
+        regulatory_references=chunks_joined,
+    )
 
     assert llm is not None
     llm_response = llm.invoke(prompt).content.strip()
@@ -183,6 +192,7 @@ Respond exclusively in valid JSON format:
         Requirement_Name=requirement_name,
         Score=score_0_5 if isinstance(score_0_5, int) else "N/A",
         Auditor_Notes=auditor_notes,
+        Prompt=PROMPT_TEMPLATE.strip(),
     )
 
 

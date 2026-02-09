@@ -1,7 +1,12 @@
 """Evaluation module for RAG system."""
 
 from evaluation.data_loading import load_params, load_text, load_ground_truth_csv
-from evaluation.metrics import compute_mae, compute_note_similarity, compute_groundedness_score
+from evaluation.metrics import (
+    compute_mae,
+    compute_note_similarity,
+    compute_groundedness_score,
+    compute_faithfulness_score,
+)
 from evaluation.preprocessing import (
     split_document_for_groundedness,
     build_requirement_question,
@@ -19,6 +24,7 @@ __all__ = [
     "compute_mae",
     "compute_note_similarity",
     "compute_groundedness_score",
+    "compute_faithfulness_score",
     "split_document_for_groundedness",
     "build_requirement_question",
     "select_relevant_contexts",

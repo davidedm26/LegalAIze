@@ -45,7 +45,6 @@ def main() -> None:
     case_selector = normalize_case_selector(eval_params.get("case_selector"))
 
     groundedness_top_k = int(groundedness_params.get("top_k", 3))
-    groundedness_threshold = float(groundedness_params.get("threshold", 0.75))
     groundedness_chunk_size = int(
         groundedness_params.get(
             "chunk_size",
@@ -84,6 +83,11 @@ def main() -> None:
         if mlflow is not None and tracking_uri
         else None
     )
+    prompt_template_path = None
+    if run_ctx is not None and rag_engine is not None:
+        with tempfile.NamedTemporaryFile("w", suffix="_prompt_template.txt", delete=False, encoding="utf-8") as f:
+            f.write(getattr(rag_engine, "PROMPT_TEMPLATE", "").strip())
+            prompt_template_path = f.name
     
     if rag_engine is None:
         raise RuntimeError("backend.rag_engine is not available. Run evaluate_rag from the repository root.")
@@ -112,6 +116,8 @@ def main() -> None:
             mlflow.log_param("precompute_top_k", precompute_params.get("top_k", 3))
             mlflow.log_param("chunk_size", ingestion_params.get("chunk_size"))
             mlflow.log_param("chunk_overlap", ingestion_params.get("chunk_overlap"))
+            if prompt_template_path and os.path.exists(prompt_template_path):
+                mlflow.log_artifact(prompt_template_path, artifact_path="inputs")
         
 
         filtered_cases = select_cases(gt_cases, case_selector)
@@ -159,6 +165,9 @@ def main() -> None:
                     if res.get("groundedness_score") is not None:
                         mlflow.log_metric(f"{name}_groundedness", res["groundedness_score"])
                         mlflow.log_metric(f"{name}_groundedness_samples", res.get("groundedness_sample_count", 0))
+                    if res.get("faithfulness_score") is not None:
+                        mlflow.log_metric(f"{name}_faithfulness", res["faithfulness_score"])
+                        mlflow.log_metric(f"{name}_faithfulness_samples", res.get("faithfulness_sample_count", 0))
                     # Log any artifacts generated during evaluation 
                     artifact_paths = res.get("artifacts", {})
                     for label, file_path in artifact_paths.items():
@@ -173,6 +182,7 @@ def main() -> None:
             total_pairs = sum(r["num_pairs"] for r in all_results)
             total_note_pairs = sum(r.get("note_similarity_count", 0) for r in all_results)
             total_groundedness_samples = sum(r.get("groundedness_sample_count", 0) for r in all_results)
+            total_faithfulness_samples = sum(r.get("faithfulness_sample_count", 0) for r in all_results)
             
             # Weighted MAE by number of pairs
             weighted_mae = (
@@ -190,7 +200,9 @@ def main() -> None:
             )
             # Weighted groundedness by sample count
             weighted_groundedness = None
+            weighted_faithfulness = None
             groundedness_results = [r for r in all_results if r.get("groundedness_score") is not None]
+            faithfulness_results = [r for r in all_results if r.get("faithfulness_score") is not None]
             if groundedness_results and total_groundedness_samples > 0:
                 weighted_groundedness = (
                     sum(
@@ -198,22 +210,33 @@ def main() -> None:
                         for r in groundedness_results
                     ) / total_groundedness_samples
                 )
+            if faithfulness_results and total_faithfulness_samples > 0:
+                weighted_faithfulness = (
+                    sum(
+                        r["faithfulness_score"] * r.get("faithfulness_sample_count", 0)
+                        for r in faithfulness_results
+                    ) / total_faithfulness_samples
+                )
         else:
             total_pairs = 0
             total_note_pairs = 0
             total_groundedness_samples = 0
+            total_faithfulness_samples = 0
             weighted_mae = 0.0
             weighted_note_similarity = 0.0
             weighted_groundedness = None
+            weighted_faithfulness = None
 
         summary = {
             "total_cases": len(all_results),
             "total_score_pairs": total_pairs,
             "weighted_mae_score": weighted_mae,
-            
             "total_note_pairs": total_note_pairs,
             "mean_note_similarity": weighted_note_similarity,
-            
+            "total_groundedness_samples": total_groundedness_samples,
+            "total_faithfulness_samples": total_faithfulness_samples,
+            "mean_groundedness_score": weighted_groundedness,
+            "mean_faithfulness_score": weighted_faithfulness,
             "cases": all_results,
         }
 
@@ -222,7 +245,11 @@ def main() -> None:
             summary["groundedness"] = {
                 "mean_score": weighted_groundedness,
                 "sample_count": total_groundedness_samples,
-                "threshold": groundedness_threshold,
+            }
+        if weighted_faithfulness is not None:
+            summary["faithfulness"] = {
+                "mean_score": weighted_faithfulness,
+                "sample_count": total_faithfulness_samples,
             }
 
         # Save metrics to JSON (for DVC)
@@ -238,6 +265,9 @@ def main() -> None:
             if weighted_groundedness is not None:
                 mlflow.log_metric("groundedness_score", weighted_groundedness)
                 mlflow.log_metric("groundedness_samples", total_groundedness_samples)
+            if weighted_faithfulness is not None:
+                mlflow.log_metric("faithfulness_score", weighted_faithfulness)
+                mlflow.log_metric("faithfulness_samples", total_faithfulness_samples)
             
             # Log the metrics file as artifact
             mlflow.log_artifact(metrics_output)

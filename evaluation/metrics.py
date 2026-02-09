@@ -10,12 +10,22 @@ except ImportError:
 
 try:
     from ragas import evaluate as ragas_evaluate
-    from ragas.metrics import ResponseGroundedness
+    from ragas.metrics import Faithfulness, ResponseGroundedness
 except ImportError:
     ragas_evaluate = None
     ResponseGroundedness = None
+    Faithfulness = None
 
-RAGAS_AVAILABLE = Dataset is not None and ragas_evaluate is not None and ResponseGroundedness is not None
+RAGAS_GROUNDEDNESS_AVAILABLE = (
+    Dataset is not None
+    and ragas_evaluate is not None
+    and ResponseGroundedness is not None
+)
+RAGAS_FAITHFULNESS_AVAILABLE = (
+    Dataset is not None
+    and ragas_evaluate is not None
+    and Faithfulness is not None
+)
 
 
 def compute_mae(gt_scores: List[float], pred_scores: List[float]) -> float:
@@ -57,7 +67,8 @@ def compute_groundedness_score(samples: List[Dict[str, Any]]) -> Optional[float]
     """Compute groundedness score for a list of samples using Ragas."""
     if not samples:
         return None
-    if not RAGAS_AVAILABLE:
+    if not RAGAS_GROUNDEDNESS_AVAILABLE:
+        print("⚠ RAGAS groundedness metric unavailable (check ragas/datasets installation).")
         return None
     
     try:
@@ -101,4 +112,54 @@ def compute_groundedness_score(samples: List[Dict[str, Any]]) -> Optional[float]
             return None
     except Exception as e:
         print(f"⚠ Failed to compute groundedness: {e}")
+        return None
+
+
+def compute_faithfulness_score(samples: List[Dict[str, Any]]) -> Optional[float]:
+    """Compute faithfulness score for a list of samples using Ragas."""
+    if not samples:
+        return None
+    if not RAGAS_FAITHFULNESS_AVAILABLE:
+        print("⚠ RAGAS faithfulness metric unavailable (check ragas/datasets installation).")
+        return None
+
+    try:
+        from backend import rag_engine
+    except ImportError:
+        return None
+
+    try:
+        assert Dataset is not None
+        assert ragas_evaluate is not None
+        assert Faithfulness is not None
+        assert rag_engine is not None
+
+        ragas_dataset = Dataset.from_list(
+            [
+                {
+                    "question": sample["question"],
+                    "answer": sample["answer"],
+                    "contexts": sample["contexts"],
+                    "ground_truth": sample.get("ground_truth", ""),
+                }
+                for sample in samples
+            ]
+        )
+        ragas_result = ragas_evaluate(
+            dataset=ragas_dataset,
+            metrics=[Faithfulness()],
+            llm=rag_engine.llm,
+        )
+        df = ragas_result.to_pandas()
+        if "nv_response_faithfulness" in df.columns:
+            return float(df["nv_response_faithfulness"].mean())
+        elif "response_faithfulness" in df.columns:
+            return float(df["response_faithfulness"].mean())
+        elif "faithfulness" in df.columns:
+            return float(df["faithfulness"].mean())
+        else:
+            print(f"⚠ Available faithfulness columns: {list(df.columns)}")
+            return None
+    except Exception as e:
+        print(f"⚠ Failed to compute faithfulness: {e}")
         return None
