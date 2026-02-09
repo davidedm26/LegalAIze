@@ -1,39 +1,5 @@
 schema: '2.0'
 stages:
-  train:
-    cmd: python train_model.py
-    deps:
-    - path: data/
-      hash: md5
-      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
-      size: 0
-      nfiles: 1
-    - path: params.yaml
-      hash: md5
-      md5: 190181a863f1db18654d6e70e28e3e2c
-      size: 135
-    - path: train_model.py
-      hash: md5
-      md5: 154c4caeef74803e12241151c920014f
-      size: 2804
-    params:
-      params.yaml:
-        model:
-          max_depth: 5
-          n_estimators: 120
-          random_state: 42
-        train:
-          test_size: 0.2
-          random_state: 42
-    outs:
-    - path: metrics.json
-      hash: md5
-      md5: e53fffc12e23345b3fedebbd08b070b1
-      size: 40
-    - path: models/model.pkl
-      hash: md5
-      md5: 2c2c99e7ed9548fa2afc1a2d7bb8b90c
-      size: 200977
   ingest:
     cmd: python data_ingestion.py
     deps:
@@ -47,12 +13,8 @@ stages:
       size: 2646955
     - path: data_ingestion.py
       hash: md5
-      md5: 21f16f09f1fbe9ca3d8c8917c70f6051
-      size: 3353
-    - path: params.yaml
-      hash: md5
-      md5: 2f2fb88a6143fb2e807e0c541a167c5e
-      size: 1607
+      md5: 1bdd1c37329d416183e46053b392fed3
+      size: 3447
     params:
       params.yaml:
         ingestion:
@@ -63,23 +25,19 @@ stages:
     outs:
     - path: data/processed/chunks.json
       hash: md5
-      md5: cce4bda3c0911e4591bb898e1f16481f
-      size: 914485
+      md5: 30dbdcf19f8e7e4d30d649432a56b451
+      size: 919736
   vectorize:
     cmd: python vectorize_data.py
     deps:
     - path: data/processed/chunks.json
       hash: md5
-      md5: cce4bda3c0911e4591bb898e1f16481f
-      size: 914485
-    - path: params.yaml
-      hash: md5
-      md5: 2f2fb88a6143fb2e807e0c541a167c5e
-      size: 1607
+      md5: 30dbdcf19f8e7e4d30d649432a56b451
+      size: 919736
     - path: vectorize_data.py
       hash: md5
-      md5: 82537414d216486892ed40c699064ba2
-      size: 3185
+      md5: af01fbe91f97d2b288ba81fa052acfb8
+      size: 3259
     params:
       params.yaml:
         vectorization:
@@ -91,8 +49,7 @@ stages:
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: ad7a89ac787c3bec0cd4c0f61dfdc062.dir
-      md5: 48916d3bcca5956acfea84c389e1ae2c.dir
+      md5: 8ed94070c6c2412d3f42bab563de321a.dir
       size: 5136943
       nfiles: 4
   precompute_rag:
@@ -104,18 +61,13 @@ stages:
       size: 13552
     - path: data/processed/vector_index
       hash: md5
-      md5: ad7a89ac787c3bec0cd4c0f61dfdc062.dir
-      md5: 48916d3bcca5956acfea84c389e1ae2c.dir
+      md5: 8ed94070c6c2412d3f42bab563de321a.dir
       size: 5136943
       nfiles: 4
-    - path: params.yaml
-      hash: md5
-      md5: 2f2fb88a6143fb2e807e0c541a167c5e
-      size: 1607
     - path: precompute_rag.py
       hash: md5
-      md5: d1360c5a54108cc9cc96dd0397b2368d
-      size: 4577
+      md5: af7142c520a7853e170df3f38f029525
+      size: 4701
     params:
       params.yaml:
         ingestion:
@@ -134,8 +86,6 @@ stages:
       hash: md5
       md5: 9b206186b1edc91b6a031cb2fa25d23e
       size: 80708
-      md5: e67989681f95c120ec1e23ae43f5477d
-      size: 100985
   evaluate_rag:
     cmd: python evaluate_rag.py
     deps:
@@ -154,7 +104,7 @@ stages:
       size: 12406
     - path: evaluation
       hash: md5
-      md5: b50250c57db11e716c1171d43c1c4552.dir
+      md5: 8cfdfaf01bc3ed9d1826f1d057b9cb12.dir
       size: 48091
       nfiles: 14
     params:
@@ -165,7 +115,11 @@ stages:
           llm_temperature: 0
           mlflow_experiment: rag_evaluation
           metrics_output: metrics/rag_eval.json
-          case_selector: 1
+          case_selector:
+          - 1
+          - 2
+          - 3
+          - 4
           ground_truth:
           - name: Evaluation1
             document_path: 
@@ -186,5 +140,5 @@ stages:
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: a75d6b5a45dcdf57ba3549518f734a40
-      size: 1077
+      md5: 06d63464a38c88dcb67bd24161639cf2
+      size: 2635
