@@ -5,6 +5,9 @@ on:
     branches:
       - main
     types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - feat/** # Added for testing, to be removed afterwards
 
 permissions:
   contents: read
@@ -12,6 +15,9 @@ permissions:
 env:
   PYTHON_VERSION: '3.11'
   OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  THRESHOLD_MAE: "2.0"               # adjust to desired max MAE
+  THRESHOLD_GROUNDEDNESS: "0.5"      # adjust to desired min groundedness
+  THRESHOLD_FAITHFULNESS: "0.5"      # adjust to desired min faithfulness
 
 jobs:
   release-checks:
@@ -46,10 +52,65 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-      - name: Backend regression smoke
+      - name: Configure DVC remote (read-only)
+        env:
+          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
-          echo "✓ Backend regression smoke (placeholder)"
+          dvc remote list | grep -q '^origin' || dvc remote add -d origin https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/${{ github.event.repository.name }}.dvc
+          dvc remote default origin
+          dvc remote modify origin --local auth basic
+          dvc remote modify origin --local user ${{ secrets.DAGSHUB_USERNAME }}
+          dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
 
-      - name: Frontend regression smoke
+      - name: Pull data from DVC
+        run: dvc pull
+
+      - name: Run evaluation (no writes)
+        env:
+          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+          MLFLOW_TRACKING_URI: https://dagshub.com/${{ github.repository }}.mlflow
         run: |
-          echo "✓ Frontend regression smoke (placeholder)"
+          python evaluate_rag.py
+
+      - name: Check metric thresholds
+        run: |
+          python - <<'PY'
+          import json, os, sys
+
+          mae_max = float(os.getenv("THRESHOLD_MAE", "inf"))
+          grounded_min = float(os.getenv("THRESHOLD_GROUNDEDNESS", "-inf"))
+          faithful_min = float(os.getenv("THRESHOLD_FAITHFULNESS", "-inf"))
+
+          with open("metrics/rag_eval.json", "r", encoding="utf-8") as f:
+              data = json.load(f)
+
+          mae = float(data.get("weighted_mae_score", 0.0))
+          grounded = data.get("mean_groundedness_score")
+          faithful = data.get("mean_faithfulness_score")
+
+          errors = []
+          if mae > mae_max:
+              errors.append(f"weighted_mae_score {mae:.4f} > max {mae_max}")
+          if grounded is None:
+              errors.append("mean_groundedness_score missing")
+          elif grounded < grounded_min:
+              errors.append(f"mean_groundedness_score {grounded:.4f} < min {grounded_min}")
+          if faithful is None:
+              errors.append("mean_faithfulness_score missing")
+          elif faithful < faithful_min:
+              errors.append(f"mean_faithfulness_score {faithful:.4f} < min {faithful_min}")
+
+          if errors:
+              print("Threshold check failed:\n - " + "\n - ".join(errors))
+              sys.exit(1)
+          else:
+              print("Threshold check passed")
+          PY
+
+      - name: Upload evaluation metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: rag-eval-metrics
+          path: metrics/rag_eval.json
