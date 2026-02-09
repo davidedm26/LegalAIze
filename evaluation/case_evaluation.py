@@ -79,28 +79,25 @@ def evaluate_single_case(
             print(f"⚠ Skipping prediction with missing or unmatched Mapped_ID: {mapped_id}")
             continue
         gt_row = ground_truth[mapped_id]
+
+        gt_score: Optional[float] = None
+        pred_score: Optional[float] = None
+
         try:
-            if gt_row.get("Score") == 'N/A':
-                print(f"⚠ Skipping GT entry with N/A score for Mapped_ID {mapped_id}.")
-                continue
-            else:
+            if gt_row.get("Score") != 'N/A':
                 gt_score = float(gt_row.get("Score", "0"))
         except ValueError:
             print(f"⚠ Invalid GT score for Mapped_ID {mapped_id}: {gt_row.get('Score')}.")
-            continue
 
         try:
-            if pred.get("Score") == 'N/A':
-                print(f"⚠ Skipping prediction with N/A score for Mapped_ID {mapped_id}.")
-                continue
-            else:
+            if pred.get("Score") != 'N/A':
                 pred_score = float(pred.get("Score", "0"))
         except (TypeError, ValueError):
             print(f"⚠ Invalid predicted score for Mapped_ID {mapped_id}: {pred.get('Score')}.")
-            continue
 
-        gt_scores.append(gt_score)
-        pred_scores.append(pred_score)
+        if gt_score is not None and pred_score is not None:
+            gt_scores.append(gt_score)
+            pred_scores.append(pred_score)
 
         gt_note = extract_ground_truth_note(gt_row)
         pred_note = pred.get("Auditor_Notes") or pred.get("auditor_notes")
