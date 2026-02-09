@@ -43,7 +43,8 @@ def evaluate_single_case(
         raise RuntimeError("backend.rag_engine is not available. Run evaluate_rag from the project root.")
 
     audit_response = rag_engine.audit_document(document_text)
-    predictions = [report.model_dump() for report in audit_response.requirements]
+    # Exclude the prompt from logged artifacts to avoid leaking template/content
+    predictions = [report.model_dump(exclude={"Prompt"}) for report in audit_response.requirements]
 
     document_chunks = split_document_for_groundedness(
         document_text,
