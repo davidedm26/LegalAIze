@@ -1,18 +1,15 @@
-FROM python:3.11-slim
+FROM python:3.11-slim  
 
 WORKDIR /app
 
-# Copia requirements e installa dipendenze
+# Copy requirements and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia codice backend
+# Copy backend code
 COPY app.py .
 
-# Crea directory per il modello
-RUN mkdir -p /app/models
-
-# Esponi porta
+# Expose port
 EXPOSE 8000
 
 # Run FastAPI

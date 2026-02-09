@@ -5,28 +5,28 @@ import csv
 import random
 import re
 import tempfile
+import traceback
 from typing import Any, Dict, List, Optional, Tuple
-
 import numpy as np
 
 from dotenv import load_dotenv
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter  
 
-import mlflow
+import mlflow 
 
 try:
-    from datasets import Dataset
+    from datasets import Dataset 
 except ImportError:
     Dataset = None  # type: ignore
 
 try:
     from ragas import evaluate as ragas_evaluate
-    from ragas.metrics import Groundedness
+    from ragas.metrics import ResponseGroundedness 
 except ImportError:
     ragas_evaluate = None  # type: ignore
-    Groundedness = None  # type: ignore
+    ResponseGroundedness = None  # type: ignore
 
-RAGAS_AVAILABLE = Dataset is not None and ragas_evaluate is not None and Groundedness is not None
+RAGAS_AVAILABLE = Dataset is not None and ragas_evaluate is not None and ResponseGroundedness is not None
 
 try:
     from backend import rag_engine
@@ -49,7 +49,7 @@ def load_text(path: str) -> str:
         return f.read()
 
 
-def load_ground_truth_csv(path: str) -> Dict[str, Dict[str, Any]]:
+def load_ground_truth_csv(path: str) -> Dict[str, Dict[str, Any]]: 
     """Load ground truth CSV into a dict keyed by Mapped_ID.
     """
     gt: Dict[str, Dict[str, Any]] = {} # Result dict
@@ -72,14 +72,14 @@ def load_ground_truth_csv(path: str) -> Dict[str, Dict[str, Any]]:
     raise UnicodeDecodeError("utf-8", b"", 0, 1, f"Unable to decode CSV file: {path}")
 
 
-# Distance metrics
+# Distance metrics between GT and predicted scores
 def compute_mae(gt_scores: List[float], pred_scores: List[float]) -> float:
     if not gt_scores:
         return 0.0
     diffs = [abs(g - p) for g, p in zip(gt_scores, pred_scores)] 
     return sum(diffs) / len(diffs)
 
-
+# Similarity between GT and predicted notes using embeddings
 def compute_note_similarity(gt_note: str, pred_note: str) -> float:
     """Compute cosine similarity between ground-truth and predicted notes using embeddings."""
     if not gt_note or not pred_note:
@@ -118,7 +118,7 @@ def normalize_case_selector(selector: Any) -> Optional[List[int]]:
             try:
                 normalized.append(int(item))
             except (TypeError, ValueError):
-                print(f"⚠ Ignoring invalid case selector entry: {item}")
+                print(f"⚠ Ignoring invalid case selector entry : {item}")
         return normalized or None
     try:
         value = int(selector)
@@ -233,6 +233,51 @@ def extract_ground_truth_note(row: Dict[str, Any]) -> Optional[str]:
         or row.get("Auditor_Notes")
     )
 
+def compute_groundedness_score(samples: List[Dict[str, Any]]) -> Optional[float]:
+    """Compute groundedness score for a list of samples using Ragas."""
+    if not samples:
+        return None
+    if not RAGAS_AVAILABLE:
+        return None
+    
+    try:
+        assert Dataset is not None
+        assert ragas_evaluate is not None
+        assert ResponseGroundedness is not None
+        assert rag_engine is not None
+
+        ragas_dataset = Dataset.from_list(
+            [
+                {
+                    "question": sample["question"],
+                    "answer": sample["answer"],
+                    "contexts": sample["contexts"],
+                    "ground_truth": sample.get("ground_truth", ""),
+                }
+                for sample in samples
+            ]
+        )
+        ragas_result = ragas_evaluate(
+            dataset=ragas_dataset,
+            metrics=[ResponseGroundedness()],
+            llm=rag_engine.llm,
+        )
+        # ragas_result is an EvaluationResult - use to_pandas() to get scores
+        df = ragas_result.to_pandas()
+        # Look for nv_response_groundedness column (NV = NVIDIA variant)
+        if 'nv_response_groundedness' in df.columns:
+            return float(df['nv_response_groundedness'].mean())
+        elif 'response_groundedness' in df.columns:
+            return float(df['response_groundedness'].mean())
+        elif 'groundedness' in df.columns:
+            return float(df['groundedness'].mean())
+        else:
+            print(f"⚠ Available score columns: {list(df.columns)}")
+            return None
+    except Exception as e:
+        print(f"⚠ Failed to compute groundedness: {e}")
+        return None
+
 def evaluate_single_case(
     *,
     case_name: str,
@@ -345,6 +390,9 @@ def evaluate_single_case(
         else 0.0
     )
 
+    # Compute groundedness for this case
+    case_groundedness_score = compute_groundedness_score(groundedness_records)
+
     return (
         {
             "num_pairs": len(gt_scores),
@@ -352,6 +400,8 @@ def evaluate_single_case(
             "artifacts": artifacts,
             "note_similarity_count": len(note_similarities),
             "mean_note_similarity": mean_note_similarity,
+            "groundedness_score": case_groundedness_score,
+            "groundedness_sample_count": len(groundedness_records),
         },
         groundedness_records,
     )
@@ -484,6 +534,9 @@ def main() -> None:
                         f"{name}_note_similarity",
                         res.get("mean_note_similarity", 0.0),
                     )
+                    if res.get("groundedness_score") is not None:
+                        mlflow.log_metric(f"{name}_groundedness", res["groundedness_score"])
+                        mlflow.log_metric(f"{name}_groundedness_samples", res.get("groundedness_sample_count", 0))
                     # Log any artifacts generated during evaluation 
                     artifact_paths = res.get("artifacts", {})
                     for label, file_path in artifact_paths.items():
@@ -497,6 +550,8 @@ def main() -> None:
         if all_results:
             total_pairs = sum(r["num_pairs"] for r in all_results)
             total_note_pairs = sum(r.get("note_similarity_count", 0) for r in all_results)
+            total_groundedness_samples = sum(r.get("groundedness_sample_count", 0) for r in all_results)
+            
             # Weighted MAE by number of pairs
             weighted_mae = (
                 sum(r["mae_score"] * r["num_pairs"] for r in all_results) / total_pairs
@@ -511,11 +566,23 @@ def main() -> None:
                 if total_note_pairs > 0
                 else 0.0
             )
+            # Weighted groundedness by sample count
+            weighted_groundedness = None
+            groundedness_results = [r for r in all_results if r.get("groundedness_score") is not None]
+            if groundedness_results and total_groundedness_samples > 0:
+                weighted_groundedness = (
+                    sum(
+                        r["groundedness_score"] * r.get("groundedness_sample_count", 0)
+                        for r in groundedness_results
+                    ) / total_groundedness_samples
+                )
         else:
             total_pairs = 0
             total_note_pairs = 0
+            total_groundedness_samples = 0
             weighted_mae = 0.0
             weighted_note_similarity = 0.0
+            weighted_groundedness = None
 
         summary = {
             "total_cases": len(all_results),
@@ -528,43 +595,13 @@ def main() -> None:
             "cases": all_results,
         }
 
-        groundedness_summary: Optional[Dict[str, Any]] = None
-        if groundedness_samples:
-            if not RAGAS_AVAILABLE:
-                print("⚠ Ragas dependencies not available. Skipping groundedness metric.")
-            else:
-                try:
-                    assert Dataset is not None
-                    assert ragas_evaluate is not None
-                    assert Groundedness is not None
-
-                    ragas_dataset = Dataset.from_list(
-                        [
-                            {
-                                "question": sample["question"],
-                                "answer": sample["answer"],
-                                "contexts": sample["contexts"],
-                                "ground_truth": sample.get("ground_truth", ""),
-                            }
-                            for sample in groundedness_samples
-                        ]
-                    )
-                    ragas_result = ragas_evaluate(
-                        dataset=ragas_dataset,
-                        metrics=[Groundedness()],
-                        llm=rag_engine.llm,
-                    )
-                    groundedness_score = float(ragas_result["groundedness"])
-                    groundedness_summary = {
-                        "mean_score": groundedness_score,
-                        "sample_count": len(groundedness_samples),
-                        "threshold": groundedness_threshold,
-                    }
-                except Exception as exc:
-                    print(f"⚠ Failed to compute groundedness metric with Ragas: {exc}")
-
-        if groundedness_summary:
-            summary["groundedness"] = groundedness_summary
+        # Add weighted groundedness if available
+        if weighted_groundedness is not None:
+            summary["groundedness"] = {
+                "mean_score": weighted_groundedness,
+                "sample_count": total_groundedness_samples,
+                "threshold": groundedness_threshold,
+            }
 
         # Save metrics to JSON (for DVC)
         with open(metrics_output, "w", encoding="utf-8") as f:
@@ -576,9 +613,9 @@ def main() -> None:
             
             mlflow.log_metric("note_pairs", total_note_pairs)
             mlflow.log_metric("mean_note_similarity", weighted_note_similarity)
-            if groundedness_summary:
-                mlflow.log_metric("groundedness_score", groundedness_summary["mean_score"])
-                mlflow.log_metric("groundedness_samples", groundedness_summary["sample_count"])
+            if weighted_groundedness is not None:
+                mlflow.log_metric("groundedness_score", weighted_groundedness)
+                mlflow.log_metric("groundedness_samples", total_groundedness_samples)
             
             # Log the metrics file as artifact
             mlflow.log_artifact(metrics_output)
