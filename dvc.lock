@@ -157,8 +157,8 @@ stages:
       size: 100985
     - path: evaluate_rag.py
       hash: md5
-      md5: f652a85f50649beb680ae7294cf7555f
-      size: 24977
+      md5: 8c6a818acb10208b73e7dcbb34dfeace
+      size: 10409
     - path: params.yaml
       hash: md5
       md5: 905a0a299cfdeac21ced9beb26c717ae
@@ -192,5 +192,5 @@ stages:
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: 0a82cac0a6bd24607361a1837c51a31f
+      md5: 0dd05810109d9872c53309a4dffb5dd9
       size: 748
