@@ -1,3 +1,5 @@
+# This workflow is currently DISABLED
+
 name: Feature Branch Push Checks
 
 on:
