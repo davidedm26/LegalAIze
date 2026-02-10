@@ -11,12 +11,15 @@ from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
-PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))  # container root is /app
-PARAMS_PATH = os.path.join(PROJECT_ROOT, "params.yaml")
-
-
 def load_params(path: Optional[str] = None) -> Dict[str, Any]:
-    params_path = path or PARAMS_PATH
+    params_path_candidates = [
+        path, # explicit path argument
+        os.path.join(os.path.dirname(__file__), "params.yaml"), # same dir as this script
+        os.path.join("..", "params.yaml") # one level up (e.g. if this script is in a subdir)
+    ]
+    params_path = next((p for p in params_path_candidates if p and os.path.exists(p)), None)
+    if not params_path:
+        raise FileNotFoundError("params.yaml not found in any of the candidate paths")
     with open(params_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
