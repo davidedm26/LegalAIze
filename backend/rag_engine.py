@@ -11,15 +11,15 @@ from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
+PARAMS_PATH = os.environ.get("PARAMS_PATH")
+if not PARAMS_PATH: # If PARAMS_PATH is not set, assume we're running in a container with a fixed path, otherwise use the provided path (e.g., for local development)
+    PROJECT_ROOT = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))  # container root is /app or local root where this file is located
+    PARAMS_PATH = os.path.join(PROJECT_ROOT, "params.yaml")
+else: # If PARAMS_PATH is set, we assume it's an absolute path provided via env var (e.g., for local development)
+    PROJECT_ROOT = os.path.abspath(os.path.dirname(PARAMS_PATH))
+
 def load_params(path: Optional[str] = None) -> Dict[str, Any]:
-    params_path_candidates = [
-        path, # explicit path argument
-        os.path.join(os.path.dirname(__file__), "params.yaml"), # same dir as this script
-        os.path.join("..", "params.yaml") # one level up (e.g. if this script is in a subdir)
-    ]
-    params_path = next((p for p in params_path_candidates if p and os.path.exists(p)), None)
-    if not params_path:
-        raise FileNotFoundError("params.yaml not found in any of the candidate paths")
+    params_path = path or PARAMS_PATH
     with open(params_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
