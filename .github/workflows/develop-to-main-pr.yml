@@ -5,16 +5,11 @@ name: Develop → Main PR Checks
 on:
   pull_request:
     branches:
-<<<<<<< HEAD
       - main
     types: [opened, synchronize, reopened]
   push:
     branches:
       - feat/** # Added for testing, to be removed afterwards
-=======
-      - main # Only run on PRs targeting the main branch
-    types: [opened, synchronize, reopened] # Only run on PR creation, updates, or reopening
->>>>>>> a5ee193b776bf391b445def6ecb51e26a817db2d
 
 permissions:
   contents: read 
@@ -65,7 +60,6 @@ jobs:
         run: |
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-<<<<<<< HEAD
 
       - name: Configure DVC remote (read-only)
         env:
@@ -86,16 +80,6 @@ jobs:
           DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
           MLFLOW_TRACKING_URI: https://dagshub.com/${{ github.repository }}.mlflow
-=======
-      
-      # Placeholder for building containers if needed in the future (Github Actions has a space limit, so we can skip this for now)
-      - name: Backend regression smoke
-        run: |
-          echo "✓ Backend regression smoke (placeholder)"
-      
-      # Placeholder for frontend regression smoke tests
-      - name: Frontend regression smoke
->>>>>>> a5ee193b776bf391b445def6ecb51e26a817db2d
         run: |
           python evaluate_rag.py
 
