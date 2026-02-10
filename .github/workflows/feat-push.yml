@@ -1,9 +1,11 @@
+# This workflow is currently DISABLED
+
 name: Feature Branch Push Checks
 
 on:
   push:
     branches:
-      - 'NOTfeat/**' # the NOT operator is just a convention here to indicate this workflow is not used currently for any branch, but can be easily switched to 'feat/**' when needed  
+      - 'feat/**' 
 permissions:
   contents: read
 
