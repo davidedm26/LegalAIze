@@ -100,8 +100,8 @@ stages:
       size: 80709
     - path: evaluate_rag.py
       hash: md5
-      md5: a5b1509366bec0b7687c6eaa1cf7c8dc
-      size: 12406
+      md5: 806eceac0c8f1bb07f18da9836fe3603
+      size: 12324
     - path: evaluation
       hash: md5
       md5: e7226b24f94c1d20afa705865e0fde88.dir
@@ -115,7 +115,9 @@ stages:
           llm_temperature: 0
           mlflow_experiment: rag_evaluation
           metrics_output: metrics/rag_eval.json
-          case_selector: 2
+          case_selector:
+          - 2
+          - 3
           ground_truth:
           - name: Evaluation1
             document_path: 
@@ -136,5 +138,5 @@ stages:
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: cb9ba0bd35b7e82c4db04683ddbb44f5
-      size: 2669
+      md5: b623fc4c9763572023da44b67cba8afc
+      size: 1415
