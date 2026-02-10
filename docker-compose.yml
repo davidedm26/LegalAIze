@@ -1,13 +1,46 @@
-version: '3.8'
+version: '3.8' #  Docker Compose file version
 
 services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: ml-qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./data/qdrant_storage:/qdrant/storage
+    restart: unless-stopped
+    # No container-local healthcheck here because the qdrant image may not include curl.
+    # The seeder will perform its own HTTP health polling before starting.
+    
+
+  qdrant_seeder:
+    build: ./qdrant_init
+    container_name: ml-qdrant-seeder
+    volumes:
+      - ./data/processed/vector_index:/data/vector_index
+    environment:
+      - LOCAL_QDRANT_PATH=/data/vector_index
+      - REMOTE_QDRANT_HOST=qdrant
+      - REMOTE_QDRANT_PORT=6333
+      - COLLECTION_NAME=legal_docs
+      - RECREATE_REMOTE=true
+    depends_on:
+      - qdrant
+    restart: 'no'
+
   backend:
     build: ./backend
     container_name: ml-backend
     ports:
       - "8000:8000"
     volumes:
+      #- ./backend:/app
       - ./params.yaml:/app/params.yaml:ro
+      - ./data/mapping.json:/app/data/mapping.json:ro
+      - ./data/processed/chunks.json:/app/data/processed/chunks.json:ro
+      - ./data/processed/requirement_chunks.json:/app/data/processed/requirement_chunks.json:ro
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
       - QDRANT_HOST=qdrant
@@ -20,6 +53,7 @@ services:
     restart: unless-stopped
     depends_on:
       - qdrant
+      - qdrant_seeder
 
   frontend:
     build: ./frontend
@@ -31,15 +65,8 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - BACKEND_URL=http://backend:8000
-    restart: unless-stopped
-
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: ml-qdrant
-    ports:
-      - "6333:6333"
     volumes:
-      - ./data/qdrant_storage:/qdrant/storage
+      - ./data/mapping.json:/data/mapping.json:ro
     restart: unless-stopped
 
 networks:

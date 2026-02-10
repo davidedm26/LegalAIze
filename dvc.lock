@@ -36,8 +36,8 @@ stages:
       size: 919736
     - path: vectorize_data.py
       hash: md5
-      md5: af01fbe91f97d2b288ba81fa052acfb8
-      size: 3259
+      md5: de41926107f5ed56e1f0d83dd00fee1e
+      size: 5673
     params:
       params.yaml:
         vectorization:
@@ -49,7 +49,7 @@ stages:
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: 8ed94070c6c2412d3f42bab563de321a.dir
+      md5: d21f6c5c01e3d56442ae4cda0fec4d6b.dir
       size: 5136943
       nfiles: 4
   precompute_rag:

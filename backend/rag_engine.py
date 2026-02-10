@@ -11,7 +11,7 @@ from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))  # container root is /app
 PARAMS_PATH = os.path.join(PROJECT_ROOT, "params.yaml")
 
 
@@ -98,13 +98,29 @@ def init_rag(force: bool = False) -> None:
         model_name = vect_params.get("model_name", "all-MiniLM-L6-v2")
         embedding_model = SentenceTransformer(model_name)
 
-        index_path = vect_params.get("vector_index_path", "data/processed/vector_index")
-        final_index_path = next((p for p in _candidate_paths(index_path) if os.path.exists(p)), None)
-        if final_index_path:
-            vector_db = QdrantClient(path=final_index_path)
-            print(f"✓ RAG Initialized with index: {final_index_path}")
+
+        # Se QDRANT_HOST o QDRANT_PORT sono definiti, usa Qdrant come servizio
+        qdrant_host = os.environ.get("QDRANT_HOST")
+        qdrant_port = os.environ.get("QDRANT_PORT")
+        if qdrant_host or qdrant_port:
+            host = qdrant_host or "qdrant"
+            port = int(qdrant_port) if qdrant_port else 6333
+            try:
+                vector_db = QdrantClient(host=host, port=port)
+                print(f"✓ RAG Initialized with Qdrant service at {host}:{port}")
+            except Exception as e:
+                print(f"⚠ Qdrant service not available at {host}:{port}: {e}")
+                vector_db = None
         else:
-            print("⚠ Vector index not found! Proceeding without vector DB.")
+            # Embedded/local mode: usa vector_index come file
+            index_path = vect_params.get("vector_index_path", "data/processed/vector_index")
+            final_index_path = next((p for p in _candidate_paths(index_path) if os.path.exists(p)), None)
+            if final_index_path:
+                vector_db = QdrantClient(path=final_index_path)
+                print(f"✓ RAG Initialized with embedded Qdrant at {final_index_path}")
+            else:
+                print("⚠ Vector index not found! Proceeding without vector DB.")
+                vector_db = None
 
         mapping_path = os.path.join(PROJECT_ROOT, "data", "mapping.json")
         if os.path.exists(mapping_path):
