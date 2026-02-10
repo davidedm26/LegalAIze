@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia codice backend
-COPY app.py .
+# Copy backend code (FastAPI app + rag engine)
+COPY app.py rag_engine.py ./
 
 # Crea directory per il modello
 RUN mkdir -p /app/models

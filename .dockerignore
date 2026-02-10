@@ -19,13 +19,25 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# SICUREZZA: ESCLUDI LE CHIAVI E I SEGRETI
+# SECURITY: EXCLUDE KEYS AND SECRETS
 .env
 dagshub_token.txt
 *.log
 
-# Escludi cartelle dati pesanti (li montiamo come volumi)
-# Nota: Se nel frontend non usi dati, questo aiuta a tenere l'immagine leggera
+# Exclude data, models, output, DVC, git, etc.
 data/
+models/
 mlruns/
 mlartifacts/
+.dvc/
+.git/
+*.dvc
+*.gz
+*.zip
+*.tar
+*.tar.gz
+*.ipynb
+output/
+tmp/
+logs/
+notebooks/
