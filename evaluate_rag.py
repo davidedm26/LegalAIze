@@ -33,6 +33,7 @@ def main() -> None:
     params = load_params()
     eval_params = params.get("evaluation", {})
     precompute_params = params.get("precompute", {})
+    vect_params = params.get("vectorization", {})
     ingestion_params = params.get("ingestion", {})
     groundedness_params = eval_params.get("groundedness", {})
 
@@ -113,6 +114,11 @@ def main() -> None:
             mlflow.log_param("random_seed", random_seed)
             mlflow.log_param("llm_model", llm_model)
             mlflow.log_param("llm_temperature", llm_temperature)
+            # Log embedding model used for vectorization (if available)
+            mlflow.log_param(
+                "embedding_model",
+                vect_params.get("model_name", ""),
+            )
             mlflow.log_param("precompute_top_k", precompute_params.get("top_k", 3))
             mlflow.log_param("chunk_size", ingestion_params.get("chunk_size"))
             mlflow.log_param("chunk_overlap", ingestion_params.get("chunk_overlap"))
@@ -122,7 +128,8 @@ def main() -> None:
 
         filtered_cases = select_cases(gt_cases, case_selector)
 
-        for case in filtered_cases: # Loop through evaluation cases (can limit with max_eval_cases)
+        #for case in filtered_cases: # Loop through evaluation cases (can limit with max_eval_cases)
+        for i, case in enumerate(filtered_cases):
             name = case.get("name", "unknown") # Evaluation case name for logging
             doc_path = case["document_path"] # Path to the document for this case
             report_path = case["report_path"] # Path to the ground truth report for this case
@@ -155,20 +162,18 @@ def main() -> None:
                 groundedness_samples.extend(case_groundedness)
 
                 if run_ctx is not None:
-                    # Log per-case metrics under a prefix
-                    mlflow.log_metric(f"{name}_mae_score", res["mae_score"])
-                    mlflow.log_metric(f"{name}_num_pairs", res["num_pairs"])
-                    mlflow.log_metric(
-                        f"{name}_note_similarity",
-                        res.get("mean_note_similarity", 0.0),
-                    )
+                    
+                    
+                    # Log per-case metrics with a step index (for easier aggregation in MLflow UI)
+                    mlflow.log_metric("mae_score_list", res["mae_score"], step=i)
+                    mlflow.log_metric("note_similarity_list",res.get("mean_note_similarity", 0.0),step=i)
                     if res.get("groundedness_score") is not None:
-                        mlflow.log_metric(f"{name}_groundedness", res["groundedness_score"])
-                        mlflow.log_metric(f"{name}_groundedness_samples", res.get("groundedness_sample_count", 0))
+                        mlflow.log_metric("groundedness_list", res["groundedness_score"], step=i)
                     if res.get("faithfulness_score") is not None:
-                        mlflow.log_metric(f"{name}_faithfulness", res["faithfulness_score"])
-                        mlflow.log_metric(f"{name}_faithfulness_samples", res.get("faithfulness_sample_count", 0))
-                    # Log any artifacts generated during evaluation 
+                        mlflow.log_metric("faithfulness_list", res["faithfulness_score"], step=i)
+                    # Log any artifacts generated during evaluation (like prediction files, confusion matrices, etc.)
+                    #mlflow.log_param(f"scenario_{i}_case_name", name)
+
                     artifact_paths = res.get("artifacts", {})
                     for label, file_path in artifact_paths.items():
                         if file_path and os.path.exists(file_path):
@@ -240,28 +245,22 @@ def main() -> None:
             "cases": all_results,
         }
 
-        # Add weighted groundedness if available
-        if weighted_groundedness is not None:
-            summary["groundedness"] = {
-                "mean_score": weighted_groundedness,
-                "sample_count": total_groundedness_samples,
-            }
-        if weighted_faithfulness is not None:
-            summary["faithfulness"] = {
-                "mean_score": weighted_faithfulness,
-                "sample_count": total_faithfulness_samples,
-            }
+        # Note: do not duplicate groundedness/faithfulness as nested objects
+        # since top-level keys (mean_groundedness_score / mean_faithfulness_score)
+        # and sample counts are already present in the summary.
 
         # Save metrics to JSON (for DVC)
         with open(metrics_output, "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2)
 
         if run_ctx is not None:
-            mlflow.log_metric("score_pairs", total_pairs)
-            mlflow.log_metric("weighted_mae_score", weighted_mae)
+            mlflow.log_metric("note_similarity_pairs", total_note_pairs)
+            mlflow.log_metric("note_similarity_mean", weighted_note_similarity)
             
-            mlflow.log_metric("note_pairs", total_note_pairs)
-            mlflow.log_metric("mean_note_similarity", weighted_note_similarity)
+            mlflow.log_metric("mae_score_pairs", total_pairs)
+            mlflow.log_metric("mae_weighted_score", weighted_mae)
+            
+
             if weighted_groundedness is not None:
                 mlflow.log_metric("groundedness_score", weighted_groundedness)
                 mlflow.log_metric("groundedness_samples", total_groundedness_samples)

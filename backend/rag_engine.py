@@ -11,9 +11,12 @@ from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
-PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))  # container root is /app
-PARAMS_PATH = os.path.join(PROJECT_ROOT, "params.yaml")
-
+PARAMS_PATH = os.environ.get("PARAMS_PATH")
+if not PARAMS_PATH: # If PARAMS_PATH is not set, assume we're running in a container with a fixed path, otherwise use the provided path (e.g., for local development)
+    PROJECT_ROOT = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))  # container root is /app or local root where this file is located
+    PARAMS_PATH = os.path.join(PROJECT_ROOT, "params.yaml")
+else: # If PARAMS_PATH is set, we assume it's an absolute path provided via env var (e.g., for local development)
+    PROJECT_ROOT = os.path.abspath(os.path.dirname(PARAMS_PATH))
 
 def load_params(path: Optional[str] = None) -> Dict[str, Any]:
     params_path = path or PARAMS_PATH

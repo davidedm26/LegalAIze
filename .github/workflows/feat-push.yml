@@ -1,4 +1,4 @@
-# This workflow is currently DISABLED
+# This workflow runs on pushes to feature branches (feat/**) and performs quick checks like linting and dependency installation. It ensures that code in feature branches adheres to basic quality standards before it is merged into develop.
 
 name: Feature Branch Push Checks
 

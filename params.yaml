@@ -23,7 +23,7 @@ evaluation:
   llm_temperature: 0
   mlflow_experiment: "rag_evaluation"
   metrics_output: "metrics/rag_eval.json"
-  case_selector: [1,2,3,4]  # e.g., 2 or [1,3] to evaluate specific cases; null runs all
+  case_selector: [2,3]  # e.g., 2 or [1,3] to evaluate specific cases; null runs all
   ground_truth:
     - name: "Evaluation1"
       document_path: "data/ground_truth/raw_data/Evaluation1/documentation.txt"
