@@ -7,9 +7,9 @@ on:
     branches:
       - main
     types: [opened, synchronize, reopened]
-  push:
-    branches:
-      - feat/** # Added for testing, to be removed afterwards
+  #push:
+    #branches:
+      #- feat/** # Added for testing, to be removed afterwards
 
 permissions:
   contents: read 
