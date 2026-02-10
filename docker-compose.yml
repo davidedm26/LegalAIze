@@ -45,6 +45,7 @@ services:
       - PYTHONUNBUFFERED=1
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
+      - PARAMS_PATH=/app/params.yaml
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
