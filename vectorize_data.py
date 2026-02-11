@@ -13,6 +13,16 @@ from pathlib import Path
 def load_params():
     with open("params.yaml", "r") as f:
         return yaml.safe_load(f)
+    
+def add_context_to_chunks(chunks: List[dict]) -> List[dict]:
+    """  
+    Adds more context to each chunk by including section titles or other relevant metadata. This can help the model understand the content better during retrieval.
+    Args:
+        chunks (List[dict]): List of chunk dictionaries, each containing at 'content' and metadata
+    Returns:
+        List[dict]: List of enriched chunk dictionaries with added context in 'content'
+    """
+    
 
 def main():
     params = load_params() # Load parameters from params.yaml
@@ -28,6 +38,8 @@ def main():
 
     with open(chunks_path, "r", encoding="utf-8") as f: # Load chunks from JSON file
         chunks = json.load(f)
+    
+    enriched_chunks = add_context_to_chunks(chunks) # Add more context to chunks (e.g. section titles)
 
     print(f"Loading embedding model: {vect_params['model_name']}...")
     model = SentenceTransformer(vect_params['model_name'])

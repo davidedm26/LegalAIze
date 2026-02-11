@@ -91,21 +91,30 @@ def main():
                 ai_act_sections = json.load(f)
             all_docs_aia = [] # Separate list for AI Act chunks to keep track of source
             for section in ai_act_sections:
-                section_name = section.get("name", "unknown")
-                section_type = section.get("type", "unknown")
-                section_title = section.get("title", None)
+                s_name = section.get("name", "unknown")
+                s_type = section.get("type", "unknown")
+                s_title = section.get("title", "No Title")
                 content = section.get("content", "")
-                # Use the splitter directly on the full section content
+                # Dividiamo il contenuto dell'articolo
                 chunks = splitter.split_text(content)
+                
                 for i, chunk in enumerate(chunks):
+                    # LOGICA DI INFILLING: Creiamo un header contestuale
+                    # Questo trasforma "(g) measures..." in "AI ACT | Art. 1 (Subject matter) | Part 2: (g) measures..."
+                    header = f"[SOURCE: AI Act | {s_type.upper()}: {s_name} | TITLE: {s_title}]\n"
+                    if len(chunks) > 1:
+                        header = header.replace("]", f" | PART: {i+1}/{len(chunks)}]")
+                    
+                    enriched_content = header + chunk
+
                     all_docs_aia.append({
-                        "source": f"ai_act::{section_name}",
-                        "section_type": section_type,
-                        "section_title": section_title,
+                        "source": f"ai_act::{s_name}",
+                        "section_type": s_type,
+                        "section_title": s_title,
                         "chunk_id": i,
-                        "content": chunk
+                        "content": enriched_content # Testo con contesto iniettato
                     })
-            print(f"✓ AI Act ingestion completed. {len(all_docs_aia)} chunks from AI Act.")
+            print(f"✓ AI Act ingestion completed. {len(all_docs_aia)} enriched chunks.")
 
     # --- Custom ingestion for ISO PDF ---
     iso_pdf_path = os.path.join(raw_dir, "iso.pdf")
@@ -120,21 +129,30 @@ def main():
             with open(iso_json_path, "r", encoding="utf-8") as f:
                 iso_sections = json.load(f)
             for section in iso_sections:
-                section_id = section.get("section_id", "unknown")
-                section_title = section.get("section_title", None)
-                section_type = section.get("section_type", "unknown")
+                s_id = section.get("section_id", "unknown")
+                s_title = section.get("section_title", "No Title")
+                s_type = section.get("section_type", "unknown")
                 content = section.get("content", "")
-                # Use the splitter directly on the full section content
+
                 chunks = splitter.split_text(content)
+                
                 for i, chunk in enumerate(chunks):
+                    # LOGICA DI INFILLING per ISO
+                    # Aiuta a distinguere tra "Requisiti" (Clause) e "Controlli" (Annex A/B)
+                    header = f"[SOURCE: ISO 42001 | ID: {s_id} | TYPE: {s_type.upper()}]\n"
+                    if s_title:
+                        header = header.replace("]", f" | TITLE: {s_title}]")
+                    
+                    enriched_content = header + chunk
+
                     all_docs_iso.append({
-                        "source": f"iso42001::{section_id}",
-                        "section_type": section_type,
-                        "section_title": section_title,
+                        "source": f"iso42001::{s_id}",
+                        "section_type": s_type,
+                        "section_title": s_title,
                         "chunk_id": i,
-                        "content": chunk
+                        "content": enriched_content # Testo con contesto iniettato
                     })
-            print(f"✓ ISO 42001 ingestion completed. {len(all_docs_iso)} chunks from ISO.")
+            print(f"✓ ISO 42001 ingestion completed. {len(all_docs_iso)} enriched chunks.")
 
     
     # Check if any PDF files are present for standard ingestion

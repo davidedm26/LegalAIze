@@ -11,8 +11,8 @@ stages:
       nfiles: 4
     - path: ingestion/
       hash: md5
-      md5: 5a5b5166a413326c94a41725d3597a90.dir
-      size: 30872
+      md5: dde94170b70cea7a6d76232c25d7f4b8.dir
+      size: 31742
       nfiles: 5
     params:
       params.yaml:
@@ -24,8 +24,8 @@ stages:
     outs:
     - path: data/processed/chunks.json
       hash: md5
-      md5: 51cff84bc95eed6dc00fe9033b41116a
-      size: 894977
+      md5: 0610aebd5529b4cd5fc579122fc199f2
+      size: 998744
   vectorize:
     cmd: python vectorize_data.py
     deps:
