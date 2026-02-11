@@ -1,39 +1,38 @@
 schema: '2.0'
 stages:
   ingest:
-    cmd: python data_ingestion.py
+    cmd:
+    - python ingestion/data_ingestion.py
     deps:
-    - path: data/ai_act.pdf
+    - path: data/raw_data/
       hash: md5
-      md5: a31da461b015738b42cc2f719a9acee4
-      size: 2583319
-    - path: data/iso.pdf
+      md5: f941a48344d6b4813c536e7eeb258564.dir
+      size: 3911604
+      nfiles: 4
+    - path: ingestion/
       hash: md5
-      md5: 2ae5af2fc9eea16d8d0d3144b57ca428
-      size: 2646955
-    - path: data_ingestion.py
-      hash: md5
-      md5: 1bdd1c37329d416183e46053b392fed3
-      size: 3447
+      md5: 5a5b5166a413326c94a41725d3597a90.dir
+      size: 30872
+      nfiles: 5
     params:
       params.yaml:
         ingestion:
           chunk_size: 1000
-          chunk_overlap: 150
-          raw_data_dir: data
+          chunk_overlap: 180
+          raw_data_dir: data/raw_data
           processed_data_dir: data/processed
     outs:
     - path: data/processed/chunks.json
       hash: md5
-      md5: 30dbdcf19f8e7e4d30d649432a56b451
-      size: 919736
+      md5: 51cff84bc95eed6dc00fe9033b41116a
+      size: 894977
   vectorize:
     cmd: python vectorize_data.py
     deps:
     - path: data/processed/chunks.json
       hash: md5
-      md5: 30dbdcf19f8e7e4d30d649432a56b451
-      size: 919736
+      md5: 293c64a9a5c30c7e6465fe58dd4a5c6c
+      size: 931686
     - path: vectorize_data.py
       hash: md5
       md5: de41926107f5ed56e1f0d83dd00fee1e
@@ -49,8 +48,8 @@ stages:
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: 1c4f48d2837dcc9147a22a90fc06ec69.dir
-      size: 5136943
+      md5: 37d665b4b51c7de369d99b4257745ce6.dir
+      size: 5145135
       nfiles: 4
   precompute_rag:
     cmd: python precompute_rag.py
@@ -61,8 +60,8 @@ stages:
       size: 13552
     - path: data/processed/vector_index
       hash: md5
-      md5: 1c4f48d2837dcc9147a22a90fc06ec69.dir
-      size: 5136943
+      md5: 37d665b4b51c7de369d99b4257745ce6.dir
+      size: 5145135
       nfiles: 4
     - path: precompute_rag.py
       hash: md5
@@ -73,7 +72,7 @@ stages:
         ingestion:
           chunk_size: 1000
           chunk_overlap: 150
-          raw_data_dir: data
+          raw_data_dir: data/raw_data
           processed_data_dir: data/processed
         vectorization:
           model_name: all-MiniLM-L6-v2
@@ -84,8 +83,8 @@ stages:
     outs:
     - path: data/processed/requirement_chunks.json
       hash: md5
-      md5: c17a57a8bfd7c7e9e53c8bcc215f3bbc
-      size: 80709
+      md5: e78f20323b09992b4a8845c1019bcde9
+      size: 78912
   evaluate_rag:
     cmd: python evaluate_rag.py
     deps:
@@ -96,15 +95,15 @@ stages:
       nfiles: 15
     - path: data/processed/requirement_chunks.json
       hash: md5
-      md5: c17a57a8bfd7c7e9e53c8bcc215f3bbc
-      size: 80709
+      md5: e78f20323b09992b4a8845c1019bcde9
+      size: 78912
     - path: evaluate_rag.py
       hash: md5
-      md5: 806eceac0c8f1bb07f18da9836fe3603
-      size: 12324
+      md5: 640f2ed8a45a1772ddfcf16636337635
+      size: 12330
     - path: evaluation
       hash: md5
-      md5: e7226b24f94c1d20afa705865e0fde88.dir
+      md5: e428b32f4cc2feddc9fef473fce6362b.dir
       size: 47842
       nfiles: 14
     params:
@@ -116,8 +115,6 @@ stages:
           mlflow_experiment: rag_evaluation
           metrics_output: metrics/rag_eval.json
           case_selector:
-          - 2
-          - 3
           ground_truth:
           - name: Evaluation1
             document_path: 
@@ -138,5 +135,5 @@ stages:
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: b623fc4c9763572023da44b67cba8afc
-      size: 1415
+      md5: a54f10bab5e6e3dc47498cfd3b835e1e
+      size: 2491
