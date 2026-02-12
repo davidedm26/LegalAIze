@@ -276,7 +276,7 @@ if analyze_btn and doc_text:
             response = requests.post(
                 f"{BACKEND_URL}/audit", 
                 json={"document_text": doc_text}, 
-                headers=headers, timeout=120
+                headers=headers, timeout=180
             )
 
             if response.status_code == 200:

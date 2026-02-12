@@ -71,48 +71,41 @@ def main():
     )
     
     all_docs = [] # To store all document chunks
+    all_docs_aia = [] # Separate list for AI Act chunks
+    all_docs_iso = [] # Separate list for ISO chunks
+    all_docs_pdf = [] # Separate list for standard PDF chunks
     
 
     # --- Custom ingestion for AI Act JSON ---
-
-    # Produce ai_act_parsed.json from ai_act.html
     ai_act_html_path = os.path.join(raw_dir, "ai_act.html")
     if not os.path.exists(ai_act_html_path):
         print(f"⚠ AI Act HTML file not found at {ai_act_html_path}. Make sure you have run 'dvc pull'.")
     else:
         parse_ai_act_file_to_json(ai_act_html_path, os.path.join(processed_dir, "ai_act_parsed.json"))
-
         ai_act_json_path = os.path.join(processed_dir, "ai_act_parsed.json")
-
-        # --- Custom ingestion for AI Act JSON ---
         if os.path.exists(ai_act_json_path):
-            #print(f"Custom ingestion: found {ai_act_json_path}, processing AI Act...")
             with open(ai_act_json_path, "r", encoding="utf-8") as f:
                 ai_act_sections = json.load(f)
-            all_docs_aia = [] # Separate list for AI Act chunks to keep track of source
             for section in ai_act_sections:
                 s_name = section.get("name", "unknown")
                 s_type = section.get("type", "unknown")
                 s_title = section.get("title", "No Title")
+                annex = section.get("annex", "")
                 content = section.get("content", "")
-                # Dividiamo il contenuto dell'articolo
                 chunks = splitter.split_text(content)
-                
                 for i, chunk in enumerate(chunks):
-                    # LOGICA DI INFILLING: Creiamo un header contestuale
-                    # Questo trasforma "(g) measures..." in "AI ACT | Art. 1 (Subject matter) | Part 2: (g) measures..."
-                    header = f"[SOURCE: AI Act | {s_type.upper()}: {s_name} | TITLE: {s_title}]\n"
-                    if len(chunks) > 1:
-                        header = header.replace("]", f" | PART: {i+1}/{len(chunks)}]")
-                    
+                    header = f"[SOURCE : AI ACT]"
+                    if annex:
+                        header += f" [ANNEX {annex}]"
+                    header += f" [PART {i+1}/{len(chunks)}]"
+                    header += f" [TYPE: {s_type.upper()}] [NAME: {s_name}] [TITLE: {s_title}]\n"
                     enriched_content = header + chunk
-
                     all_docs_aia.append({
                         "source": f"ai_act::{s_name}",
                         "section_type": s_type,
                         "section_title": s_title,
                         "chunk_id": i,
-                        "content": enriched_content # Testo con contesto iniettato
+                        "content": enriched_content
                     })
             print(f"✓ AI Act ingestion completed. {len(all_docs_aia)} enriched chunks.")
 
@@ -123,35 +116,53 @@ def main():
     else:
         parse_iso_file_to_json(iso_pdf_path, os.path.join(processed_dir, "iso_parsed.json"))
         iso_json_path = os.path.join(processed_dir, "iso_parsed.json")
-        all_docs_iso = [] # Separate list for ISO chunks to keep track of source
-        if os.path.exists(iso_json_path):   
-            #print(f"Custom ingestion: found {iso_json_path}, processing ISO 42001...")
+        if os.path.exists(iso_json_path):
             with open(iso_json_path, "r", encoding="utf-8") as f:
                 iso_sections = json.load(f)
+            # Prepara una mappa per i contenuti di Annex A
+            annex_a_map = {}
+            for section in iso_sections:
+                if section.get("section_type") == "control_requirement" or section.get("section_type") == "control_objective":
+                    annex_a_map[section.get("section_id")] = section.get("content", "")
+            # Processa solo Clause e Annex B
             for section in iso_sections:
                 s_id = section.get("section_id", "unknown")
                 s_title = section.get("section_title", "No Title")
                 s_type = section.get("section_type", "unknown")
                 content = section.get("content", "")
-
-                chunks = splitter.split_text(content)
-                
-                for i, chunk in enumerate(chunks):
-                    # LOGICA DI INFILLING per ISO
-                    # Aiuta a distinguere tra "Requisiti" (Clause) e "Controlli" (Annex A/B)
-                    header = f"[SOURCE: ISO 42001 | ID: {s_id} | TYPE: {s_type.upper()}]\n"
-                    if s_title:
-                        header = header.replace("]", f" | TITLE: {s_title}]")
-                    
-                    enriched_content = header + chunk
-
-                    all_docs_iso.append({
-                        "source": f"iso42001::{s_id}",
-                        "section_type": s_type,
-                        "section_title": s_title,
-                        "chunk_id": i,
-                        "content": enriched_content # Testo con contesto iniettato
-                    })
+                # Solo Clause e Annex B
+                if s_type == "management_requirement":
+                    chunks = splitter.split_text(content)
+                    for i, chunk in enumerate(chunks):
+                        header = f"[SOURCE : ISO 42001] [ID: {s_id}] [TYPE: {s_type.upper()}] [Part {i+1}/{len(chunks)}] [TITLE: {s_title}]\n"
+                        enriched_content = header + chunk
+                        all_docs_iso.append({
+                            "source": f"iso42001::{s_id}",
+                            "section_type": s_type,
+                            "section_title": s_title,
+                            "chunk_id": i,
+                            "content": enriched_content
+                        })
+                elif s_type == "implementation_guidance":
+                    # Mappa con Annex A
+                    mapping_target = section.get("metadata", {}).get("maps_to_control", "")
+                    annex_a_content = annex_a_map.get(mapping_target, "")
+                    chunks = splitter.split_text(content)
+                    for i, chunk in enumerate(chunks):
+                        header = f"[SOURCE : ISO 42001] [ID: {s_id}] [TYPE: {s_type.upper()}] [Part {i+1}/{len(chunks)}] [TITLE: {s_title}]"
+                        if mapping_target:
+                            header += f" [ANNEX A REF: {mapping_target}]"
+                        if annex_a_content:
+                            header += f" [ CORRISPONDENT ANNEX A CONTENT: {annex_a_content}...]"
+                        header += "\n"
+                        enriched_content = header + chunk
+                        all_docs_iso.append({
+                            "source": f"iso42001::{s_id}",
+                            "section_type": s_type,
+                            "section_title": s_title,
+                            "chunk_id": i,
+                            "content": enriched_content
+                        })
             print(f"✓ ISO 42001 ingestion completed. {len(all_docs_iso)} enriched chunks.")
 
     

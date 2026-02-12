@@ -8,31 +8,48 @@ def ingest_iso_advanced(pdf_path):
     doc = fitz.open(pdf_path)
     full_text = ""
     for page in doc:
-        # Clean metadata and licenses to avoid noise in chunks
         text = page.get_text()
+        # Pulizia licenze e copyright
         text = re.sub(r"(Licenced to|BS ISO/IEC|ISO/IEC 2023|Page \d+|v\n|vi\n|vii\n).*", "", text)
         full_text += text
 
     parsed_data = []
 
-    # --- 1. PARSING CLAUSE 4-10 (CORE REQUIREMENTS) ---
-    # Identify sections like "4.1 Understanding the organization..."
-    clauses = re.finditer(r'\n([4-9]|10)\.(\d+(?:\.\d+)*)?\s+([A-Z][a-zA-Z\s\-\,]+)\n(.*?)(?=\n\d+\.|\nAnnex|\Z)', full_text, re.DOTALL)
+    # --- 1. PARSING CLAUSE 4-10 (REQUISITI CORE) ---
+    # Usiamo un lookahead negativo per evitare le righe con i puntini dell'indice
+    # Cerchiamo: Nuova riga + Numero (4-10) + Punto + Numero + Spazio + Titolo
+    # Ma ESCLUDIAMO se ci sono più di 3 puntini di fila nella riga
+    clauses = re.finditer(
+        r'\n(?![^\n]*\.{3,})([4-9]|10)\.(\d+(?:\.\d+)*)?\s+([^\n]+)\n(.*?)(?=\n(?![^\n]*\.{3,})(?:[4-9]|10)\.|\nAnnex|\Z)',
+        full_text,
+        re.DOTALL
+    )
+    
     for m in clauses:
         c_id = f"{m.group(1)}.{m.group(2)}" if m.group(2) else m.group(1)
+        title = m.group(3).strip()
+        content = m.group(4).strip()
+        
+        # Ulteriore pulizia per sicurezza: se il contenuto è troppo corto o il titolo ha puntini, scartiamo (è l'indice)
+        if len(content) < 10 or "...." in title:
+            continue
+
         parsed_data.append({
             "source": f"ISO 42001:2023::Clause {c_id}",
             "section_id": c_id,
-            "section_title": m.group(3).strip(),
+            "section_title": title,
             "section_type": "management_requirement",
-            "content": m.group(4).strip(),
+            "content": content,
             "metadata": {"normative": True, "annex": None}
         })
 
-    # --- 2. PARSING ANNEX A (NORMATIVE CONTROLS) ---
-    # Control objectives start with A.x (e.g. A.2 Policies related to AI)
-    # Specific controls start with A.x.x (e.g. A.2.2 AI policy)
-    annex_a_matches = re.finditer(r'\n(A\.\d+(?:\.\d+)*)\s+([A-Z][a-zA-Z\s\-\,]+)\n(.*?)(?=\n[A-B]\.|\nAnnex|\Z)', full_text, re.DOTALL)
+    # --- 2. PARSING ANNEX A (CONTROLLI) ---
+    # Simile alle clausole, escludiamo le righe dell'indice con i puntini
+    annex_a_matches = re.finditer(
+        r'\n(?![^\n]*\.{3,})(A\.\d+(?:\.\d+)*)\s+([^\n]+)\n(.*?)(?=\n(?![^\n]*\.{3,})[A-B]\.|\nAnnex|\Z)', 
+        full_text, 
+        re.DOTALL
+    )
     for m in annex_a_matches:
         a_id = m.group(1)
         parsed_data.append({
@@ -44,25 +61,32 @@ def ingest_iso_advanced(pdf_path):
             "metadata": {"normative": True, "annex": "A"}
         })
 
-    # --- 3. PARSING ANNEX B (IMPLEMENTATION GUIDANCE) ---
-    # Each section in B maps 1:1 to a control in A (e.g. B.2.2 guides A.2.2)
-    annex_b_matches = re.finditer(r'\n(B\.\d+(?:\.\d+)*)\s+([A-Z][a-zA-Z\s\-\,]+)\n(.*?)(?=\n[B-C]\.|\nAnnex|\Z)', full_text, re.DOTALL)
+    # --- 3. PARSING ANNEX B (GUIDA) ---
+    annex_b_matches = re.finditer(
+        r'\n(?![^\n]*\.{3,})(B\.\d+(?:\.\d+)*)\s+([^\n]+)\n(.*?)(?=\n(?![^\n]*\.{3,})B\.\d|\nAnnex [A-C]|\Z)', 
+        full_text, 
+        re.DOTALL
+    )
+
     for m in annex_b_matches:
         b_id = m.group(1)
-        mapping_target = b_id.replace('B', 'A') # Semantic link to the control
+        mapping_target = b_id.replace('B', 'A')
+        clean_title = re.split(r'\n|Control', m.group(2))[0].strip()
+        
+        raw_content = m.group(3).strip()
         parsed_data.append({
             "source": f"ISO 42001:2023::Annex B Guidance {b_id}",
             "section_id": b_id,
-            "section_title": m.group(2).strip(),
+            "section_title": clean_title,
             "section_type": "implementation_guidance",
-            "content": m.group(3).strip(),
+            "content": raw_content,
             "metadata": {
                 "normative": False, 
                 "annex": "B",
                 "maps_to_control": mapping_target
             }
         })
-
+        
     return parsed_data
 
 

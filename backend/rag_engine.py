@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 from qdrant_client import QdrantClient
-from sentence_transformers import SentenceTransformer
+#from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
@@ -30,28 +30,42 @@ eval_params = params.get("evaluation", {})
 
 
 # Static prompt template (placeholders only, no injected content)
+
 PROMPT_TEMPLATE = """
-You are an expert auditor in regulatory compliance for AI systems, specialized in AI Act and ISO/IEC 42001 standards.
+You are a Senior AI Compliance Auditor. Your task is to perform a professional gap analysis using a "Guidance-based Assessment" logic.
 
-Evaluate the compliance of the provided document against the specified requirement. Use the extracted regulatory references as additional context to interpret the requirement.
-
-Document to evaluate:
+DOCUMENT TO EVALUATE:
 {document_text}
 
-Requirement to verify:
+REQUIREMENT CATEGORY:
 {requirement_text}
 
-Relevant regulatory references (extracted from legal corpus):
+REGULATORY CONTEXT:
 {regulatory_references}
 
-Instructions:
-- Score: An integer from 0 to 5 (0 = no compliance, 5 = maximum compliance).
-- Auditor Notes: A concise note (max 100 words) explaining the evaluation, citing evidence from the document and references.
-- If you cannot determine a score, return N/A for the score and explain in the notes.
-Respond exclusively in valid JSON format:
+AUDIT RULES (MANDATORY):
+1. ANCHORING: The compliance score and verdict MUST be based ONLY on 'AI ACT' Articles and 'ISO Annex A' (ID: A.x.x). You must NEVER declare non-compliance against Annex B, as it is not mandatory.
+2. GUIDANCE DEPENDENCY: Use 'ISO Annex B' (ID: B.x.x) as the lens to evaluate the mandatory 'ISO Annex A' requirement. 
+   - Example: To judge if ISO A.3.2 (Roles) is met, use the details in ISO B.3.2 to verify if the document provides sufficient implementation evidence.
+3. EVIDENCE RECOGNITION: Recognize specific metrics (e.g., %, F1-score), named tools, or documented procedures as high-level evidence.
+
+SCORING CRITERIA:
+5 (Full Compliance): Meets the AI Act/ISO Annex A requirement perfectly, providing the specific technical evidence (metrics/tools) suggested in the corresponding ISO Annex B.
+4 (Substantial Compliance): Meets the mandatory AI Act/ISO Annex A requirement. The implementation is solid, though it may lack some secondary details described in Annex B.
+3 (Partial Compliance): The mandatory Annex A requirement is addressed, but the implementation lacks the procedural depth or metrics recommended in Annex B to be truly effective.
+2 (Major Gap): The mandatory Annex A requirement is mentioned, but the document lacks the technical substance or the "how-to" described in Annex B.
+1 (Negligible): Mentioned only in passing without any alignment with Annex A.
+0 (No Compliance): The document is completely silent on the requirement.
+
+OUTPUT INSTRUCTIONS:
+- Start 'auditor_notes' with: "Compliance/Non-compliance with [AI Act Art. / ISO Annex A ID]". 
+- DO NOT cite ISO B as the violated requirement. Instead, state: "Non-compliant with ISO A.x.x because [Evidence from B.x.x] is missing."
+- Respond ONLY in valid JSON format.
+
+RESPONSE FORMAT:
 {{
-    "score": integer from 0 to 5,
-    "auditor_notes": "note text"
+    "score": integer (0-5),
+    "auditor_notes": "Verdict vs Annex A/AI Act. Cite ID. Only for the Annex A requirement explain why based on Annex B guidance, for the AI Act use the corresponding article. Max 100 words."
 }}
 """
 
@@ -70,7 +84,7 @@ class AuditResponse(BaseModel):
     requirements: List[RequirementReport]
 
 
-embedding_model: Optional[SentenceTransformer] = None
+#embedding_model: Optional[SentenceTransformer] = None
 vector_db: Optional[QdrantClient] = None
 mapping: Optional[Dict[str, Any]] = None
 llm: Optional[ChatOpenAI] = None
@@ -93,13 +107,13 @@ def _candidate_paths(relative_path: str) -> List[str]:
 
 
 def init_rag(force: bool = False) -> None:
-    global embedding_model, vector_db, mapping, llm, requirement_chunks, _initialized
+    global vector_db, mapping, llm, requirement_chunks, _initialized #, embedding_model, 
     if _initialized and not force:
         return
 
     try:
         model_name = vect_params.get("model_name", "all-MiniLM-L6-v2")
-        embedding_model = SentenceTransformer(model_name)
+        #embedding_model = SentenceTransformer(model_name)
 
 
         # Se QDRANT_HOST o QDRANT_PORT sono definiti, usa Qdrant come servizio
@@ -162,7 +176,7 @@ def init_rag(force: bool = False) -> None:
 def rag_ready() -> bool:
     return all([
         vector_db is not None,
-        embedding_model is not None,
+        #embedding_model is not None,
         mapping is not None,
         llm is not None,
         bool(requirement_chunks),
