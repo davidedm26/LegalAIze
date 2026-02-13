@@ -47,28 +47,24 @@ def select_relevant_contexts(
     chunk_embeddings: Optional[np.ndarray],
     chunk_norms: Optional[np.ndarray],
     top_k: int,
+    embedding_model=None,
 ) -> List[str]:
-    """Select the most relevant document chunks based on similarity to reference text."""
+    """Select the most relevant document chunks based on similarity to reference text.
+    embedding_model must be passed as a parameter.
+    """
     if not chunk_texts:
         return []
     if top_k <= 0:
         return []
-    
-    try:
-        from backend import rag_engine
-    except ImportError:
-        return chunk_texts[:top_k]
-    
     if (
         not reference_text
         or chunk_embeddings is None
         or chunk_norms is None
-        or rag_engine is None
-        or rag_engine.embedding_model is None
+        or embedding_model is None
     ):
         return chunk_texts[:top_k]
 
-    note_vec = rag_engine.embedding_model.encode(
+    note_vec = embedding_model.encode(
         [reference_text],
         convert_to_numpy=True,
     )[0]

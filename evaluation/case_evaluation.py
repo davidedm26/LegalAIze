@@ -29,6 +29,7 @@ def evaluate_single_case(
     chunk_overlap: int,
     groundedness_top_k: int,
     case_artifact_dir: Optional[str] = None,
+    embedding_model=None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """Evaluate one ground-truth/report pair using the local RAG engine."""
     try:
@@ -53,8 +54,8 @@ def evaluate_single_case(
     )
     chunk_embeddings: Optional[np.ndarray] = None
     chunk_norms: Optional[np.ndarray] = None
-    if document_chunks and rag_engine.embedding_model is not None:
-        chunk_embeddings = rag_engine.embedding_model.encode(
+    if document_chunks and embedding_model is not None:
+        chunk_embeddings = embedding_model.encode(
             document_chunks,
             convert_to_numpy=True,
         )
@@ -103,7 +104,7 @@ def evaluate_single_case(
         pred_note = pred.get("Auditor_Notes") or pred.get("auditor_notes")
         if gt_note and pred_note:
             try:
-                similarity = compute_note_similarity(gt_note, pred_note)
+                similarity = compute_note_similarity(gt_note, pred_note, embedding_model)
                 note_similarities.append(similarity)
             except Exception as exc:
                 print(f"⚠ Failed to compute note similarity for {mapped_id}: {exc}")
@@ -114,6 +115,7 @@ def evaluate_single_case(
             chunk_embeddings=chunk_embeddings,
             chunk_norms=chunk_norms,
             top_k=groundedness_top_k,
+            embedding_model=embedding_model,
         )
         question_text = build_requirement_question(mapped_id, pred.get("Requirement_Name"))
         groundedness_records.append(

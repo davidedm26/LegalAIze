@@ -36,20 +36,22 @@ def compute_mae(gt_scores: List[float], pred_scores: List[float]) -> float:
     return sum(diffs) / len(diffs)
 
 
-def compute_note_similarity(gt_note: str, pred_note: str) -> float:
-    """Compute cosine similarity between ground-truth and predicted notes using embeddings."""
+def compute_note_similarity(gt_note: str, pred_note: str, embedding_model) -> float:
+    """
+    Compute cosine similarity between ground-truth and predicted notes using embeddings.
+    Args:
+        gt_note (str): Ground-truth note text.
+        pred_note (str): Predicted note text.
+        embedding_model: SentenceTransformer or compatible model with .encode().
+    Returns:
+        float: Cosine similarity between the two notes in [-1, 1].
+    """
     if not gt_note or not pred_note:
         return 0.0
+    if embedding_model is None:
+        raise ValueError("embedding_model must be provided to compute_note_similarity.")
     
-    try:
-        from backend import rag_engine
-    except ImportError:
-        raise RuntimeError("backend.rag_engine is not available.")
-    
-    if rag_engine is None or rag_engine.embedding_model is None:
-        raise RuntimeError("Sentence embedding model not available. Ensure rag_engine.init_rag() has run.")
-
-    embeddings = rag_engine.embedding_model.encode(
+    embeddings = embedding_model.encode(
         [gt_note, pred_note],
         convert_to_numpy=True,
     )

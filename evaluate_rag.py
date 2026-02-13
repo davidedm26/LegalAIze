@@ -1,3 +1,4 @@
+from sentence_transformers import SentenceTransformer
 import os
 import json
 import random
@@ -58,6 +59,9 @@ def main() -> None:
             ingestion_params.get("chunk_overlap", 100),
         )
     )
+
+    embedding_model = SentenceTransformer(vect_params.get("model_name", "all-MiniLM-L6-v2"))
+
 
     # Set seed for reproducibility where possible
     random.seed(random_seed)
@@ -156,6 +160,7 @@ def main() -> None:
                     chunk_overlap=groundedness_chunk_overlap,
                     groundedness_top_k=groundedness_top_k,
                     case_artifact_dir=tmpdir,
+                    embedding_model=embedding_model,
                 ) # Evaluate this evaluation case
                 res["name"] = name # Add case name to results
                 all_results.append(res) # Append to all results

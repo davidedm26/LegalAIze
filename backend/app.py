@@ -67,17 +67,10 @@ async def audit(document_text: str = Body(..., embed=True)): # Audit endpoint
 @app.get("/model_info")
 def model_info():
     """Comprehensive information about the system components"""
-    embedding_model = rag_engine.embedding_model
     vector_db = rag_engine.vector_db
     llm = rag_engine.llm
     mapping = rag_engine.mapping
     info = {
-        "embedding_model": {
-            "loaded": embedding_model is not None,
-            "type": type(embedding_model).__name__ if embedding_model else None,
-            "model_name": getattr(embedding_model, 'model_name', None) if embedding_model else None,
-            "max_seq_length": getattr(embedding_model, 'max_seq_length', None) if embedding_model else None,
-        },
         "vector_db": {
             "loaded": vector_db is not None,
             "type": type(vector_db).__name__ if vector_db else None,

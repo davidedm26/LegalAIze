@@ -16,7 +16,6 @@ permissions:
 
 env:
   PYTHON_VERSION: '3.11'
-  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
   THRESHOLD_MAE: "1.0"               # adjust to desired max MAE
   THRESHOLD_GROUNDEDNESS: "0.5"      # adjust to desired min groundedness
   THRESHOLD_FAITHFULNESS: "0.5"      # adjust to desired min faithfulness
@@ -80,6 +79,8 @@ jobs:
           DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
           MLFLOW_TRACKING_URI: https://dagshub.com/${{ github.repository }}.mlflow
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
         run: |
           python evaluate_rag.py
 
