@@ -77,7 +77,6 @@ def main() -> None:
     precompute_params = params.get("precompute", {})
     vect_params = params.get("vectorization", {})
     ingestion_params = params.get("ingestion", {})
-    groundedness_params = eval_params.get("groundedness", {})
 
     random_seed = int(eval_params.get("random_seed", 42))
 
@@ -137,10 +136,9 @@ def main() -> None:
 
     if run_ctx is not None:
         print(f"✓ MLflow run started: {run_ctx.info.run_id}")
-        # Add github tags if running in GitHub Actions environment
+        # Set run label (run_name) and GitHub tags if running in GitHub Actions environment
         if os.getenv("GITHUB_ACTIONS", "false").lower() == "true":
-            mlflow.set_tag("run_source", "github_actions")
-            # Altri tag utili da GitHub Actions
+            mlflow.set_tag("mlflow.runName", "github_actions")
             mlflow.set_tag("github_workflow", os.getenv("GITHUB_WORKFLOW", ""))
             mlflow.set_tag("github_run_id", os.getenv("GITHUB_RUN_ID", ""))
             mlflow.set_tag("github_run_number", os.getenv("GITHUB_RUN_NUMBER", ""))
@@ -150,7 +148,7 @@ def main() -> None:
             mlflow.set_tag("github_actor", os.getenv("GITHUB_ACTOR", ""))
             mlflow.set_tag("github_repository", os.getenv("GITHUB_REPOSITORY", ""))
         else:
-            mlflow.set_tag("run_source", "local")
+            mlflow.set_tag("mlflow.runName", "local")
     else:
         print("⚠ MLflow tracking URI not configured. Metrics will not be logged to MLflow.")
 
@@ -203,6 +201,8 @@ def main() -> None:
 
                 ragas_records.extend(case_ragas_records) # Collect groundedness samples for potential further analysis or separate logging
 
+
+
                 if run_ctx is not None:
                     # Log per-case metrics with a step index (for easier aggregation in MLflow UI charts)
                     mlflow.log_metric("mae_score_list", res["mae_score"], step=i)
@@ -226,11 +226,13 @@ def main() -> None:
         # After processing all cases, compute aggregated metrics across all results and log them to MLflow and/or save to a JSON file for DVC tracking or other uses.
         if all_results:
 
+
             total_score_pairs = sum(r["num_pairs"] for r in all_results)
             total_note_pairs = sum(r.get("note_similarity_count", 0) for r in all_results)
             total_groundedness_samples = sum(r.get("groundedness_sample_count", 0) for r in all_results)
             total_faithfulness_samples = sum(r.get("faithfulness_sample_count", 0) for r in all_results)
             total_relevancy_samples = sum(r.get("relevancy_sample_count", 0) for r in all_results)
+            total_correctness_samples = sum(r.get("correctness_sample_count", 0) for r in all_results)
 
             # Weighted MAE by number of pairs
             weighted_mae = (
@@ -282,17 +284,30 @@ def main() -> None:
                     ) / total_relevancy_samples
                 )
 
+            # Weighted correctness by sample count
+            weighted_correctness = None
+            correctness_results = [r for r in all_results if r.get("correctness_score") is not None]
+            if correctness_results and total_correctness_samples > 0:
+                weighted_correctness = (
+                    sum(
+                        r["correctness_score"] * r.get("correctness_sample_count", 0)
+                        for r in correctness_results
+                    ) / total_correctness_samples
+                )
+
         else: # Fallback values if no results were processed (e.g., all cases were skipped due to missing files)
             total_score_pairs = 0
             total_note_pairs = 0
             total_groundedness_samples = 0
             total_faithfulness_samples = 0
             total_relevancy_samples = 0
+            total_correctness_samples = 0
             weighted_mae = 0.0
             weighted_note_similarity = 0.0
             weighted_groundedness = None
             weighted_faithfulness = None
             weighted_relevancy   = None
+            weighted_correctness = None
 
         summary = {
             "total_cases": len(all_results),
@@ -303,9 +318,11 @@ def main() -> None:
             "total_groundedness_samples": total_groundedness_samples,
             "total_faithfulness_samples": total_faithfulness_samples,
             "total_relevancy_samples": total_relevancy_samples,
+            "total_correctness_samples": total_correctness_samples,
             "mean_groundedness_score": weighted_groundedness,
             "mean_faithfulness_score": weighted_faithfulness,
             "mean_relevancy_score": weighted_relevancy,
+            "mean_correctness_score": weighted_correctness,
             "cases": all_results,
         }
 
@@ -319,6 +336,7 @@ def main() -> None:
             mlflow.log_metric("note_similarity_pairs", total_note_pairs)
             mlflow.log_metric("note_similarity_mean", weighted_note_similarity)
 
+
             if weighted_groundedness is not None:
                 mlflow.log_metric("groundedness_score", weighted_groundedness)
                 mlflow.log_metric("groundedness_samples", total_groundedness_samples)
@@ -328,11 +346,21 @@ def main() -> None:
             if weighted_relevancy is not None:
                 mlflow.log_metric("relevancy_score", weighted_relevancy)
                 mlflow.log_metric("relevancy_samples", total_relevancy_samples)
+            if weighted_correctness is not None:
+                mlflow.log_metric("correctness_score", weighted_correctness)
+                mlflow.log_metric("correctness_samples", total_correctness_samples)
 
             # Log the metrics file also as artifact
             mlflow.log_artifact(metrics_output)
             if os.path.exists(mapping_path):
                 mlflow.log_artifact(mapping_path, artifact_path="inputs")
+
+            # Log RAGAS records as artifact for potential further analysis
+            if ragas_records:
+                ragas_artifact_path = os.path.join(metrics_dir, "ragas_records.json")
+                with open(ragas_artifact_path, "w", encoding="utf-8") as f:
+                    json.dump(ragas_records, f, indent=2)
+                mlflow.log_artifact(ragas_artifact_path, artifact_path="ragas")
 
         print("✓ RAG evaluation completed.")
 

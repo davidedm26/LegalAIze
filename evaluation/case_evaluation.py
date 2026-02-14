@@ -140,6 +140,7 @@ def evaluate_single_case(
     case_groundedness_score = ragas_metrics.get("groundedness")
     case_faithfulness_score = ragas_metrics.get("faithfulness")
     case_relevancy_score = ragas_metrics.get("relevancy")
+    case_correctness_score = ragas_metrics.get("correctness")
 
     if case_groundedness_score is None:
         print("⚠ Groundedness score is None, RAGAS evaluation may have failed or is unavailable.")
@@ -147,7 +148,8 @@ def evaluate_single_case(
         print("⚠ Faithfulness score is None, RAGAS evaluation may have failed or is unavailable.")
     if case_relevancy_score is None:
         print("⚠ Relevancy score is None, RAGAS evaluation may have failed or is unavailable.")
- 
+    if case_correctness_score is None:
+        print("⚠ Correctness score is None, RAGAS evaluation may have failed or is unavailable.")
 
     return (
         {
@@ -162,6 +164,8 @@ def evaluate_single_case(
             "faithfulness_sample_count": len(ragas_records),
             "relevancy_score": case_relevancy_score,
             "relevancy_sample_count": len(ragas_records),
+            "correctness_score": case_correctness_score,
+            "correctness_sample_count": len(ragas_records),
         },
         ragas_records,
     )
