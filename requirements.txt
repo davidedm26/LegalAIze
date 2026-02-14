@@ -19,6 +19,7 @@ python-dotenv==1.0.0
 pydantic==2.12.5
 
 # RAG and LLM
+pymupdf==1.23.8
 langchain-text-splitters==0.3.11
 langchain==0.3.27
 langchain-community==0.3.31

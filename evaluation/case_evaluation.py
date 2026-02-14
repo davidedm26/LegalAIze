@@ -147,7 +147,7 @@ def evaluate_single_case(
         print("⚠ Faithfulness score is None, RAGAS evaluation may have failed or is unavailable.")
     if case_relevancy_score is None:
         print("⚠ Relevancy score is None, RAGAS evaluation may have failed or is unavailable.")
-
+ 
 
     return (
         {
