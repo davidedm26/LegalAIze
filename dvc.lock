@@ -35,8 +35,8 @@ stages:
       size: 983985
     - path: vectorize_data.py
       hash: md5
-      md5: 12e662d42ee6028175885dfff11369f2
-      size: 5563
+      md5: 89c0351df93af62a78ea27a7cd95b0b0
+      size: 5643
     params:
       params.yaml:
         vectorization:
@@ -48,7 +48,7 @@ stages:
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: a73bc73958ff3bc6484c420a457eb17e.dir
+      md5: 3d02bfa79ce0f93608dc7068c55da363.dir
       size: 4678190
       nfiles: 4
   precompute_rag:
@@ -60,13 +60,13 @@ stages:
       size: 13552
     - path: data/processed/vector_index
       hash: md5
-      md5: a73bc73958ff3bc6484c420a457eb17e.dir
+      md5: 3d02bfa79ce0f93608dc7068c55da363.dir
       size: 4678190
       nfiles: 4
     - path: precompute_rag.py
       hash: md5
-      md5: 8f30cd64ff5dd31ca550d034996e61bf
-      size: 7046
+      md5: f35371c1af7262b79650b6d679fd06de
+      size: 7124
     params:
       params.yaml:
         ingestion:
@@ -99,12 +99,12 @@ stages:
       size: 96634
     - path: evaluate_rag.py
       hash: md5
-      md5: 2154fad7b5d6181e8392d0f1041f2955
-      size: 14260
+      md5: 94347d84282c25732d3f6c28d4d82942
+      size: 15259
     - path: evaluation
       hash: md5
-      md5: 39f73415eb74cdbe4595f46e6e908f1b.dir
-      size: 41980
+      md5: 2d05a741eebe0b33caa5e61a97d9cec9.dir
+      size: 44269
       nfiles: 13
     params:
       params.yaml:
@@ -113,7 +113,7 @@ stages:
           llm_model: gpt-4o-mini
           llm_temperature: 0
           mlflow_experiment: rag_evaluation
-          case_selector:
+          case_selector: 1
           ground_truth:
           - name: Evaluation1
             document_path: 
@@ -134,5 +134,5 @@ stages:
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: fdd1be21d73050fe54156232858fa869
-      size: 2493
+      md5: 2ee035c6e4c15f7cc06009eb25bcac5f
+      size: 1048

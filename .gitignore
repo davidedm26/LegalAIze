@@ -47,7 +47,6 @@ dagshub_token.txt
 backend/debug_responses/
 
 # Data
-data/raw_data/
 data/mapping.json
 data/qdrant_storage/
 /data/ground_truth/raw_data/**

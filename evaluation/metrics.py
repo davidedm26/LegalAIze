@@ -8,13 +8,16 @@ try:
 except ImportError:
     Dataset = None
 
+
 try:
     from ragas import evaluate as ragas_evaluate
-    from ragas.metrics import Faithfulness, ResponseGroundedness
+    from ragas.metrics import Faithfulness, ResponseGroundedness, AnswerRelevancy
 except ImportError:
     ragas_evaluate = None
     ResponseGroundedness = None
     Faithfulness = None
+    AnswerRelevancy = None
+
 
 RAGAS_GROUNDEDNESS_AVAILABLE = (
     Dataset is not None
@@ -25,6 +28,11 @@ RAGAS_FAITHFULNESS_AVAILABLE = (
     Dataset is not None
     and ragas_evaluate is not None
     and Faithfulness is not None
+)
+RAGAS_RELEVANCY_AVAILABLE = (
+    Dataset is not None
+    and ragas_evaluate is not None
+    and AnswerRelevancy is not None
 )
 
 
@@ -66,27 +74,29 @@ def compute_note_similarity(gt_note: str, pred_note: str, embedding_model) -> fl
 
 
 
+
 def compute_ragas_metrics(samples: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
     """
-    Compute both groundedness and faithfulness scores for a list of samples using a single Ragas evaluation call.
-    Returns a dict with keys 'groundedness' and 'faithfulness'.
+    Compute groundedness, faithfulness, and relevance scores for a list of samples using a single Ragas evaluation call.
+    Returns a dict with keys 'groundedness', 'faithfulness', and 'relevancy'.
     """
     if not samples:
-        return {"groundedness": None, "faithfulness": None}
-    if not (RAGAS_GROUNDEDNESS_AVAILABLE and RAGAS_FAITHFULNESS_AVAILABLE):
+        return {"groundedness": None, "faithfulness": None, "relevancy": None}
+    if not (RAGAS_GROUNDEDNESS_AVAILABLE and RAGAS_FAITHFULNESS_AVAILABLE and RAGAS_RELEVANCY_AVAILABLE):
         print("⚠ RAGAS metrics unavailable (check ragas/datasets installation).")
-        return {"groundedness": None, "faithfulness": None}
+        return {"groundedness": None, "faithfulness": None, "relevancy": None}
 
     try:
         from backend import rag_engine
     except ImportError:
-        return {"groundedness": None, "faithfulness": None}
+        return {"groundedness": None, "faithfulness": None, "relevancy": None}
 
     try:
         assert Dataset is not None
         assert ragas_evaluate is not None
         assert ResponseGroundedness is not None
         assert Faithfulness is not None
+        assert AnswerRelevancy is not None
         assert rag_engine is not None
 
         ragas_dataset = Dataset.from_list([
@@ -100,7 +110,7 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]]) -> Dict[str, Optional[f
         ])
         ragas_result = ragas_evaluate(
             dataset=ragas_dataset,
-            metrics=[ResponseGroundedness(), Faithfulness()],
+            metrics=[ResponseGroundedness(), Faithfulness(), AnswerRelevancy()],
             llm=rag_engine.llm,
         )
         df = ragas_result.to_pandas()
@@ -113,7 +123,6 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]]) -> Dict[str, Optional[f
             groundedness = float(df['groundedness'].mean())
         else:
             groundedness = None
-            
         # Extract faithfulness
         if "nv_response_faithfulness" in df.columns:
             faithfulness = float(df["nv_response_faithfulness"].mean())
@@ -123,7 +132,16 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]]) -> Dict[str, Optional[f
             faithfulness = float(df["faithfulness"].mean())
         else:
             faithfulness = None
-        return {"groundedness": groundedness, "faithfulness": faithfulness}
+        # Extract relevance
+        if "nv_response_answer_relevancy" in df.columns:
+            relevancy = float(df["nv_response_answer_relevancy"].mean())
+        elif "response_answer_relevancy" in df.columns:
+            relevancy = float(df["response_answer_relevancy"].mean())
+        elif "answer_relevancy" in df.columns:
+            relevancy = float(df["answer_relevancy"].mean())
+        else:
+            relevancy = None
+        return {"groundedness": groundedness, "faithfulness": faithfulness, "relevancy": relevancy}
     except Exception as e:
         print(f"⚠ Failed to compute RAGAS metrics: {e}")
-        return {"groundedness": None, "faithfulness": None}
+        return {"groundedness": None, "faithfulness": None, "relevancy": None}
