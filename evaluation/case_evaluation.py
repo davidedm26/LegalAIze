@@ -11,12 +11,6 @@ from evaluation.metrics import (
     compute_note_similarity,
     compute_ragas_metrics,
 )
-from evaluation.preprocessing import (
-    split_document_for_groundedness,
-    build_requirement_question,
-    select_relevant_contexts,
-    extract_ground_truth_note,
-)
 
 
 def evaluate_single_case(
@@ -24,9 +18,6 @@ def evaluate_single_case(
     case_name: str,
     gt_path: str,
     doc_path: str,
-    chunk_size: int,
-    chunk_overlap: int,
-    groundedness_top_k: int,
     case_artifact_dir: Optional[str] = None,
     embedding_model=None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
@@ -47,21 +38,6 @@ def evaluate_single_case(
     # Exclude the prompt from logged artifacts, it may contain sensitive info and is not needed for evaluation analysis. Only log the structured predictions.
     predictions = [report.model_dump(exclude={"Prompt"}) for report in audit_response.requirements]
 
-    # Split input document into chunks for groundedness evaluation
-    document_chunks = split_document_for_groundedness(
-        document_text,
-        chunk_size,
-        chunk_overlap,
-    )
-
-    chunk_embeddings: Optional[np.ndarray] = None
-    chunk_norms: Optional[np.ndarray] = None
-    if document_chunks and embedding_model is not None: # Precompute embeddings for document chunks
-        chunk_embeddings = embedding_model.encode(
-            document_chunks,
-            convert_to_numpy=True,
-        )
-        chunk_norms = np.linalg.norm(chunk_embeddings, axis=1) # Precompute norms for efficient cosine similarity calculation during context selection
 
     # Log input artifacts to MLflow (document and ground truth report) for this case, if MLflow is active. The predictions will be logged as a separate artifact (backend_predictions.json) for easier analysis and debugging.
     artifacts: Dict[str, str] = {}
@@ -108,7 +84,19 @@ def evaluate_single_case(
             pred_scores.append(pred_score)
 
         # Compute note similarity for this couple
+
+        # Extract GT note
+        def extract_ground_truth_note(row: Dict[str, Any]) -> Optional[str]:
+            """Extract ground truth auditor notes from a CSV row."""
+            return (
+                row.get("Auditor Notes")
+                or row.get("auditor_notes")
+                or row.get("Auditor_Notes")
+            )
+        
         gt_note = extract_ground_truth_note(gt_row)
+
+
         pred_note = pred.get("Auditor_Notes") or pred.get("auditor_notes")
         if gt_note and pred_note:
             try:
@@ -118,20 +106,12 @@ def evaluate_single_case(
                 print(f"⚠ Failed to compute note similarity for {mapped_id}: {exc}")
 
 
-        # To be consisten with the RAG worflow we will use the whole document as context for RAGAS evaluation
-        """
-        contexts = select_relevant_contexts(
-            reference_text=pred_note or "",
-            chunk_texts=document_chunks,
-            chunk_embeddings=chunk_embeddings,
-            chunk_norms=chunk_norms,
-            top_k=groundedness_top_k,
-            embedding_model=embedding_model,
-        )
-        """
-
-        # Build question text for RAGAS groundedness evaluation, including requirement metadata if available
-        question_text = build_requirement_question(mapped_id, pred.get("Requirement_Name"))
+        # Build question text for RAGAS groundedness evaluation
+        identifier = mapped_id or "Unknown requirement"
+        requirement_name = pred.get("Requirement_Name") or gt_row.get("Requirement_Name")
+        title = requirement_name 
+        # Only use title and id, no metadata
+        question_text = f"{title} ({identifier})"
 
         ragas_records.append(
             {
