@@ -78,11 +78,11 @@ st.markdown("""
     /* FOOTER STYLE */
     .legal-disclaimer {
         font-size: 0.75rem;
-        color: #6b7280;
+        color: var(--text-color-secondary, #6b7280);
         text-align: center;
         margin-top: 60px;
         padding-top: 20px;
-        border-top: 1px solid #e5e7eb;
+        border-top: 1px solid var(--secondary-background-color, #e5e7eb);
         font-style: italic;
     }
     
@@ -92,8 +92,8 @@ st.markdown("""
     /* --- BUTTON STYLING (Matching Home Page Blue) --- */
     div.stButton > button:first-child, 
     div.stDownloadButton > button:first-child {
-        background-color: #1e3a8a !important; /* Deep Navy Blue */
-        color: white !important;
+        background-color: var(--primary-color, #1e3a8a) !important;
+        color: var(--button-text-color, white) !important;
         border: none !important;
         border-radius: 8px !important;
         font-weight: 600 !important;
@@ -102,14 +102,14 @@ st.markdown("""
 
     div.stButton > button:first-child:hover,
     div.stDownloadButton > button:first-child:hover {
-        background-color: #172554 !important; /* Darker Navy */
-        color: #e2e8f0 !important;
+        background-color: var(--primary-color-dark, #172554) !important;
+        color: var(--button-text-color-hover, #e2e8f0) !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
 
     /* TEXT HIGHLIGHTS */
     h1, h2, h3 {
-        color: #1e3a8a !important;
+        color: var(--primary-color, #1e3a8a) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -230,6 +230,17 @@ with st.sidebar:
 # ==============================================================================
 # MAIN UI
 # ==============================================================================
+
+
+# --- BACK TO HOME BUTTON IN ALTO A DESTRA ---
+
+# --- Migliore allineamento Home in alto a destra ---
+col_spacer, col_home = st.columns([12, 1])
+with col_home:
+    st.markdown("<div style='padding-top:0.5rem; padding-right:0.5rem;'>", unsafe_allow_html=True)
+    st.page_link("app.py", label="Home", icon="🏠", use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
 st.title("🔍 Audit Compliance")
 st.markdown("Automated analysis of technical documentation powered by AI.")
 
