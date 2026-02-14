@@ -4,7 +4,7 @@ This script performs the following steps:
 1. Loads parameters from params.yaml.
 2. Reads PDF files from the raw data directory.
 3. Extracts text from each PDF, maintaining paragraph structure.
-4. Splits the text into chunks.
+4. Splits the text into chunks, adding enriched context such as section titles and metadata.
 5. Saves the chunks as a JSON file in the processed data directory.
 
 """
@@ -73,27 +73,28 @@ def main():
     all_docs = [] # To store all document chunks
     all_docs_aia = [] # Separate list for AI Act chunks
     all_docs_iso = [] # Separate list for ISO chunks
-    all_docs_pdf = [] # Separate list for standard PDF chunks
     
 
-    # --- Custom ingestion for AI Act JSON ---
+    # --- Custom ingestion for AI Act  ---
     ai_act_html_path = os.path.join(raw_dir, "ai_act.html")
     if not os.path.exists(ai_act_html_path):
         print(f"⚠ AI Act HTML file not found at {ai_act_html_path}. Make sure you have run 'dvc pull'.")
     else:
-        parse_ai_act_file_to_json(ai_act_html_path, os.path.join(processed_dir, "ai_act_parsed.json"))
+        parse_ai_act_file_to_json(ai_act_html_path, os.path.join(processed_dir, "ai_act_parsed.json")) # Parse AI Act HTML and save as JSON
         ai_act_json_path = os.path.join(processed_dir, "ai_act_parsed.json")
         if os.path.exists(ai_act_json_path):
             with open(ai_act_json_path, "r", encoding="utf-8") as f:
                 ai_act_sections = json.load(f)
-            for section in ai_act_sections:
+            for section in ai_act_sections: # Process each section of AI Act and create enriched chunks
                 s_name = section.get("name", "unknown")
                 s_type = section.get("type", "unknown")
                 s_title = section.get("title", "No Title")
                 annex = section.get("annex", "")
                 content = section.get("content", "")
-                chunks = splitter.split_text(content)
-                for i, chunk in enumerate(chunks):
+
+                chunks = splitter.split_text(content) # Split content into chunks using the text splitter
+
+                for i, chunk in enumerate(chunks): # Add enriched context to each chunk (e.g. section name, type, title, annex reference)
                     header = f"[SOURCE : AI ACT]"
                     if annex:
                         header += f" [ANNEX {annex}]"
@@ -107,31 +108,31 @@ def main():
                         "chunk_id": i,
                         "content": enriched_content
                     })
-            print(f"✓ AI Act ingestion completed. {len(all_docs_aia)} enriched chunks.")
+            print(f"✓ AI Act ingestion completed. {len(all_docs_aia)} enriched chunks.") 
 
-    # --- Custom ingestion for ISO PDF ---
+    # --- Custom ingestion for ISO  ---
     iso_pdf_path = os.path.join(raw_dir, "iso.pdf")
     if not os.path.exists(iso_pdf_path):
         print(f"⚠ ISO PDF file not found at {iso_pdf_path}. Make sure you have run 'dvc pull'.")
     else:
-        parse_iso_file_to_json(iso_pdf_path, os.path.join(processed_dir, "iso_parsed.json"))
+        parse_iso_file_to_json(iso_pdf_path, os.path.join(processed_dir, "iso_parsed.json")) # Parse ISO PDF and save as JSON
         iso_json_path = os.path.join(processed_dir, "iso_parsed.json")
         if os.path.exists(iso_json_path):
             with open(iso_json_path, "r", encoding="utf-8") as f:
                 iso_sections = json.load(f)
-            # Prepara una mappa per i contenuti di Annex A
+
             annex_a_map = {}
-            for section in iso_sections:
-                if section.get("section_type") == "control_requirement" or section.get("section_type") == "control_objective":
+            for section in iso_sections: 
+                # Annex A and Annex B are strongly linked, so we create a mapping of Annex A controls to enrich Annex B chunks
+                if section.get("section_type") == "control_requirement" or section.get("section_type") == "control_objective": 
                     annex_a_map[section.get("section_id")] = section.get("content", "")
-            # Processa solo Clause e Annex B
-            for section in iso_sections:
+
                 s_id = section.get("section_id", "unknown")
                 s_title = section.get("section_title", "No Title")
                 s_type = section.get("section_type", "unknown")
                 content = section.get("content", "")
-                # Solo Clause e Annex B
-                if s_type == "management_requirement":
+                
+                if s_type == "management_requirement": # Remaining sections
                     chunks = splitter.split_text(content)
                     for i, chunk in enumerate(chunks):
                         header = f"[SOURCE : ISO 42001] [ID: {s_id}] [TYPE: {s_type.upper()}] [Part {i+1}/{len(chunks)}] [TITLE: {s_title}]\n"
@@ -143,11 +144,13 @@ def main():
                             "chunk_id": i,
                             "content": enriched_content
                         })
-                elif s_type == "implementation_guidance":
-                    # Mappa con Annex A
+                elif s_type == "implementation_guidance": # Annex B sections
+                    
                     mapping_target = section.get("metadata", {}).get("maps_to_control", "")
                     annex_a_content = annex_a_map.get(mapping_target, "")
                     chunks = splitter.split_text(content)
+
+                    # Add enriched context to each chunk, including reference to mapped Annex A control and its content if available (since Annex B is guidance for Annex A controls)
                     for i, chunk in enumerate(chunks):
                         header = f"[SOURCE : ISO 42001] [ID: {s_id}] [TYPE: {s_type.upper()}] [Part {i+1}/{len(chunks)}] [TITLE: {s_title}]"
                         if mapping_target:
@@ -165,42 +168,13 @@ def main():
                         })
             print(f"✓ ISO 42001 ingestion completed. {len(all_docs_iso)} enriched chunks.")
 
-    
-    # Check if any PDF files are present for standard ingestion
-    # Exclude AI Act and ISO since they are handled with custom parsers
-    pdf_files = [f for f in os.listdir(raw_dir) if f.endswith('.pdf') and f not in ["ai_act.pdf", "iso.pdf"]]
 
-    # --- Standard ingestion for all other PDFs ---
-    all_docs_pdf = [] # Separate list for standard PDF chunks to keep track of source
-    if not pdf_files and not all_docs:
-        print(f"⚠ No other PDF files found in {raw_dir}.")
-    
-    else:
-        for pdf_file in pdf_files:
-            current_pdf_docs = []
-            print(f"Analyzing {pdf_file}...")
-            pdf_path = os.path.join(raw_dir, pdf_file)
-            raw_pages = extract_text_from_pdf(pdf_path)
-            text = process_law_text(raw_pages)
-            chunks = splitter.split_text(text)
-            for i, chunk in enumerate(chunks):
-                current_pdf_docs.append({
-                    "source": pdf_file,
-                    "chunk_id": i,
-                    "content": chunk
-                })
-            all_docs_pdf.extend(current_pdf_docs)
-            print(f"✓ {pdf_file} processed. {len(chunks)} chunks extracted.")
-
-    # Combine custom ingestions with standard ones
+    # Combine custom ingestions
     all_docs.extend(all_docs_aia) # Add AI Act chunks
     all_docs.extend(all_docs_iso) # Add ISO chunks
-    if all_docs_pdf:
-        all_docs.extend(all_docs_pdf) # Add standard PDF chunks
+
 
     # Save all chunks to a JSON file
-
-
     output_path = os.path.join(processed_dir, "chunks.json")
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(all_docs, f, indent=2, ensure_ascii=False)

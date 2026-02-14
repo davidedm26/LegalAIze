@@ -1,6 +1,9 @@
+"""   
+Backend application for the LegalAIze audit system. This module defines the FastAPI application, including endpoints for health checks, auditing documents, and retrieving model information. It also includes a lifespan event to initialize the RAG engine components on startup. The main endpoint is /audit, which accepts document text and returns an audit report based on the evaluation of mapped requirements using the RAG engine. CORS middleware is configured to allow requests from any origin for simplicity in development.
+"""
+
 import os
 from contextlib import asynccontextmanager
-
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,13 +26,13 @@ async def lifespan(app: FastAPI):
         rag_engine.init_rag()
         yield
     finally:
-        # No teardown logic required for now
         pass
 
 
 app = FastAPI(title="LegalAIze Audit API", version="1.0.0", lifespan=lifespan) # FastAPI instance
 
 # CORS - Cross-Origin Resource Sharing , allow all origins for simplicity
+# If don't set up CORS, frontend running on a different origin (e.g. localhost:3000) would be blocked from making requests to this backend (e.g. localhost:8000) by the browser's same-origin policy. In production, you would want to restrict this to only allow the specific origins that need access.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,7 +47,7 @@ def health():
     return {"status": "healthy", "rag_ready": rag_engine.rag_ready()}
 
 
-@app.post("/audit", response_model=AuditResponse)
+@app.post("/audit", response_model=AuditResponse) # Audit endpoint, accepts document text and returns an audit report
 async def audit(document_text: str = Body(..., embed=True)): # Audit endpoint
     """
     Produce an audit report for the given document text.
@@ -64,7 +67,7 @@ async def audit(document_text: str = Body(..., embed=True)): # Audit endpoint
         raise HTTPException(status_code=500, detail=f"Audit failed: {exc}")
 
 
-@app.get("/model_info")
+@app.get("/model_info") # Endpoint to retrieve information about the loaded models and components in the RAG engine, useful for debugging and monitoring
 def model_info():
     """Comprehensive information about the system components"""
     vector_db = rag_engine.vector_db

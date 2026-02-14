@@ -15,7 +15,6 @@ stages:
     deps:
       - vectorize_data.py
       - data/processed/chunks.json
-      #- params.yaml
     params:
       - vectorization
     outs:
@@ -26,7 +25,6 @@ stages:
     deps:
       - precompute_rag.py
       - data/mapping.json
-      #- params.yaml
       - data/processed/vector_index
     params:
       - vectorization
@@ -39,7 +37,6 @@ stages:
     deps:
       - evaluate_rag.py
       - evaluation
-      #- params.yaml
       - data/processed/requirement_chunks.json
       - data/ground_truth
     params:

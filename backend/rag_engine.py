@@ -1,3 +1,8 @@
+"""    
+This module implements the core RAG (Retrieval-Augmented Generation) engine for the AI compliance auditing system. It provides functionality to initialize the RAG components, evaluate individual requirements against a given document, and perform a full audit of a document by iterating through all mapped requirements. The engine uses a combination of a vector database (Qdrant) for retrieving relevant regulatory context, and a language model (e.g. Langchain's ChatOpenAI) to perform the actual evaluation based on a structured prompt template. The results are returned in a structured format that includes scores and auditor notes for each requirement.
+
+"""
+
 import os
 import json
 from typing import Any, Dict, List, Optional, Union
@@ -7,7 +12,6 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 from qdrant_client import QdrantClient
-#from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
@@ -29,8 +33,7 @@ vect_params = params.get("vectorization", {})
 eval_params = params.get("evaluation", {})
 
 
-# Static prompt template (placeholders only, no injected content)
-
+# Static prompt template 
 PROMPT_TEMPLATE = """
 You are a Senior AI Compliance Auditor. Your task is to perform a professional gap analysis using a "Guidance-based Assessment" logic.
 
@@ -69,30 +72,28 @@ RESPONSE FORMAT:
 }}
 """
 
-RequirementScore = Union[int, str]
-
+RequirementScore = Union[int, str] # Score can be an integer from 0 to 5, or "N/A" if not applicable or if parsing fails
 
 class RequirementReport(BaseModel):
     Mapped_ID: str
     Requirement_Name: str
     Score: RequirementScore
     Auditor_Notes: str
-    Prompt: str  # static prompt template (no injected chunks/document)
+    Prompt: str  # static prompt included for monitoring/debugging purposes
 
 
 class AuditResponse(BaseModel):
     requirements: List[RequirementReport]
 
 
-#embedding_model: Optional[SentenceTransformer] = None
 vector_db: Optional[QdrantClient] = None
 mapping: Optional[Dict[str, Any]] = None
 llm: Optional[ChatOpenAI] = None
 requirement_chunks: Dict[str, Any] = {}
-_initialized = False
+_initialized = False # Flag to prevent re-initialization if already done
 
 
-def _candidate_paths(relative_path: str) -> List[str]:
+def _candidate_paths(relative_path: str) -> List[str]: # Generate candidate paths for a given relative path, including both relative and absolute forms, and ensure uniqueness while preserving order
     rel = relative_path.replace("\\", "/")
     candidates = [
         os.path.join(PROJECT_ROOT, rel),
@@ -106,17 +107,15 @@ def _candidate_paths(relative_path: str) -> List[str]:
     return unique
 
 
+# Initialization function to set up vector DB, mapping, requirement chunks, and LLM. It checks for environment variables to determine how to connect to Qdrant (external service vs embedded index) and loads necessary data files. The function can be forced to re-initialize if needed.
 def init_rag(force: bool = False) -> None:
-    global vector_db, mapping, llm, requirement_chunks, _initialized #, embedding_model, 
+    global vector_db, mapping, llm, requirement_chunks, _initialized 
     if _initialized and not force:
         return
 
     try:
-        model_name = vect_params.get("model_name", "all-MiniLM-L6-v2")
-        #embedding_model = SentenceTransformer(model_name)
 
-
-        # Se QDRANT_HOST o QDRANT_PORT sono definiti, usa Qdrant come servizio
+        # If environment variables for Qdrant connection are set, use them to connect to an external Qdrant service. Otherwise, look for a local embedded index file. This allows flexibility for different deployment scenarios (local development vs production).
         qdrant_host = os.environ.get("QDRANT_HOST")
         qdrant_port = os.environ.get("QDRANT_PORT")
         if qdrant_host or qdrant_port:
@@ -129,7 +128,7 @@ def init_rag(force: bool = False) -> None:
                 print(f"⚠ Qdrant service not available at {host}:{port}: {e}")
                 vector_db = None
         else:
-            # Embedded/local mode: usa vector_index come file
+            # Embedded/local mode: use vector_index as a file
             index_path = vect_params.get("vector_index_path", "data/processed/vector_index")
             final_index_path = next((p for p in _candidate_paths(index_path) if os.path.exists(p)), None)
             if final_index_path:
@@ -176,7 +175,6 @@ def init_rag(force: bool = False) -> None:
 def rag_ready() -> bool:
     return all([
         vector_db is not None,
-        #embedding_model is not None,
         mapping is not None,
         llm is not None,
         bool(requirement_chunks),
@@ -197,25 +195,26 @@ def evaluate_requirement(
     if not rag_ready():
         raise RuntimeError("RAG system not initialized")
 
-    req_text = _build_requirement_text(requirement_data)
-    pre_chunks = requirement_chunks.get(requirement_name, [])
-    chunks_text = [chunk.get("content", "") for chunk in pre_chunks]
-    chunks_joined = "\n".join(chunks_text)
+    req_text = _build_requirement_text(requirement_data) # Build the requirement text for the prompt
+    pre_chunks = requirement_chunks.get(requirement_name, []) # Get the precomputed relevant chunks for this requirement from the loaded requirement_chunks data
+    chunks_text = [chunk.get("content", "") for chunk in pre_chunks] # Extract the text content of the chunks to include in the prompt as regulatory references
+    chunks_joined = "\n".join(chunks_text) # Join the chunk texts with newlines to create a single string to insert into the prompt under "REGULATORY CONTEXT". This provides the LLM with the relevant context for evaluating the requirement against the document.
 
-    prompt = PROMPT_TEMPLATE.format(
+
+    prompt = PROMPT_TEMPLATE.format( 
         document_text=document_text,
         requirement_text=req_text,
         regulatory_references=chunks_joined,
     )
 
     assert llm is not None
-    llm_response = llm.invoke(prompt).content.strip()
+    llm_response = llm.invoke(prompt).content.strip() # Call the LLM with the constructed prompt and get the response. We expect the response to be a JSON string containing the score and auditor notes as per the instructions in the prompt.
 
     try:
-        cleaned_response = llm_response.replace("```json", "").replace("```", "").strip()
-        response_json = json.loads(cleaned_response)
-        score_0_5 = int(response_json["score"])
-        auditor_notes = response_json["auditor_notes"]
+        cleaned_response = llm_response.replace("```json", "").replace("```", "").strip() # Clean response
+        response_json = json.loads(cleaned_response) # Parse the response as JSON
+        score_0_5 = int(response_json["score"]) # Extract the score
+        auditor_notes = response_json["auditor_notes"] # Extract the auditor notes
     except Exception:
         score_0_5 = 0
         auditor_notes = f"LLM response parsing failed. Response was: {llm_response}"
@@ -225,10 +224,10 @@ def evaluate_requirement(
         Requirement_Name=requirement_name,
         Score=score_0_5 if isinstance(score_0_5, int) else "N/A",
         Auditor_Notes=auditor_notes,
-        Prompt=PROMPT_TEMPLATE.strip(),
+        Prompt=PROMPT_TEMPLATE.strip(), # Include the static prompt template in the report for monitoring/debugging purposes, so we can see exactly what was sent to the LLM for each requirement evaluation.
     )
 
-
+# Main function to perform a full audit of a document by evaluating all requirements in the mapping
 def audit_document(
     document_text: str,
     *,
@@ -240,11 +239,12 @@ def audit_document(
 
     requirements_reports: List[RequirementReport] = []
 
+    # For each requirement in the mapping, call evaluate_requirement to get the report for that requirement and collect all reports in a list. This will produce a comprehensive audit report covering all requirements.
     for req_name, req_data in mapping.items():
         requirement_report = evaluate_requirement(document_text, req_name, req_data)
         requirements_reports.append(requirement_report)
 
-    if debug_dump_path:
+    if debug_dump_path: # If a debug dump path is provided, save the raw requirement reports
         debug_dir = os.path.dirname(debug_dump_path) or "."
         os.makedirs(debug_dir, exist_ok=True)
         with open(debug_dump_path, "w", encoding="utf-8") as f:

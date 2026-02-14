@@ -1,11 +1,11 @@
 """Evaluation module for RAG system."""
+# This module allows the use of functions as a library.
 
 from evaluation.data_loading import load_params, load_text, load_ground_truth_csv
 from evaluation.metrics import (
     compute_mae,
     compute_note_similarity,
-    compute_groundedness_score,
-    compute_faithfulness_score,
+    compute_ragas_metrics,
 )
 from evaluation.preprocessing import (
     split_document_for_groundedness,

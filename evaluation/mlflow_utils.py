@@ -3,7 +3,6 @@
 import os
 import json
 import tempfile
-from typing import Dict, Any
 import mlflow
 
 from evaluation.data_loading import load_ground_truth_csv

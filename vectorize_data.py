@@ -1,3 +1,6 @@
+"""   
+Chunks embedding and indexing script. This script takes the processed document chunks, generates vector embeddings using a specified model, and indexes them into a Qdrant vector database for efficient retrieval during RAG operations. It supports both local Qdrant instances (using file-based storage) and remote Qdrant services (via host/port connection), allowing flexibility for different deployment scenarios.
+"""
 import os
 import json
 import yaml
@@ -7,21 +10,11 @@ from qdrant_client.http.models import Distance, VectorParams, PointStruct
 import requests
 import time
 from typing import List 
-import shutil
-from pathlib import Path
+
 
 def load_params():
     with open("params.yaml", "r") as f:
         return yaml.safe_load(f)
-    
-def add_context_to_chunks(chunks: List[dict]) -> List[dict]:
-    """  
-    Adds more context to each chunk by including section titles or other relevant metadata. This can help the model understand the content better during retrieval.
-    Args:
-        chunks (List[dict]): List of chunk dictionaries, each containing at 'content' and metadata
-    Returns:
-        List[dict]: List of enriched chunk dictionaries with added context in 'content'
-    """
     
 
 def main():
@@ -39,17 +32,17 @@ def main():
     with open(chunks_path, "r", encoding="utf-8") as f: # Load chunks from JSON file
         chunks = json.load(f)
     
-    enriched_chunks = add_context_to_chunks(chunks) # Add more context to chunks (e.g. section titles)
-
-    print(f"Loading embedding model: {vect_params['model_name']}...")
-    model = SentenceTransformer(vect_params['model_name'])
 
     # Decide mode: local qdrant process (path) or remote service (host:port)
+    # If the QDRANT_HOST environment variable is set, we assume remote service mode; otherwise, we use local path-based storage. This allows flexibility for different deployment scenarios (local development vs production).
+
     qdrant_host = os.getenv("QDRANT_HOST") # Use localhost to connect to qdrant container when running this script in local environment.
     qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
+
     vector_index_path = vect_params.get('vector_index_path')
     collection_name = vect_params.get('collection_name')
 
+    # Helper function to wait for Qdrant service to be ready (only relevant for remote service mode)
     def wait_for_qdrant(host: str, port: int, timeout: int = 60):
         url = f"http://{host}:{port}/healthz"
         deadline = time.time() + timeout
@@ -63,14 +56,14 @@ def main():
             time.sleep(1)
         return False
 
-    if qdrant_host:
+    if qdrant_host: # If QDRANT_HOST is set, we're in remote service mode
         print(f"Using remote Qdrant service at {qdrant_host}:{qdrant_port}")
         if not wait_for_qdrant(qdrant_host, qdrant_port, timeout=60):
             print("⚠ Qdrant service not ready (health check failed). Aborting.")
             return
         client = QdrantClient(host=qdrant_host, port=qdrant_port)
     else:
-        # local path-based qdrant
+        # Embedded Qdrant client with local storage 
         if not vector_index_path:
             print("⚠ Missing 'vector_index_path' in params for local Qdrant storage.")
             return
@@ -79,22 +72,28 @@ def main():
         print(f"Initializing local Qdrant at {vector_index_path}...")
         client = QdrantClient(path=vector_index_path)
 
-    # Ensure collection exists (recreate to keep idempotent)
-    vector_size = model.get_sentence_embedding_dimension()
-    client.recreate_collection(
+
+    print(f"Loading embedding model: {vect_params['model_name']}...")
+    model = SentenceTransformer(vect_params['model_name'])
+    if model is None:
+        print(f"⚠ Failed to load embedding model '{vect_params['model_name']}'. Check model name and availability.")
+        return
+    # Ensure collection exists 
+    vector_size = model.get_sentence_embedding_dimension() # Get vector size from model
+    client.recreate_collection( 
         collection_name=collection_name,
         vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
     )
 
     print(f"Generating embeddings for {len(chunks)} chunks...")
 
-    texts = [c.get("content", "") for c in chunks]
-    embeddings = model.encode(texts, convert_to_numpy=True, show_progress_bar=True)
+    texts = [c.get("content", "") for c in chunks] # Extract content for embedding; 
+    embeddings = model.encode(texts, convert_to_numpy=True, show_progress_bar=True) # Generate embeddings for all chunks 
 
     # Upsert in batches to avoid very large requests
     batch_size = vect_params.get('batch_size', 128)
     points: List[PointStruct] = []
-    for i, chunk in enumerate(chunks):
+    for i, chunk in enumerate(chunks): # Create PointStruct for each chunk with embedding and metadata payload
         emb = embeddings[i].tolist()
         points.append(PointStruct(id=i, vector=emb, payload={
             "source": chunk.get('source'),
@@ -102,7 +101,7 @@ def main():
             "chunk_id": chunk.get('chunk_id')
         }))
 
-    for i in range(0, len(points), batch_size):
+    for i in range(0, len(points), batch_size): # Upsert points in batches
         batch_points = points[i:i+batch_size]
         client.upsert(collection_name=collection_name, points=batch_points)
 
@@ -111,31 +110,7 @@ def main():
         status_path = os.path.join(vector_index_path, "status.json")
         with open(status_path, "w", encoding="utf-8") as f:
             json.dump({"status": "indexed", "count": len(chunks)}, f)
-        '''
-        # Optionally create a portable snapshot copy of the vector_index for DVC
-        snapshot_path = vect_params.get("snapshot_path") or os.path.join(os.path.dirname(vector_index_path), "vector_index_snapshot")
-        try:
-            print(f"Requesting Qdrant server snapshot for collection '{collection_name}'...")
-            snapshot_resp = None
-            try:
-                # Prefer explicit collection_name when supported
-                snapshot_resp = client.create_snapshot(collection_name=collection_name, wait=True)
-            except TypeError:
-                # Some client versions may not accept collection_name; try without it
-                snapshot_resp = client.create_snapshot(wait=True)
-            except Exception as e:
-                print(f"⚠ Qdrant create_snapshot() failed: {e}")
-
-            # Close client (release handles). We won't write local snapshot_meta.json per request.
-            try:
-                client.close()
-            except Exception:
-                pass
-
-            print("✓ Snapshot requested on Qdrant server (no local metadata written)")
-        except Exception as e:
-            print(f"⚠ Failed to request/create snapshot: {e}")
-        '''
+        
     else:
         print("Note: no local vector_index_path configured; skipping snapshot creation for remote Qdrant.")
 

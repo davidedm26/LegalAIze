@@ -21,23 +21,10 @@ def split_document_for_groundedness(
 
 
 def build_requirement_question(mapped_id: Optional[str], requirement_name: Optional[str]) -> str:
-    """Build a question text for a requirement including metadata."""
+    """Build a question text (For RAGAS) for a specific requirement """
     identifier = mapped_id or "Unknown requirement"
     title = requirement_name or identifier
-    
-    try:
-        from backend import rag_engine
-        mapping_data = getattr(rag_engine, "mapping", None) or {}
-    except ImportError:
-        mapping_data = {}
-    
-    req_metadata = mapping_data.get(requirement_name or "", {}) if mapping_data else {}
-    iso_ref = req_metadata.get("iso_ref")
-    iso_text = req_metadata.get("iso_control_text")
-    suffix_parts = [part for part in (iso_ref, iso_text) if part]
-    if suffix_parts:
-        suffix = " | ".join(suffix_parts)
-        return f"{title} ({identifier}) — {suffix}"
+    # Only return title and id, no metadata
     return f"{title} ({identifier})"
 
 

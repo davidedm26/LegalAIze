@@ -6,6 +6,8 @@ __pycache__/
 .Python
 env/
 venv/
+backend/backend_venv/
+frontend/frontend_venv/
 ENV/
 .venv
 
@@ -16,6 +18,8 @@ mlartifacts/
 # DVC
 /data/*.csv
 /data/*.pdf
+.dvc/config.local
+.dvc/tmp
 
 /models/*.pkl
 .dvc/cache
@@ -41,4 +45,11 @@ Thumbs.db
 dagshub_token.txt
 
 backend/debug_responses/
+
+# Data
+data/raw_data/
+data/mapping.json
+data/qdrant_storage/
+/data/ground_truth/raw_data/**
+/data/unused/**
 

@@ -60,108 +60,70 @@ def compute_note_similarity(gt_note: str, pred_note: str, embedding_model) -> fl
     pred_norm = np.linalg.norm(pred_vec)
     if not gt_norm or not pred_norm:
         return 0.0
-    similarity = float(np.dot(gt_vec, pred_vec) / (gt_norm * pred_norm))
-    # Numerical noise can push slightly outside [-1,1]
-    return max(min(similarity, 1.0), -1.0)
+    similarity = float(np.dot(gt_vec, pred_vec) / (gt_norm * pred_norm)) # Cosine similarity (Dot product divided by norms)
+
+    return max(min(similarity, 1.0), -1.0) # Ensure similarity is in [-1, 1] range
 
 
-def compute_groundedness_score(samples: List[Dict[str, Any]]) -> Optional[float]:
-    """Compute groundedness score for a list of samples using Ragas."""
+
+def compute_ragas_metrics(samples: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
+    """
+    Compute both groundedness and faithfulness scores for a list of samples using a single Ragas evaluation call.
+    Returns a dict with keys 'groundedness' and 'faithfulness'.
+    """
     if not samples:
-        return None
-    if not RAGAS_GROUNDEDNESS_AVAILABLE:
-        print("⚠ RAGAS groundedness metric unavailable (check ragas/datasets installation).")
-        return None
-    
+        return {"groundedness": None, "faithfulness": None}
+    if not (RAGAS_GROUNDEDNESS_AVAILABLE and RAGAS_FAITHFULNESS_AVAILABLE):
+        print("⚠ RAGAS metrics unavailable (check ragas/datasets installation).")
+        return {"groundedness": None, "faithfulness": None}
+
     try:
         from backend import rag_engine
     except ImportError:
-        return None
-    
+        return {"groundedness": None, "faithfulness": None}
+
     try:
         assert Dataset is not None
         assert ragas_evaluate is not None
         assert ResponseGroundedness is not None
-        assert rag_engine is not None
-
-        ragas_dataset = Dataset.from_list(
-            [
-                {
-                    "question": sample["question"],
-                    "answer": sample["answer"],
-                    "contexts": sample["contexts"],
-                    "ground_truth": sample.get("ground_truth", ""),
-                }
-                for sample in samples
-            ]
-        )
-        ragas_result = ragas_evaluate(
-            dataset=ragas_dataset,
-            metrics=[ResponseGroundedness()],
-            llm=rag_engine.llm,
-        )
-        # ragas_result is an EvaluationResult - use to_pandas() to get scores
-        df = ragas_result.to_pandas()
-        # Look for nv_response_groundedness column (NV = NVIDIA variant)
-        if 'nv_response_groundedness' in df.columns:
-            return float(df['nv_response_groundedness'].mean())
-        elif 'response_groundedness' in df.columns:
-            return float(df['response_groundedness'].mean())
-        elif 'groundedness' in df.columns:
-            return float(df['groundedness'].mean())
-        else:
-            print(f"⚠ Available score columns: {list(df.columns)}")
-            return None
-    except Exception as e:
-        print(f"⚠ Failed to compute groundedness: {e}")
-        return None
-
-
-def compute_faithfulness_score(samples: List[Dict[str, Any]]) -> Optional[float]:
-    """Compute faithfulness score for a list of samples using Ragas."""
-    if not samples:
-        return None
-    if not RAGAS_FAITHFULNESS_AVAILABLE:
-        print("⚠ RAGAS faithfulness metric unavailable (check ragas/datasets installation).")
-        return None
-
-    try:
-        from backend import rag_engine
-    except ImportError:
-        return None
-
-    try:
-        assert Dataset is not None
-        assert ragas_evaluate is not None
         assert Faithfulness is not None
         assert rag_engine is not None
 
-        ragas_dataset = Dataset.from_list(
-            [
-                {
-                    "question": sample["question"],
-                    "answer": sample["answer"],
-                    "contexts": sample["contexts"],
-                    "ground_truth": sample.get("ground_truth", ""),
-                }
-                for sample in samples
-            ]
-        )
+        ragas_dataset = Dataset.from_list([
+            {
+                "question": f"Evaluate compliance for: {sample['question']}",
+                "answer": sample["answer"],
+                "contexts": sample["contexts"],
+                "ground_truth": sample.get("ground_truth", ""),
+            }
+            for sample in samples
+        ])
         ragas_result = ragas_evaluate(
             dataset=ragas_dataset,
-            metrics=[Faithfulness()],
+            metrics=[ResponseGroundedness(), Faithfulness()],
             llm=rag_engine.llm,
         )
         df = ragas_result.to_pandas()
-        if "nv_response_faithfulness" in df.columns:
-            return float(df["nv_response_faithfulness"].mean())
-        elif "response_faithfulness" in df.columns:
-            return float(df["response_faithfulness"].mean())
-        elif "faithfulness" in df.columns:
-            return float(df["faithfulness"].mean())
+        # Extract groundedness
+        if 'nv_response_groundedness' in df.columns:
+            groundedness = float(df['nv_response_groundedness'].mean())
+        elif 'response_groundedness' in df.columns:
+            groundedness = float(df['response_groundedness'].mean())
+        elif 'groundedness' in df.columns:
+            groundedness = float(df['groundedness'].mean())
         else:
-            print(f"⚠ Available faithfulness columns: {list(df.columns)}")
-            return None
+            groundedness = None
+            
+        # Extract faithfulness
+        if "nv_response_faithfulness" in df.columns:
+            faithfulness = float(df["nv_response_faithfulness"].mean())
+        elif "response_faithfulness" in df.columns:
+            faithfulness = float(df["response_faithfulness"].mean())
+        elif "faithfulness" in df.columns:
+            faithfulness = float(df["faithfulness"].mean())
+        else:
+            faithfulness = None
+        return {"groundedness": groundedness, "faithfulness": faithfulness}
     except Exception as e:
-        print(f"⚠ Failed to compute faithfulness: {e}")
-        return None
+        print(f"⚠ Failed to compute RAGAS metrics: {e}")
+        return {"groundedness": None, "faithfulness": None}
