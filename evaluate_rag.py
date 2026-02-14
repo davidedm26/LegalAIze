@@ -204,7 +204,7 @@ def main() -> None:
                         if file_path and os.path.exists(file_path):
                             mlflow.log_artifact(
                                 file_path,
-                                artifact_path=f"eval_cases/{case_slug}/outputs/{label}",
+                                artifact_path=f"cases/{case_slug}/outputs/{label}",
                             )
 
         # After processing all cases, compute aggregated metrics across all results and log them to MLflow and/or save to a JSON file for DVC tracking or other uses.
