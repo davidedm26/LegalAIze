@@ -134,11 +134,25 @@ def main() -> None:
         os.path.join(ingestion_params.get("raw_data_dir", "data"), "mapping.json"),
     )
 
+
     if run_ctx is not None:
         print(f"✓ MLflow run started: {run_ctx.info.run_id}")
-    else: 
+        # Add github tags if running in GitHub Actions environment
+        if os.getenv("GITHUB_ACTIONS", "false").lower() == "true":
+            mlflow.set_tag("run_source", "github_actions")
+            # Altri tag utili da GitHub Actions
+            mlflow.set_tag("github_workflow", os.getenv("GITHUB_WORKFLOW", ""))
+            mlflow.set_tag("github_run_id", os.getenv("GITHUB_RUN_ID", ""))
+            mlflow.set_tag("github_run_number", os.getenv("GITHUB_RUN_NUMBER", ""))
+            mlflow.set_tag("github_job", os.getenv("GITHUB_JOB", ""))
+            mlflow.set_tag("github_ref", os.getenv("GITHUB_REF", ""))
+            mlflow.set_tag("github_sha", os.getenv("GITHUB_SHA", ""))
+            mlflow.set_tag("github_actor", os.getenv("GITHUB_ACTOR", ""))
+            mlflow.set_tag("github_repository", os.getenv("GITHUB_REPOSITORY", ""))
+        else:
+            mlflow.set_tag("run_source", "local")
+    else:
         print("⚠ MLflow tracking URI not configured. Metrics will not be logged to MLflow.")
-        
 
     try:
         # Log static params to MLflow if available
@@ -153,8 +167,7 @@ def main() -> None:
             mlflow.log_param("chunk_overlap", ingestion_params.get("chunk_overlap"))
             if prompt_template_path and os.path.exists(prompt_template_path):
                 mlflow.log_artifact(prompt_template_path, artifact_path="inputs")
-        
-            
+
         filtered_cases = select_cases(gt_cases, case_selector) # Select cases based on case_selector (params)
 
         # Loop through evaluation cases
