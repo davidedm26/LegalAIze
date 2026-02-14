@@ -49,6 +49,7 @@ backend/debug_responses/
 # Data
 data/mapping.json
 data/qdrant_storage/
-/data/ground_truth/raw_data/**
-/data/unused/**
-
+data/ground_truth/raw_data/**
+data/unused/**
+data/raw_data/*.pdf
+data/raw_data/*.html
