@@ -6,6 +6,9 @@ import json
 import yaml
 from typing import Dict, List, Any 
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 

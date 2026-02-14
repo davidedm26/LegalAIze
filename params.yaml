@@ -1,8 +1,8 @@
 # Parameters for LegalAIze Project (Audit & Search)
 
 ingestion:
-  chunk_size: 1300  # number of characters per chunk
-  chunk_overlap: 200 # minimum overlap between chunks to preserve context
+  chunk_size: 1000  # number of characters per chunk
+  chunk_overlap: 150 # minimum overlap between chunks to preserve context
   raw_data_dir: "data/raw_data"
   processed_data_dir: "data/processed"
 

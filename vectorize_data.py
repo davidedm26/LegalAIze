@@ -4,6 +4,10 @@ Chunks embedding and indexing script. This script takes the processed document c
 import os
 import json
 import yaml
+
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams, PointStruct

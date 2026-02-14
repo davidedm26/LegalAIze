@@ -78,7 +78,6 @@ jobs:
         env:
           DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
-          MLFLOW_TRACKING_URI: https://dagshub.com/${{ github.repository }}.mlflow
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
         run: |

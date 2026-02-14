@@ -2,7 +2,8 @@
 RAG Evaluation Script
 This script evaluates the RAG system using the local RAG engine defined in backend.rag_engine. It loads evaluation cases defined in params.yaml, runs them through the RAG engine, computes metrics and logs results to MLflow (if configured).    
 """
-
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 from sentence_transformers import SentenceTransformer
 import os
@@ -35,12 +36,20 @@ def setup_mlflow():
     # 1. Primary Attempt: Use MLFLOW_TRACKING_URI from environment variable ( Remember to turn on MLFlow )
     mlflow_uri = os.getenv("MLFLOW_TRACKING_URI")
     
+    
     # If the URI is local, check if the server responds
     if mlflow_uri:
         try:
-            # Remove any trailing slashes for the connection test
+            mlflow_username = os.getenv("MLFLOW_TRACKING_USERNAME")
+            mlflow_password = os.getenv("MLFLOW_TRACKING_PASSWORD")     
+
             requests.get(mlflow_uri.rstrip('/') + '/health', timeout=2)
-            mlflow.set_tracking_uri(mlflow_uri)
+
+            if mlflow_username and mlflow_password:
+                mlflow.set_tracking_uri(mlflow_uri)
+                mlflow.set_tracking_username(mlflow_username)
+                mlflow.set_tracking_password(mlflow_password)
+
             print(f"✅ MLflow connected to: {mlflow_uri}")
             return
         except:
@@ -78,19 +87,8 @@ def main() -> None:
     gt_cases = eval_params.get("ground_truth", [])
     case_selector = normalize_case_selector(eval_params.get("case_selector"))
 
-    groundedness_top_k = int(groundedness_params.get("top_k", 3))
-    groundedness_chunk_size = int(
-        groundedness_params.get(
-            "chunk_size",
-            ingestion_params.get("chunk_size", 800),
-        )
-    )
-    groundedness_chunk_overlap = int(
-        groundedness_params.get(
-            "chunk_overlap",
-            ingestion_params.get("chunk_overlap", 100),
-        )
-    )
+
+
 
     embedding_model = SentenceTransformer(vect_params.get("model_name", "all-MiniLM-L6-v2"))
 
@@ -183,9 +181,6 @@ def main() -> None:
                     case_name=name,
                     gt_path=report_path,
                     doc_path=doc_path,
-                    chunk_size=groundedness_chunk_size,
-                    chunk_overlap=groundedness_chunk_overlap,
-                    groundedness_top_k=groundedness_top_k,
                     case_artifact_dir=tmpdir,
                     embedding_model=embedding_model,
                 ) # Evaluate this evaluation case
