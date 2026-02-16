@@ -232,8 +232,6 @@ You can provide input documents in two ways:
 
 ## 10. Evaluation
 
-## 10. Evaluation
-
 The evaluation step allows you to assess the performance and compliance of the RAG system using provided test cases. Results and metrics are automatically logged to the MLflow instance configured in your `.env` file and stored in the `metrics/` directory.
 
 You can modify the `params.yaml` file to specify which evaluation case to run the test on.
