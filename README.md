@@ -116,12 +116,17 @@ This will make the MLflow UI available at http://localhost:5000.
 To use a remote MLflow instance on DagsHub, create your own DagsHub repository and set:
 
 ```
-MLFLOW_TRACKING_URI=https://dagshub.com/YOUR_USERNAME/YOUR_REPO.mlflow
+DAGSHUB_REPO=YOUR_REPO
 DAGSHUB_USERNAME=YOUR_USERNAME
 DAGSHUB_TOKEN=YOUR_TOKEN
 ```
 
 To collaborate with the LegalAIze team and log experiments to the main DagsHub repository, set your DagsHub username and token in the `.env` and request write access from the maintainers.
+
+```
+DAGSHUB_USERNAME=YOUR_USERNAME
+DAGSHUB_TOKEN=YOUR_TOKEN
+```
 
 ---
 
@@ -148,9 +153,10 @@ dvc pull
 
 Force full pipeline execution and artifact generation:
 ```bash
+pip install -r requirements.txt
 dvc repro --force
 ```
-
+> **Note:** Requirements download and artifacts initialization may take several minutes.
 ---
 
 ## 6. Container Build and Start
@@ -199,7 +205,7 @@ streamlit run app.py
 
 
 
-<img src="./img/logo.png" alt="Dashboard Screenshot" width="800"/>
+<img src="./img/webapp.png" alt="Dashboard Screenshot" width="800"/>
 
 ---
 
