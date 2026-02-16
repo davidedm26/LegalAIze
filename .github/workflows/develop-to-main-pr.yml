@@ -81,7 +81,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
         run: |
-          python evaluate_rag.py
+          python evaluation/evaluate_rag.py
 
       - name: Check metric thresholds
         run: |
