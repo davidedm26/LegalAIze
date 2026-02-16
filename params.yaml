@@ -9,8 +9,6 @@ ingestion:
 vectorization:
   model_name: "all-MiniLM-L6-v2"
   collection_name: "legal_docs"
-  qdrant_host: "localhost"
-  qdrant_port: 6333
   vector_index_path: "data/processed/vector_index"
 
 precompute:

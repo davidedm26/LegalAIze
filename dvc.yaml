@@ -42,3 +42,4 @@ stages:
       - evaluation
     outs:
       - metrics/rag_eval.json
+      - metrics/ragas_records.json

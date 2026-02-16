@@ -11,7 +11,7 @@ stages:
       nfiles: 4
     - path: ingestion/
       hash: md5
-      md5: 92f6029d8114e894f208c9c66f3c78b2.dir
+      md5: 483ca76b077d93f506f05814114ffc68.dir
       size: 32636
       nfiles: 5
     params:
@@ -42,13 +42,11 @@ stages:
         vectorization:
           model_name: all-MiniLM-L6-v2
           collection_name: legal_docs
-          qdrant_host: localhost
-          qdrant_port: 6333
           vector_index_path: data/processed/vector_index
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: 3d02bfa79ce0f93608dc7068c55da363.dir
+      md5: 6db0afb58a5ec62ad39b9f5431925851.dir
       size: 4678190
       nfiles: 4
   precompute_rag:

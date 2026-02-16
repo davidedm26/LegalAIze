@@ -109,12 +109,13 @@ def _candidate_paths(relative_path: str) -> List[str]: # Generate candidate path
 
 # Initialization function to set up vector DB, mapping, requirement chunks, and LLM. It checks for environment variables to determine how to connect to Qdrant (external service vs embedded index) and loads necessary data files. The function can be forced to re-initialize if needed.
 def init_rag(force: bool = False) -> None:
-    global vector_db, mapping, llm, requirement_chunks, _initialized 
+    global  mapping, llm, requirement_chunks, _initialized #, vector_db 
     if _initialized and not force:
         return
 
     try:
 
+        '''
         # If environment variables for Qdrant connection are set, use them to connect to an external Qdrant service. Otherwise, look for a local embedded index file. This allows flexibility for different deployment scenarios (local development vs production).
         qdrant_host = os.environ.get("QDRANT_HOST")
         qdrant_port = os.environ.get("QDRANT_PORT")
@@ -137,7 +138,7 @@ def init_rag(force: bool = False) -> None:
             else:
                 print("⚠ Vector index not found! Proceeding without vector DB.")
                 vector_db = None
-
+        '''
         mapping_path = os.path.join(PROJECT_ROOT, "data", "mapping.json")
         if os.path.exists(mapping_path):
             with open(mapping_path, "r", encoding="utf-8") as f:
@@ -174,7 +175,7 @@ def init_rag(force: bool = False) -> None:
 
 def rag_ready() -> bool:
     return all([
-        vector_db is not None,
+        #vector_db is not None,
         mapping is not None,
         llm is not None,
         bool(requirement_chunks),

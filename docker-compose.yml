@@ -1,36 +1,7 @@
-version: '3.8' #  Docker Compose file version
-
 services:
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: ml-qdrant
-    ports:
-      - "6333:6333"
-    volumes:
-      - ./data/qdrant_storage:/qdrant/storage
-    restart: unless-stopped
-    # No container-local healthcheck here because the qdrant image may not include curl.
-    # The seeder will perform its own HTTP health polling before starting.
-    
-
-  qdrant_seeder:
-    build: ./qdrant_init
-    container_name: ml-qdrant-seeder
-    volumes:
-      - ./data/processed/vector_index:/data/vector_index
-    environment:
-      - LOCAL_QDRANT_PATH=/data/vector_index
-      - REMOTE_QDRANT_HOST=qdrant
-      - REMOTE_QDRANT_PORT=6333
-      - COLLECTION_NAME=legal_docs
-      - RECREATE_REMOTE=true
-    depends_on:
-      - qdrant
-    restart: 'no'
-
   backend:
     build: ./backend
-    container_name: ml-backend
+    container_name: legalaize-backend
     ports:
       - "8000:8000"
     volumes:
@@ -43,8 +14,6 @@ services:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
       - PARAMS_PATH=/app/params.yaml
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -52,13 +21,11 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
-    depends_on:
-      - qdrant
-      - qdrant_seeder
+
 
   frontend:
     build: ./frontend
-    container_name: ml-frontend
+    container_name: legalaize-frontend
     ports:
       - "8501:8501"
     depends_on:

@@ -70,15 +70,15 @@ async def audit(document_text: str = Body(..., embed=True)): # Audit endpoint
 @app.get("/model_info") # Endpoint to retrieve information about the loaded models and components in the RAG engine, useful for debugging and monitoring
 def model_info():
     """Comprehensive information about the system components"""
-    vector_db = rag_engine.vector_db
+    #vector_db = rag_engine.vector_db
     llm = rag_engine.llm
     mapping = rag_engine.mapping
     info = {
-        "vector_db": {
-            "loaded": vector_db is not None,
-            "type": type(vector_db).__name__ if vector_db else None,
-            "path": getattr(vector_db, '_location', None) if vector_db else None,
-        },
+        #"vector_db": {
+        #    "loaded": vector_db is not None,
+        #    "type": type(vector_db).__name__ if vector_db else None,
+        #    "path": getattr(vector_db, '_location', None) if vector_db else None,
+        #},
         "llm": {
             "loaded": llm is not None,
             "model_name": getattr(llm, 'model_name', None) if llm else None,
