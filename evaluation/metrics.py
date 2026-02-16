@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Any, Optional
 import numpy as np
-
+from langchain_openai import ChatOpenAI 
 try:
     from datasets import Dataset
 except ImportError:
@@ -82,8 +82,6 @@ def compute_note_similarity(gt_note: str, pred_note: str, embedding_model) -> fl
 
 
 
-
-
 def compute_ragas_metrics(samples: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
     """
     Compute groundedness, faithfulness, relevancy, and correctness scores for a list of samples using a single Ragas evaluation call.
@@ -95,19 +93,20 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]]) -> Dict[str, Optional[f
         print("⚠ RAGAS metrics unavailable (check ragas/datasets installation).")
         return {"groundedness": None, "faithfulness": None, "relevancy": None, "correctness": None}
 
+    import yaml
+    import os
     try:
-        from backend import rag_engine
-    except ImportError:
-        return {"groundedness": None, "faithfulness": None, "relevancy": None, "correctness": None}
-
-    try:
-        assert Dataset is not None
-        assert ragas_evaluate is not None
-        assert ResponseGroundedness is not None
-        assert Faithfulness is not None
-        assert AnswerRelevancy is not None
-        assert AnswerCorrectness is not None
-        assert rag_engine is not None
+        # Load LLM model name from params.yaml
+        params_path = os.path.join(os.path.dirname(__file__), "..", "params.yaml")
+        with open(params_path, "r", encoding="utf-8") as f:
+            params = yaml.safe_load(f)
+        # Extract the LLM model name from the params
+        llm_model = params.get("evaluation", {}).get("llm_model", None)
+        llm_temperature = params.get("evaluation", {}).get("llm_temperature", 0.0)
+        if llm_model is None:
+            print("⚠ LLM model name not found in params.yaml under evaluation.llm_model.")
+            return {"groundedness": None, "faithfulness": None, "relevancy": None, "correctness": None}
+        llm = ChatOpenAI(model=llm_model, temperature=llm_temperature, request_timeout=180)
 
         ragas_dataset = Dataset.from_list([
             {
@@ -121,7 +120,7 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]]) -> Dict[str, Optional[f
         ragas_result = ragas_evaluate(
             dataset=ragas_dataset,
             metrics=[ResponseGroundedness(), Faithfulness(), AnswerRelevancy(), AnswerCorrectness()],
-            llm=rag_engine.llm,
+            llm=llm,
         )
         df = ragas_result.to_pandas()
         # Extract groundedness

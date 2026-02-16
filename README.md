@@ -29,21 +29,28 @@ LegalAIze is an auditing tool designed to assess technical documentation for com
 
 ---
 
-## Architecture
+## Demo Architecture
 
 ```mermaid
-flowchart LR
+flowchart TD
 	User((User)) --> Streamlit["Streamlit UI"]
-	Streamlit --> FastAPI["FastAPI Backend"]
-	FastAPI --> SentenceTransformers["Sentence Transformers"]
-	SentenceTransformers --> Qdrant["Qdrant Vector DB"]
-	FastAPI --> OpenAI["OpenAI LLM"]
+	subgraph Frontend ["Streamlit Container"]
+		Streamlit
+	end
+	subgraph Backend ["FastAPI Backend Container"]
+		FastAPI["FastAPI Backend"]
+	end
+	Streamlit -- REST API --> FastAPI
+	FastAPI -- read --> ReqChunks["requirements_chunks.json"]
+	FastAPI -- build prompt --> OpenAI["OpenAI LLM"]
+	OpenAI -- response --> FastAPI
+	FastAPI -- REST response --> Streamlit
 ```
 
 ---
 
 ## Project Structure
-
+(Da aggiornare alla fine)
 ```text
 LegalAIze/
 ├── backend/
@@ -223,7 +230,38 @@ You can provide input documents in two ways:
 
 ---
 
-## 10. Troubleshooting / FAQ
+## 10. Evaluation
+
+## 10. Evaluation
+
+The evaluation step allows you to assess the performance and compliance of the RAG system using provided test cases. Results and metrics are automatically logged to the MLflow instance configured in your `.env` file and stored in the `metrics/` directory.
+
+You can modify the `params.yaml` file to specify which evaluation case to run the test on.
+
+
+**1. Full Configuration Setup**
+Before running the evaluation, ensure your environment is fully configured by installing the dependencies.
+> **Note:** This step involves downloading and installing multiple libraries and may take some time.
+
+```bash
+pip install -r requirements.txt
+```
+**2. Artifact Retrieval**
+Ensure you have the necessary artifacts. If you have not executed Section 5 yet (or if you are in a fresh environment), run the following command to download the artifacts:
+
+```bash
+dvc pull
+```
+
+**2. Execution**
+Once the environment is ready and artifacts are present, run the evaluation script:
+
+```bash
+python evaluate_rag.py
+```
+---
+
+## 11. Troubleshooting / FAQ
 
 **Q: The containers fail to start or services are not reachable.**
 A: Ensure Docker is running and ports 8000 (backend) and 8501 (frontend) are free.
@@ -239,7 +277,7 @@ A: Verify your `OPENAI_API_KEY` is set correctly in the `.env` file and you have
 
 ---
 
-## 11. Contributing / Development
+## 12. Contributing / Development
 
 GitHub Actions are configured for CI/CD:
 - Linting and testing of Python code
@@ -248,7 +286,7 @@ These actions run automatically on pushes to the repository.
 
 ---
 
-## 12. Authors & License
+## 13. Authors & License
 
 **Authors:**
 - Davide Di Matteo 

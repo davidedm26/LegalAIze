@@ -58,7 +58,7 @@ stages:
       size: 13552
     - path: data/processed/vector_index
       hash: md5
-      md5: 3d02bfa79ce0f93608dc7068c55da363.dir
+      md5: 6db0afb58a5ec62ad39b9f5431925851.dir
       size: 4678190
       nfiles: 4
     - path: precompute_rag.py
@@ -75,8 +75,6 @@ stages:
         vectorization:
           model_name: all-MiniLM-L6-v2
           collection_name: legal_docs
-          qdrant_host: localhost
-          qdrant_port: 6333
           vector_index_path: data/processed/vector_index
     outs:
     - path: data/processed/requirement_chunks.json
@@ -99,17 +97,16 @@ stages:
       hash: md5
       md5: 60af817d1f4a4fd37be1c17327b8393d
       size: 17577
-    - path: evaluation
+    - path: evaluation/
       hash: md5
-      md5: 27fd88c47b8a5ef4b5d50ddf3001749b.dir
-      size: 46656
+      md5: f78c193b96e4a80daa61cc58d87e9dc2.dir
+      size: 47845
       nfiles: 13
     params:
       params.yaml:
         evaluation:
-          random_seed: 42
           llm_model: gpt-4o-mini
-          llm_temperature: 0
+          llm_temperature: 0.0
           mlflow_experiment: rag_evaluation
           case_selector: 1
           ground_truth:
@@ -129,8 +126,15 @@ stages:
             document_path: 
               data/ground_truth/raw_data/Evaluation4/documentation.txt
             report_path: data/ground_truth/raw_data/Evaluation4/report.CSV
+        llm:
+          llm_model: gpt-4o-mini
+          llm_temperature: 0.0
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: 22ee60ead5dca3d0fbceae1dd5914c02
-      size: 1231
+      md5: b51ebe53af48bce87e5f297cf0b8a468
+      size: 1233
+    - path: metrics/ragas_records.json
+      hash: md5
+      md5: 4175ba01491002a34866a0270e549ebf
+      size: 112852

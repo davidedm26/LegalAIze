@@ -30,7 +30,7 @@ def load_params(path: Optional[str] = None) -> Dict[str, Any]:
 
 params = load_params()
 vect_params = params.get("vectorization", {})
-eval_params = params.get("evaluation", {})
+llm_params = params.get("llm", {})
 
 
 # Static prompt template 
@@ -161,8 +161,8 @@ def init_rag(force: bool = False) -> None:
             print("⚠ Requirement chunks file not found!")
             requirement_chunks = {}
 
-        llm_model_name = eval_params.get("llm_model")
-        llm_temperature = float(eval_params.get("llm_temperature", 0))
+        llm_model_name = llm_params.get("llm_model")
+        llm_temperature = float(llm_params.get("llm_temperature", 0))
         llm = ChatOpenAI(model=llm_model_name, temperature=llm_temperature, request_timeout=30)
         print(f"✓ LLM Initialized ({llm_model_name}, temp={llm_temperature})")
 

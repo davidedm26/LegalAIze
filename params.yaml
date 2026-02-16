@@ -16,11 +16,9 @@ precompute:
   chunks_output: "data/processed/requirement_chunks.json"
 
 evaluation:
-  random_seed: 42
-  llm_model: "gpt-4o-mini"  # documented for reproducibility
-  llm_temperature: 0
+  llm_model: "gpt-4o-mini" # RAGAS evaluation LLM model
+  llm_temperature: 0.0
   mlflow_experiment: "rag_evaluation"
-  #metrics_output: "metrics/rag_eval.json"
   case_selector: 1  # e.g., 2 or [1,3] to evaluate specific cases; null runs all
   ground_truth:
     - name: "Evaluation1"
@@ -36,3 +34,6 @@ evaluation:
       document_path: "data/ground_truth/raw_data/Evaluation4/documentation.txt"
       report_path: "data/ground_truth/raw_data/Evaluation4/report.CSV"
   
+llm:
+  llm_model: "gpt-4o-mini"  # RAG LLM model
+  llm_temperature: 0.0

@@ -33,13 +33,15 @@ stages:
       - data/processed/requirement_chunks.json
 
   evaluate_rag:
-    cmd: python evaluation/evaluate_rag.py
+    cmd: python evaluate_rag.py
     deps:
-      - evaluation/  
+      - evaluate_rag.py
+      - evaluation/ 
       - data/processed/requirement_chunks.json
       - data/ground_truth
     params:
       - evaluation
+      - llm
     outs:
       - metrics/rag_eval.json
       - metrics/ragas_records.json
