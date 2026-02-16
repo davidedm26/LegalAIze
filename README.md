@@ -1,56 +1,119 @@
+
 # LegalAIze: AI Audit Tool
+
+![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)
+![Docker](https://img.shields.io/badge/docker-ready-blue)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+---
+
+<img src="./img/logo.png" alt="LegalAIze Logo" width="200"/>
+
+---
+
+
 
 LegalAIze is an auditing tool designed to assess technical documentation for compliance with the EU AI Act and ISO 42001 standards. It streamlines the evaluation process, helping organizations ensure their AI systems meet regulatory and quality requirements.
 
-## Requirements
+---
 
-- Python 3.11 is required.
-- Docker and Docker Compose must be installed.
+## Key Features
 
-## Technology Stack
+- Automated Compliance Checks (EU AI Act, ISO 42001)
+- Retrieval-Augmented Generation (RAG) implementation
+- PDF and TXT parsing with chunking
+- Experiment tracking with MLflow and DagsHub
+- Semantic search with Qdrant
+- Streamlit UI for document upload and results
+- FastAPI backend for scalable audit logic
 
-- DVC: Artifacts versioning
-- Qdrant: Vector database
-- MLflow: Experiments logging
-- Sentence Transformers: Embedding model
-- OpenAI: LLM API
-- FastAPI: Backend API
-- Streamlit: Frontend UI
-- Docker: Containerization
+---
 
-## 1. Repository Initialization
+## Architecture
 
-Clone the repository:
+```mermaid
+flowchart LR
+	User((User)) --> Streamlit["Streamlit UI"]
+	Streamlit --> FastAPI["FastAPI Backend"]
+	FastAPI --> SentenceTransformers["Sentence Transformers"]
+	SentenceTransformers --> Qdrant["Qdrant Vector DB"]
+	FastAPI --> OpenAI["OpenAI LLM"]
+```
+
+---
+
+## Project Structure
+
+```text
+LegalAIze/
+├── backend/
+├── frontend/
+├── data/
+├── models/
+├── notebooks/
+├── evaluation/
+├── ingestion/
+├── metrics/
+├── qdrant_init/
+├── params.yaml
+├── dvc.yaml
+├── docker-compose.yml
+├── requirements.txt
+```
+
+---
+
+## 1. Requirements
+
+- Python 3.11 is required
+- Docker and Docker Compose must be installed
+
+---
+
+## 2. Configuration (.env)
+
+Create a `.env` file in the project root. Example configuration:
+
+| Variable                | Description                                 | Example Value                                 |
+|-------------------------|---------------------------------------------|-----------------------------------------------|
+| OPENAI_API_KEY          | OpenAI API key for LLM access               | sk-...                                        |
+| MLFLOW_TRACKING_URI     | MLflow tracking URI (local or remote)        | http://localhost:5000                         |
+| DAGSHUB_USERNAME        | DagsHub username (if using DagsHub)          | your_username                                 |
+| DAGSHUB_TOKEN           | DagsHub token (if using DagsHub)             | your_token                                    |
+
+
+Refer to `.env.example` for all available options.
+
+---
+
+## 3. Repository Initialization
+
+Clone the repository and install DVC:
 
 ```bash
 git clone https://github.com/davidedm_26/LegalAIze.git
 cd LegalAIze
-```
-
-Install DVC:
-
-```bash
 pip install dvc
 ```
 
+---
 
-## 2. MLflow Initialization
+## 4. MLflow Setup
 
-
-Create a `.env` file in the project root. By default, it is recommended to use a local MLflow instance for experiment tracking:
+By default, use a local MLflow instance for experiment tracking:
 
 ```
 MLFLOW_TRACKING_URI=http://localhost:5000
 ```
 
-If you use the local MLflow option, you must start the MLflow server before running experiments:
+Start the MLflow server before running experiments:
 
 ```bash
 mlflow ui --backend-store-uri ./mlruns --host 0.0.0.0 --port 5000
 ```
 This will make the MLflow UI available at http://localhost:5000.
 
-If you want to use a remote MLflow instance on DagsHub, you can create your own DagsHub repository and set the following in your `.env`:
+To use a remote MLflow instance on DagsHub, create your own DagsHub repository and set:
 
 ```
 MLFLOW_TRACKING_URI=https://dagshub.com/YOUR_USERNAME/YOUR_REPO.mlflow
@@ -58,20 +121,13 @@ DAGSHUB_USERNAME=YOUR_USERNAME
 DAGSHUB_TOKEN=YOUR_TOKEN
 ```
 
-If you want to collaborate with the LegalAIze team and log experiments to the main DagsHub repository, simply set your DagsHub username and token in the `.env`:
+To collaborate with the LegalAIze team and log experiments to the main DagsHub repository, set your DagsHub username and token in the `.env` and request write access from the maintainers.
 
-```
-DAGSHUB_USERNAME=YOUR_USERNAME
-DAGSHUB_TOKEN=YOUR_TOKEN
-```
+---
 
-Note: 
-- To log experiments to the main repository, you must request write access from the maintainers.
-- You can refer to the .env.example file.
+## 5. Artifact Initialization
 
-## 3. Artifact Initialization (Choose One Mode)
-
-### A. Quick Demo Mode (uses precomputed artifacts)
+### Quick Demo Mode (uses precomputed artifacts)
 
 Initialize DVC (required for new setups):
 
@@ -83,19 +139,21 @@ dvc remote modify origin --local user YOUR_USERNAME
 dvc remote modify origin --local password YOUR_TOKEN
 ```
 
-Run DVC pull to download all required artifacts:
+Download all required artifacts:
 ```bash
 dvc pull
 ```
 
-### B. Complete Demo Mode (recomputes all artifacts)
+### Complete Demo Mode (recomputes all artifacts)
 
-Run DVC repro to force full pipeline execution and artifact generation:
+Force full pipeline execution and artifact generation:
 ```bash
 dvc repro --force
 ```
 
-## 4. Container Build and Start
+---
+
+## 6. Container Build and Start
 
 Build the containers:
 ```bash
@@ -106,17 +164,46 @@ Start the demo:
 docker compose up
 ```
 
-## 4. Running the Demo
+---
 
-Open the following link on your browser:
+## 7. Running the Demo
+
+Open the following link in your browser:
 - http://localhost:8501
 
-## 5. Demo Tutorial and Limitations
+---
+
+## 8. Local Development (No Docker)
+
+You can run the backend and frontend separately for development:
+
+**Backend (FastAPI):**
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app:app --reload --port 8000
+```
+
+**Frontend (Streamlit):**
+```bash
+cd frontend
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+---
+
+## 9. Demo Tutorial and Limitations
 
 ### How to Use the Demo
 
-You can provide input documents in two ways:
 
+
+<img src="./img/logo.png" alt="Dashboard Screenshot" width="800"/>
+
+---
+
+You can provide input documents in two ways:
 - Copy and paste the text directly into the interface
 - Drag and drop or upload a `.txt` or `.pdf` file
 
@@ -128,13 +215,38 @@ You can provide input documents in two ways:
 - All input documents are processed by an OpenAI Large Language Model (LLM) via API
 - The LegalAIze team does not assume legal responsibility for data protection or privacy regarding the documents submitted. Please ensure that you do not upload sensitive or confidential information.
 
-## Notes
+---
 
-- Python 3.11 is required for all scripts and containers.
-- For local development, you can run backend and frontend separately as described in their respective folders.
+## 10. Troubleshooting / FAQ
 
-## Contributing / Development
+**Q: The containers fail to start or services are not reachable.**
+A: Ensure Docker is running and ports 8000 (backend) and 8501 (frontend) are free.
+
+**Q: DVC pull fails or is slow.**
+A: Check your DagsHub credentials and internet connection. Try again after a few minutes.
+
+**Q: MLflow UI is not available.**
+A: Make sure you started the MLflow server as described above and that the port is not blocked.
+
+**Q: OpenAI API errors.**
+A: Verify your `OPENAI_API_KEY` is set correctly in the `.env` file and you have sufficient quota.
+
+---
+
+## 11. Contributing / Development
 
 GitHub Actions are configured for CI/CD:
+- Linting and testing of Python code
+- Docker image build checks
+These actions run automatically on pushes to the repository.
 
-- TO UPDATE
+---
+
+## 12. Authors & License
+
+**Authors:**
+- Davide Di Matteo 
+- Vittoria Alberto
+
+**License:**
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
