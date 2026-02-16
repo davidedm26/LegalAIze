@@ -11,8 +11,9 @@ LegalAIze is an auditing tool designed to assess technical documentation for com
 
 - DVC: Artifacts versioning
 - Qdrant: Vector database
-- MLflow: experiments logging
+- MLflow: Experiments logging
 - Sentence Transformers: Embedding model
+- OpenAI: LLM API
 - FastAPI: Backend API
 - Streamlit: Frontend UI
 - Docker: Containerization
@@ -107,11 +108,33 @@ docker compose up
 
 ## 4. Running the Demo
 
-- Backend: http://localhost:8000
-- Frontend: http://localhost:8501
+Open the following link on your browser:
+- http://localhost:8501
+
+## 5. Demo Tutorial and Limitations
+
+### How to Use the Demo
+
+You can provide input documents in two ways:
+
+- Copy and paste the text directly into the interface
+- Drag and drop or upload a `.txt` or `.pdf` file
+
+**Requirements:**
+- An active internet connection is required
+- Uploaded files should not exceed 50 pages (this limit is subject to revision)
+
+**Important Notice:**
+- All input documents are processed by an OpenAI Large Language Model (LLM) via API
+- The LegalAIze team does not assume legal responsibility for data protection or privacy regarding the documents submitted. Please ensure that you do not upload sensitive or confidential information.
 
 ## Notes
 
 - Python 3.11 is required for all scripts and containers.
 - For local development, you can run backend and frontend separately as described in their respective folders.
-- For CI/CD, GitHub Actions is configured for linting, testing, and Docker builds.
+
+## Contributing / Development
+
+GitHub Actions are configured for CI/CD:
+
+- TO UPDATE
