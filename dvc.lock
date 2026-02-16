@@ -1,43 +1,42 @@
 schema: '2.0'
 stages:
   ingest:
-    cmd: python data_ingestion.py
+    cmd:
+    - python ingestion/data_ingestion.py
     deps:
-    - path: data/ai_act.pdf
+    - path: data/raw_data/
       hash: md5
-      md5: a31da461b015738b42cc2f719a9acee4
-      size: 2583319
-    - path: data/iso.pdf
+      md5: f941a48344d6b4813c536e7eeb258564.dir
+      size: 3911604
+      nfiles: 4
+    - path: ingestion/
       hash: md5
-      md5: 2ae5af2fc9eea16d8d0d3144b57ca428
-      size: 2646955
-    - path: data_ingestion.py
-      hash: md5
-      md5: 1bdd1c37329d416183e46053b392fed3
-      size: 3447
+      md5: 92f6029d8114e894f208c9c66f3c78b2.dir
+      size: 32636
+      nfiles: 5
     params:
       params.yaml:
         ingestion:
           chunk_size: 1000
           chunk_overlap: 150
-          raw_data_dir: data
+          raw_data_dir: data/raw_data
           processed_data_dir: data/processed
     outs:
     - path: data/processed/chunks.json
       hash: md5
-      md5: 30dbdcf19f8e7e4d30d649432a56b451
-      size: 919736
+      md5: b426f8e5c32715ed06db971d761bc9db
+      size: 983985
   vectorize:
     cmd: python vectorize_data.py
     deps:
     - path: data/processed/chunks.json
       hash: md5
-      md5: 30dbdcf19f8e7e4d30d649432a56b451
-      size: 919736
+      md5: b426f8e5c32715ed06db971d761bc9db
+      size: 983985
     - path: vectorize_data.py
       hash: md5
-      md5: de41926107f5ed56e1f0d83dd00fee1e
-      size: 5673
+      md5: 89c0351df93af62a78ea27a7cd95b0b0
+      size: 5643
     params:
       params.yaml:
         vectorization:
@@ -49,8 +48,8 @@ stages:
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: 1c4f48d2837dcc9147a22a90fc06ec69.dir
-      size: 5136943
+      md5: 3d02bfa79ce0f93608dc7068c55da363.dir
+      size: 4678190
       nfiles: 4
   precompute_rag:
     cmd: python precompute_rag.py
@@ -61,19 +60,19 @@ stages:
       size: 13552
     - path: data/processed/vector_index
       hash: md5
-      md5: 1c4f48d2837dcc9147a22a90fc06ec69.dir
-      size: 5136943
+      md5: 3d02bfa79ce0f93608dc7068c55da363.dir
+      size: 4678190
       nfiles: 4
     - path: precompute_rag.py
       hash: md5
-      md5: af7142c520a7853e170df3f38f029525
-      size: 4701
+      md5: f35371c1af7262b79650b6d679fd06de
+      size: 7124
     params:
       params.yaml:
         ingestion:
           chunk_size: 1000
           chunk_overlap: 150
-          raw_data_dir: data
+          raw_data_dir: data/raw_data
           processed_data_dir: data/processed
         vectorization:
           model_name: all-MiniLM-L6-v2
@@ -84,29 +83,29 @@ stages:
     outs:
     - path: data/processed/requirement_chunks.json
       hash: md5
-      md5: c17a57a8bfd7c7e9e53c8bcc215f3bbc
-      size: 80709
+      md5: 26696b751ddbf98000d396e6a7383ac7
+      size: 96634
   evaluate_rag:
     cmd: python evaluate_rag.py
     deps:
     - path: data/ground_truth
       hash: md5
-      md5: 7b8852d7b0bfdedbe15110623dd23aec.dir
-      size: 58589
-      nfiles: 15
+      md5: d14ab41908475195e2eaa957efb5e0a4.dir
+      size: 58578
+      nfiles: 13
     - path: data/processed/requirement_chunks.json
       hash: md5
-      md5: c17a57a8bfd7c7e9e53c8bcc215f3bbc
-      size: 80709
+      md5: 26696b751ddbf98000d396e6a7383ac7
+      size: 96634
     - path: evaluate_rag.py
       hash: md5
-      md5: 806eceac0c8f1bb07f18da9836fe3603
-      size: 12324
+      md5: 60af817d1f4a4fd37be1c17327b8393d
+      size: 17577
     - path: evaluation
       hash: md5
-      md5: e7226b24f94c1d20afa705865e0fde88.dir
-      size: 47842
-      nfiles: 14
+      md5: 27fd88c47b8a5ef4b5d50ddf3001749b.dir
+      size: 46656
+      nfiles: 13
     params:
       params.yaml:
         evaluation:
@@ -114,10 +113,7 @@ stages:
           llm_model: gpt-4o-mini
           llm_temperature: 0
           mlflow_experiment: rag_evaluation
-          metrics_output: metrics/rag_eval.json
-          case_selector:
-          - 2
-          - 3
+          case_selector: 1
           ground_truth:
           - name: Evaluation1
             document_path: 
@@ -138,5 +134,5 @@ stages:
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: b623fc4c9763572023da44b67cba8afc
-      size: 1415
+      md5: 22ee60ead5dca3d0fbceae1dd5914c02
+      size: 1231

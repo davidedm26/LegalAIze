@@ -1,11 +1,10 @@
 stages:
   ingest:
-    cmd: python data_ingestion.py
+    cmd: 
+      - python ingestion/data_ingestion.py
     deps:
-      - data_ingestion.py
-      - data/ai_act.pdf
-      - data/iso.pdf
-      #- params.yaml/ingestion
+      - ingestion/
+      - data/raw_data/
     params:
       - ingestion
     outs:
@@ -16,7 +15,6 @@ stages:
     deps:
       - vectorize_data.py
       - data/processed/chunks.json
-      #- params.yaml
     params:
       - vectorization
     outs:
@@ -27,7 +25,6 @@ stages:
     deps:
       - precompute_rag.py
       - data/mapping.json
-      #- params.yaml
       - data/processed/vector_index
     params:
       - vectorization
@@ -40,7 +37,6 @@ stages:
     deps:
       - evaluate_rag.py
       - evaluation
-      #- params.yaml
       - data/processed/requirement_chunks.json
       - data/ground_truth
     params:

@@ -38,7 +38,7 @@ st.markdown("""
         font-family: 'Helvetica Neue', sans-serif;
         font-weight: 800;
         font-size: 3.5rem;
-        color: #1e3a8a; /* Deep Navy Blue */
+        color: var(--primary-color, #1e3a8a);
         margin: 0;
         padding: 0;
         line-height: 1.2;
@@ -48,7 +48,7 @@ st.markdown("""
     /* HERO SUBTITLE */
     .hero-subtitle {
         font-size: 1.2rem;
-        color: #4b5563;
+        color: var(--text-color, #4b5563);
         font-weight: 400;
         text-align: center;
         margin-top: 10px;
@@ -101,7 +101,7 @@ st.markdown("""
     /* DESCRIPTION TEXT BELOW LENS */
     .lens-description {
         text-align: center;
-        color: #64748b;
+        color: var(--text-color-secondary, #64748b);
         font-size: 1.1rem;
         /* Margine negativo per "tirare su" il testo vicino alla lente */
         margin-top: -20px; 
@@ -114,8 +114,8 @@ st.markdown("""
     
     .lens-cta {
         font-weight: 800;
-        color: #1e3a8a; /* Blu scuro come il titolo */
-        font-size: 1.8rem; /* Bello grande */
+        color: var(--primary-color, #1e3a8a);
+        font-size: 1.8rem;
         margin-bottom: 10px;
         letter-spacing: -0.5px;
     }
@@ -123,7 +123,7 @@ st.markdown("""
     /* Sidebar Styling text */
     .sidebar-text {
         font-size: 0.95rem;
-        color: #334155;
+        color: var(--text-color, #334155);
         margin-bottom: 15px;
         line-height: 1.6;
     }
@@ -132,9 +132,9 @@ st.markdown("""
     .footer {
         text-align: center;
         margin-top: 80px;
-        color: #9ca3af;
+        color: var(--text-color-secondary, #9ca3af);
         font-size: 0.8rem;
-        border-top: 1px solid #e5e7eb;
+        border-top: 1px solid var(--secondary-background-color, #e5e7eb);
         padding-top: 20px;
     }
 </style>
@@ -144,7 +144,7 @@ st.markdown("""
 # SIDEBAR CONTENT (ENGLISH)
 # ==============================================================================
 with st.sidebar:
-    st.markdown("### 🤖 How does it work?")
+    st.markdown("### How does it work?")
     st.markdown("""
     <div class="sidebar-text">
     Welcome to <b>LegalAIze</b>. This tool assists you in verifying the compliance of your AI systems.

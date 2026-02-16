@@ -9,14 +9,7 @@ from evaluation.data_loading import load_ground_truth_csv, load_text
 from evaluation.metrics import (
     compute_mae,
     compute_note_similarity,
-    compute_groundedness_score,
-    compute_faithfulness_score,
-)
-from evaluation.preprocessing import (
-    split_document_for_groundedness,
-    build_requirement_question,
-    select_relevant_contexts,
-    extract_ground_truth_note,
+    compute_ragas_metrics,
 )
 
 
@@ -25,10 +18,8 @@ def evaluate_single_case(
     case_name: str,
     gt_path: str,
     doc_path: str,
-    chunk_size: int,
-    chunk_overlap: int,
-    groundedness_top_k: int,
     case_artifact_dir: Optional[str] = None,
+    embedding_model=None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """Evaluate one ground-truth/report pair using the local RAG engine."""
     try:
@@ -36,30 +27,19 @@ def evaluate_single_case(
     except ImportError:
         raise RuntimeError("backend.rag_engine is not available. Run evaluate_rag from the project root.")
     
-    ground_truth = load_ground_truth_csv(gt_path)
-    document_text = load_text(doc_path)
+    ground_truth = load_ground_truth_csv(gt_path) # Benchmark report
+    document_text = load_text(doc_path) # Original document text for RAG evaluation
 
     if rag_engine is None:
         raise RuntimeError("backend.rag_engine is not available. Run evaluate_rag from the project root.")
 
-    audit_response = rag_engine.audit_document(document_text)
-    # Exclude the prompt from logged artifacts to avoid leaking template/content
+    audit_response = rag_engine.audit_document(document_text) # Get predictions
+
+    # Exclude the prompt from logged artifacts, it may contain sensitive info and is not needed for evaluation analysis. Only log the structured predictions.
     predictions = [report.model_dump(exclude={"Prompt"}) for report in audit_response.requirements]
 
-    document_chunks = split_document_for_groundedness(
-        document_text,
-        chunk_size,
-        chunk_overlap,
-    )
-    chunk_embeddings: Optional[np.ndarray] = None
-    chunk_norms: Optional[np.ndarray] = None
-    if document_chunks and rag_engine.embedding_model is not None:
-        chunk_embeddings = rag_engine.embedding_model.encode(
-            document_chunks,
-            convert_to_numpy=True,
-        )
-        chunk_norms = np.linalg.norm(chunk_embeddings, axis=1)
 
+    # Log input artifacts to MLflow (document and ground truth report) for this case, if MLflow is active. The predictions will be logged as a separate artifact (backend_predictions.json) for easier analysis and debugging.
     artifacts: Dict[str, str] = {}
     if case_artifact_dir:
         os.makedirs(case_artifact_dir, exist_ok=True)
@@ -68,11 +48,14 @@ def evaluate_single_case(
             json.dump(predictions, f, ensure_ascii=False, indent=2)
         artifacts["backend_predictions"] = predictions_path
 
+
+    # Initialize accumulators for metrics
     gt_scores: List[float] = []
     pred_scores: List[float] = []
     note_similarities: List[float] = []
-    groundedness_records: List[Dict[str, Any]] = []
+    ragas_records: List[Dict[str, Any]] = []
 
+    # Process each prediction and corresponding ground truth entry, matching by Mapped_ID. If Mapped_ID is missing or does not match any GT entry, skip that prediction and log a warning.
     for pred in predictions:
         mapped_id = pred.get("Mapped_ID")
         if not mapped_id or mapped_id not in ground_truth:
@@ -83,6 +66,7 @@ def evaluate_single_case(
         gt_score: Optional[float] = None
         pred_score: Optional[float] = None
 
+        # If Score is 'N/A' or missing, we treat it as None and exclude from MAE calculation, but still include in note similarity and groundedness if notes are available. Log warnings for invalid score formats.
         try:
             if gt_row.get("Score") != 'N/A':
                 gt_score = float(gt_row.get("Score", "0"))
@@ -99,33 +83,49 @@ def evaluate_single_case(
             gt_scores.append(gt_score)
             pred_scores.append(pred_score)
 
+        # Compute note similarity for this couple
+
+        # Extract GT note
+        def extract_ground_truth_note(row: Dict[str, Any]) -> Optional[str]:
+            """Extract ground truth auditor notes from a CSV row."""
+            return (
+                row.get("Auditor Notes")
+                or row.get("auditor_notes")
+                or row.get("Auditor_Notes")
+            )
+        
         gt_note = extract_ground_truth_note(gt_row)
+
+
         pred_note = pred.get("Auditor_Notes") or pred.get("auditor_notes")
         if gt_note and pred_note:
             try:
-                similarity = compute_note_similarity(gt_note, pred_note)
+                similarity = compute_note_similarity(gt_note, pred_note, embedding_model)
                 note_similarities.append(similarity)
             except Exception as exc:
                 print(f"⚠ Failed to compute note similarity for {mapped_id}: {exc}")
 
-        contexts = select_relevant_contexts(
-            reference_text=pred_note or "",
-            chunk_texts=document_chunks,
-            chunk_embeddings=chunk_embeddings,
-            chunk_norms=chunk_norms,
-            top_k=groundedness_top_k,
-        )
-        question_text = build_requirement_question(mapped_id, pred.get("Requirement_Name"))
-        groundedness_records.append(
+
+        # Build question text for RAGAS groundedness evaluation
+        identifier = mapped_id or "Unknown requirement"
+        requirement_name = pred.get("Requirement_Name") or gt_row.get("Requirement_Name")
+        title = requirement_name 
+        # Only use title and id, no metadata
+        question_text = f"{title} ({identifier})"
+
+        ragas_records.append(
             {
                 "question": question_text,
                 "answer": pred_note or "",
-                "contexts": contexts,
+                # RAGAS expects a list of strings for 'contexts', even if only one context is used
+                "contexts": [document_text],
                 "ground_truth": gt_note or "",
                 "requirement_id": mapped_id,
                 "case": case_name,
             }
         )
+
+    # Compute Metrics 
 
     mae = compute_mae(gt_scores, pred_scores)
 
@@ -135,9 +135,21 @@ def evaluate_single_case(
         else 0.0
     )
 
-    # Compute groundedness for this case
-    case_groundedness_score = compute_groundedness_score(groundedness_records)
-    case_faithfulness_score = compute_faithfulness_score(groundedness_records)
+    ragas_metrics = compute_ragas_metrics(ragas_records)
+
+    case_groundedness_score = ragas_metrics.get("groundedness")
+    case_faithfulness_score = ragas_metrics.get("faithfulness")
+    case_relevancy_score = ragas_metrics.get("relevancy")
+    case_correctness_score = ragas_metrics.get("correctness")
+
+    if case_groundedness_score is None:
+        print("⚠ Groundedness score is None, RAGAS evaluation may have failed or is unavailable.")
+    if case_faithfulness_score is None:
+        print("⚠ Faithfulness score is None, RAGAS evaluation may have failed or is unavailable.")
+    if case_relevancy_score is None:
+        print("⚠ Relevancy score is None, RAGAS evaluation may have failed or is unavailable.")
+    if case_correctness_score is None:
+        print("⚠ Correctness score is None, RAGAS evaluation may have failed or is unavailable.")
 
     return (
         {
@@ -147,9 +159,13 @@ def evaluate_single_case(
             "note_similarity_count": len(note_similarities),
             "mean_note_similarity": mean_note_similarity,
             "groundedness_score": case_groundedness_score,
-            "groundedness_sample_count": len(groundedness_records),
+            "groundedness_sample_count": len(ragas_records),
             "faithfulness_score": case_faithfulness_score,
-            "faithfulness_sample_count": len(groundedness_records),
+            "faithfulness_sample_count": len(ragas_records),
+            "relevancy_score": case_relevancy_score,
+            "relevancy_sample_count": len(ragas_records),
+            "correctness_score": case_correctness_score,
+            "correctness_sample_count": len(ragas_records),
         },
-        groundedness_records,
+        ragas_records,
     )

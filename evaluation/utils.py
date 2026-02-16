@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 
 def slugify_case_name(name: str) -> str:
-    """Convert a case name to a slug suitable for file paths."""
+    """Convert a case name to a slug format (URL-friendly string)."""
     base = name or "case"
     slug = re.sub(r"[^a-z0-9_-]+", "-", base.lower()).strip("-")
     return slug or "case"
