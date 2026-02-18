@@ -9,13 +9,17 @@ ingestion:
 vectorization:
   model_name: "all-MiniLM-L6-v2"
   collection_name: "legal_docs"
-  qdrant_host: "localhost"
-  qdrant_port: 6333
+  #qdrant_host: "localhost"
+  #qdrant_port: 6333
   vector_index_path: "data/processed/vector_index"
 
-precompute:
-  top_k: 5  # number of chunks per requirement in precompute_rag
-  chunks_output: "data/processed/requirement_chunks.json"
+rag:
+  document_chunk_size: 512
+  document_chunk_overlap: 64
+  pre_rerank_top_k: 10
+
+  llm_model: "gpt-4o-mini"  # RAG LLM model
+  llm_temperature: 0.0
 
 evaluation:
   llm_model: "gpt-4o-mini" # RAGAS evaluation LLM model
@@ -36,6 +40,3 @@ evaluation:
       document_path: "data/ground_truth/raw_data/Evaluation4/documentation.txt"
       report_path: "data/ground_truth/raw_data/Evaluation4/report.CSV"
   
-llm:
-  llm_model: "gpt-4o-mini"  # RAG LLM model
-  llm_temperature: 0.0

@@ -18,7 +18,7 @@ def load_text(path: str) -> str:
 
 
 def load_ground_truth_csv(path: str) -> Dict[str, Dict[str, Any]]:
-    """Load ground truth CSV into a dict keyed by Mapped_ID."""
+    """Load ground truth CSV into a dict keyed by Requirement_ID."""
     gt: Dict[str, Dict[str, Any]] = {}
 
     for encoding in ("utf-8-sig", "latin-1"):
@@ -26,10 +26,10 @@ def load_ground_truth_csv(path: str) -> Dict[str, Dict[str, Any]]:
             with open(path, "r", encoding=encoding) as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    mapped_id = row.get("Mapped_ID") or row.get("Mapped ID")
-                    if not mapped_id:
+                    requirement_id = row.get("Requirement_ID") or row.get("Mapped ID")
+                    if not requirement_id:
                         continue
-                    gt[mapped_id] = row
+                    gt[requirement_id] = row
             return gt
         except UnicodeDecodeError:
             continue

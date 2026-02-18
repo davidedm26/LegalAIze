@@ -8,29 +8,29 @@ stages:
     params:
       - ingestion
     outs:
-      - data/processed/chunks.json
+      - data/processed/requirement_chunks.json
 
   vectorize:
     cmd: python vectorize_data.py
     deps:
       - vectorize_data.py
-      - data/processed/chunks.json
+      - data/processed/requirement_chunks.json
     params:
       - vectorization
     outs:
       - data/processed/vector_index
 
-  precompute_rag:
-    cmd: python precompute_rag.py
-    deps:
-      - precompute_rag.py
-      - data/mapping.json
-      - data/processed/vector_index
-    params:
-      - vectorization
-      - ingestion
-    outs:
-      - data/processed/requirement_chunks.json
+#  precompute_rag:
+#    cmd: python precompute_rag.py
+#    deps:
+#      - precompute_rag.py
+#      - data/mapping.json
+#      - data/processed/vector_index
+#    params:
+#      - vectorization
+#      - ingestion
+#    outs:
+#      - data/processed/requirement_chunks.json
 
   evaluate_rag:
     cmd: python evaluate_rag.py

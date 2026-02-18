@@ -14,7 +14,6 @@ import os
 import re
 import json
 import yaml
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from parse_aia import parse_ai_act_file_to_json  # Custom parser for AI Act HTML
 from parse_iso import parse_iso_file_to_json  # Custom parser for ISO PDF
 
@@ -199,6 +198,7 @@ def build_requirement_chunks(mapping, ai_act_sections, iso_sections):
         ethical_principle = principle.get("ethical_principle", "")
         for req in principle.get("technical_requirements", []):
             req_name = req.get("name", "")
+            id = req.get("id", "")
             eu_refs = req.get("eu_ai_act_articles", [])
             iso_refs = req.get("iso_42001_sections", [])
             eu_contents = []
@@ -217,6 +217,7 @@ def build_requirement_chunks(mapping, ai_act_sections, iso_sections):
                         "content": f"[TITLE: {req_name}] [REF: {ref}] [ISO SECTION: {sid}] [TITLE: {stitle}]\n{scontent.strip()}"
                     })
             requirement_chunks.append({
+                "id": id,
                 "ethicalPrinciple": ethical_principle,
                 "requirementName": req_name,
                 "euAiActArticles": eu_contents,

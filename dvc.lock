@@ -11,8 +11,8 @@ stages:
       nfiles: 4
     - path: ingestion/
       hash: md5
-      md5: 92f6029d8114e894f208c9c66f3c78b2.dir
-      size: 32636
+      md5: 54a9503d1f2d27cf8763c4e39558d1d1.dir
+      size: 36249
       nfiles: 5
     params:
       params.yaml:
@@ -24,32 +24,30 @@ stages:
     outs:
     - path: data/processed/requirement_chunks.json
       hash: md5
-      md5: c0cbb5c39588bd0f0d5b5c4ac9023501
-      size: 211185
+      md5: 44039b19edf55e1c52d68f5897f97c81
+      size: 211658
   vectorize:
     cmd: python vectorize_data.py
     deps:
-    - path: data/processed/chunks.json
+    - path: data/processed/requirement_chunks.json
       hash: md5
-      md5: b426f8e5c32715ed06db971d761bc9db
-      size: 983985
+      md5: 44039b19edf55e1c52d68f5897f97c81
+      size: 211658
     - path: vectorize_data.py
       hash: md5
-      md5: 89c0351df93af62a78ea27a7cd95b0b0
-      size: 5643
+      md5: 85712003cf54f1e1f87141e92ad86e01
+      size: 6688
     params:
       params.yaml:
         vectorization:
           model_name: all-MiniLM-L6-v2
           collection_name: legal_docs
-          qdrant_host: localhost
-          qdrant_port: 6333
           vector_index_path: data/processed/vector_index
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: 3d02bfa79ce0f93608dc7068c55da363.dir
-      size: 4678190
+      md5: 74ea133bce15e615fec170a9f376af9c.dir
+      size: 655917
       nfiles: 4
   precompute_rag:
     cmd: python precompute_rag.py
@@ -88,21 +86,21 @@ stages:
     deps:
     - path: data/ground_truth
       hash: md5
-      md5: d14ab41908475195e2eaa957efb5e0a4.dir
-      size: 58578
-      nfiles: 13
+      md5: e085866d442ac8b651e409a6b8f28547.dir
+      size: 30778
+      nfiles: 10
     - path: data/processed/requirement_chunks.json
       hash: md5
-      md5: 26696b751ddbf98000d396e6a7383ac7
-      size: 96634
+      md5: 44039b19edf55e1c52d68f5897f97c81
+      size: 211658
     - path: evaluate_rag.py
       hash: md5
       md5: 60af817d1f4a4fd37be1c17327b8393d
       size: 17577
     - path: evaluation/
       hash: md5
-      md5: f78c193b96e4a80daa61cc58d87e9dc2.dir
-      size: 47845
+      md5: b007cb912f280b18aeb39a5920aa6076.dir
+      size: 47987
       nfiles: 13
     params:
       params.yaml:
@@ -134,9 +132,5 @@ stages:
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: b51ebe53af48bce87e5f297cf0b8a468
+      md5: 7666517d49c077171d7dfc70e7a6b0a0
       size: 1233
-    - path: metrics/ragas_records.json
-      hash: md5
-      md5: 4175ba01491002a34866a0270e549ebf
-      size: 112852

@@ -27,7 +27,7 @@ def main():
     ingest_params = params['ingestion'] # Ingestion parameters
     
     processed_dir = ingest_params['processed_data_dir'] # Directory for processed data
-    chunks_path = os.path.join(processed_dir, "chunks.json") # Path to chunks file
+    chunks_path = os.path.join(processed_dir, "requirement_chunks.json") # Path to chunks file
     
     if not os.path.exists(chunks_path): # Check if chunks file exists
         print(f"⚠ File {chunks_path} not found. Run the ingestion step first.")
@@ -91,21 +91,51 @@ def main():
 
     print(f"Generating embeddings for {len(chunks)} chunks...")
 
-    texts = [c.get("content", "") for c in chunks] # Extract content for embedding; 
-    embeddings = model.encode(texts, convert_to_numpy=True, show_progress_bar=True) # Generate embeddings for all chunks 
+    flat_chunks = []
+    for req in chunks:
+        principle = req.get("ethicalPrinciple")
+        req_name = req.get("requirementName")
+        id = req.get("id", "")
+        # EU AI Act articles
+        for art in req.get("euAiActArticles", []):
+            flat_chunks.append({
+                "source": "EU_AI_ACT",
+                "ethicalPrinciple": principle,
+                "requirementId": id,
+                "requirementName": req_name,
+                "reference": art.get("reference"),
+                "content": art.get("content"),
+            })
+        # ISO references
+        for iso in req.get("iso42001Reference", []):
+            flat_chunks.append({
+                "source": "ISO_42001",
+                "ethicalPrinciple": principle,
+                "requirementId": id,
+                "requirementName": req_name,
+                "reference": iso.get("reference"),
+                "content": iso.get("content"),
+            })
 
-    # Upsert in batches to avoid very large requests
+    print(f"Generating embeddings for {len(flat_chunks)} atomic chunks...")
+
+    texts = [c.get("content", "") for c in flat_chunks]
+    embeddings = model.encode(texts, convert_to_numpy=True, show_progress_bar=True)
+
     batch_size = vect_params.get('batch_size', 128)
     points: List[PointStruct] = []
-    for i, chunk in enumerate(chunks): # Create PointStruct for each chunk with embedding and metadata payload
+    for i, chunk in enumerate(flat_chunks):
         emb = embeddings[i].tolist()
         points.append(PointStruct(id=i, vector=emb, payload={
             "source": chunk.get('source'),
+            "ethicalPrinciple": chunk.get('ethicalPrinciple'),
+            "requirementId": chunk.get('requirementId'),
+            "requirementName": chunk.get('requirementName'),
+            "reference": chunk.get('reference'),
             "content": chunk.get('content'),
-            "chunk_id": chunk.get('chunk_id')
         }))
 
-    for i in range(0, len(points), batch_size): # Upsert points in batches
+    for i in range(0, len(points), batch_size):
         batch_points = points[i:i+batch_size]
         client.upsert(collection_name=collection_name, points=batch_points)
 

@@ -302,7 +302,7 @@ if analyze_btn and doc_text:
                 st.write("📊 Calculating compliance scores...")
                 for item in req_list:
                     r_name = item.get("Requirement_Name", "Unnamed Requirement")
-                    r_id = item.get("Mapped_ID", "N/A")
+                    r_id = item.get("Requirement_ID", "N/A")
                     r_notes = item.get("Auditor_Notes", "No notes available.")
                     score = item.get("Score", 0) 
                     

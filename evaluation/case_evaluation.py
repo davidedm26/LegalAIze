@@ -33,7 +33,7 @@ def evaluate_single_case(
     if rag_engine is None:
         raise RuntimeError("backend.rag_engine is not available. Run evaluate_rag from the project root.")
 
-    audit_response = rag_engine.audit_document(document_text) # Get predictions
+    audit_response = rag_engine.audit_document(document_text) # Get predictions 
 
     # Exclude the prompt from logged artifacts, it may contain sensitive info and is not needed for evaluation analysis. Only log the structured predictions.
     predictions = [report.model_dump(exclude={"Prompt"}) for report in audit_response.requirements]
@@ -55,13 +55,13 @@ def evaluate_single_case(
     note_similarities: List[float] = []
     ragas_records: List[Dict[str, Any]] = []
 
-    # Process each prediction and corresponding ground truth entry, matching by Mapped_ID. If Mapped_ID is missing or does not match any GT entry, skip that prediction and log a warning.
+    # Process each prediction and corresponding ground truth entry, matching by Requirement_ID. If Requirement_ID is missing or does not match any GT entry, skip that prediction and log a warning.
     for pred in predictions:
-        mapped_id = pred.get("Mapped_ID")
-        if not mapped_id or mapped_id not in ground_truth:
-            print(f"⚠ Skipping prediction with missing or unmatched Mapped_ID: {mapped_id}")
+        requirement_id = pred.get("Requirement_ID")
+        if not requirement_id or requirement_id not in ground_truth:
+            print(f"⚠ Skipping prediction with missing or unmatched Requirement_ID: {requirement_id}")
             continue
-        gt_row = ground_truth[mapped_id]
+        gt_row = ground_truth[requirement_id]
 
         gt_score: Optional[float] = None
         pred_score: Optional[float] = None
@@ -71,13 +71,13 @@ def evaluate_single_case(
             if gt_row.get("Score") != 'N/A':
                 gt_score = float(gt_row.get("Score", "0"))
         except ValueError:
-            print(f"⚠ Invalid GT score for Mapped_ID {mapped_id}: {gt_row.get('Score')}.")
+            print(f"⚠ Invalid GT score for Requirement_ID {requirement_id}: {gt_row.get('Score')}.")
 
         try:
             if pred.get("Score") != 'N/A':
                 pred_score = float(pred.get("Score", "0"))
         except (TypeError, ValueError):
-            print(f"⚠ Invalid predicted score for Mapped_ID {mapped_id}: {pred.get('Score')}.")
+            print(f"⚠ Invalid predicted score for Requirement_ID {requirement_id}: {pred.get('Score')}.")
 
         if gt_score is not None and pred_score is not None:
             gt_scores.append(gt_score)
@@ -103,11 +103,11 @@ def evaluate_single_case(
                 similarity = compute_note_similarity(gt_note, pred_note, embedding_model)
                 note_similarities.append(similarity)
             except Exception as exc:
-                print(f"⚠ Failed to compute note similarity for {mapped_id}: {exc}")
+                print(f"⚠ Failed to compute note similarity for {requirement_id}: {exc}")
 
 
         # Build question text for RAGAS groundedness evaluation
-        identifier = mapped_id or "Unknown requirement"
+        identifier = requirement_id or "Unknown requirement"
         requirement_name = pred.get("Requirement_Name") or gt_row.get("Requirement_Name")
         title = requirement_name 
         # Only use title and id, no metadata
@@ -120,7 +120,7 @@ def evaluate_single_case(
                 # RAGAS expects a list of strings for 'contexts', even if only one context is used
                 "contexts": [document_text],
                 "ground_truth": gt_note or "",
-                "requirement_id": mapped_id,
+                "requirement_id": requirement_id,
                 "case": case_name,
             }
         )
