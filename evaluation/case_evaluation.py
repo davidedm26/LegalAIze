@@ -18,6 +18,7 @@ def evaluate_single_case(
     case_name: str,
     gt_path: str,
     doc_path: str,
+    document_context: List[str], # Chunks extracted from the Document under Test for the particular requirement
     case_artifact_dir: Optional[str] = None,
     embedding_model=None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
@@ -33,7 +34,9 @@ def evaluate_single_case(
     if rag_engine is None:
         raise RuntimeError("backend.rag_engine is not available. Run evaluate_rag from the project root.")
 
-    audit_response = rag_engine.audit_document(document_text) # Get predictions 
+    audit_response  = rag_engine.audit_document(document_text) # Get predictions 
+
+
 
     # Exclude the prompt from logged artifacts, it may contain sensitive info and is not needed for evaluation analysis. Only log the structured predictions.
     predictions = [report.model_dump(exclude={"Prompt"}) for report in audit_response.requirements]
@@ -113,12 +116,15 @@ def evaluate_single_case(
         # Only use title and id, no metadata
         question_text = f"{title} ({identifier})"
 
+        # Context is made up by the whole chunks extracted from the Document under Test for the particular requirement. This is the same context that the RAG engine used to produce the prediction, so it allows us to evaluate groundedness in a way that is consistent with the actual information available to the model at inference time.
+        # We can reuse the already built context, passing it as a parameter to this function.
+
         ragas_records.append(
             {
                 "question": question_text,
                 "answer": pred_note or "",
                 # RAGAS expects a list of strings for 'contexts', even if only one context is used
-                "contexts": [document_text],
+                "contexts": document_context,
                 "ground_truth": gt_note or "",
                 "requirement_id": requirement_id,
                 "case": case_name,

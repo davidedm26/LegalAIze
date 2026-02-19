@@ -1,5 +1,5 @@
 """   
-Chunks embedding and indexing script. This script takes the processed document chunks, generates vector embeddings using a specified model, and indexes them into a Qdrant vector database for efficient retrieval during RAG operations. It supports both local Qdrant instances (using file-based storage) and remote Qdrant services (via host/port connection), allowing flexibility for different deployment scenarios.
+Chunks embedding and indexing script. This script takes the processed regulatory chunks, generates vector embeddings using a specified model, and indexes them into a Qdrant vector database for efficient retrieval during RAG operations. It supports both local Qdrant instances (using file-based storage) and remote Qdrant services (via host/port connection), allowing flexibility for different deployment scenarios.
 """
 import os
 import json

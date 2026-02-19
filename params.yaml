@@ -16,7 +16,7 @@ vectorization:
 rag:
   document_chunk_size: 512
   document_chunk_overlap: 64
-  pre_rerank_top_k: 10
+  pre_rerank_top_k: 2
 
   llm_model: "gpt-4o-mini"  # RAG LLM model
   llm_temperature: 0.0

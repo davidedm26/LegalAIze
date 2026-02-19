@@ -74,7 +74,7 @@ OUTPUT INSTRUCTIONS:
 RESPONSE FORMAT:
 {{
     "score": integer (0-5),
-    "auditor_notes": "Verdict vs Annex A/AI Act. Cite ID. Only for the Annex A requirement explain why based on Annex B guidance, for the AI Act use the corresponding article. Max 100 words."
+    "auditor_notes": "General Verdict caused by Verdicts vs AI_ACT/ISO_42001 sections. Cite regulatory references and why they are met or not met. Max 100 words."
 }}
 """
 
@@ -87,15 +87,19 @@ class RequirementReport(BaseModel):
     Score: RequirementScore
     Auditor_Notes: str
     Prompt: str  # static prompt included for monitoring/debugging purposes
+    
+    
 
 
 class AuditResponse(BaseModel):
-    requirements: List[RequirementReport]
+    requirements: List[RequirementReport] #We can include the providex doc context for future steps
+
 
 
 vector_db: Optional[QdrantClient] = None
 mapping: Optional[Dict[str, Any]] = None
 llm: Optional[ChatOpenAI] = None
+embedding_model: Optional[SentenceTransformer] = None
 requirement_chunks: Dict[str, Any] = {}
 _initialized = False # Flag to prevent re-initialization if already done
 
@@ -116,7 +120,7 @@ def _candidate_paths(relative_path: str) -> List[str]: # Generate candidate path
 
 # Initialization function to set up vector DB, mapping, requirement chunks, and LLM. It checks for environment variables to determine how to connect to Qdrant (external service vs embedded index) and loads necessary data files. The function can be forced to re-initialize if needed.
 def init_rag(force: bool = False) -> None:
-    global vector_db, llm, requirement_chunks, _initialized 
+    global vector_db, llm, embedding_model, requirement_chunks, _initialized 
     if _initialized and not force:
         return
 
@@ -165,6 +169,11 @@ def init_rag(force: bool = False) -> None:
         llm_temperature = float(rag_params.get("llm_temperature", 0))
         llm = ChatOpenAI(model=llm_model_name, temperature=llm_temperature, request_timeout=30)
         print(f"✓ LLM Initialized ({llm_model_name}, temp={llm_temperature})")
+
+        # Initialize embedding model ONCE
+        embedding_model_name = vect_params.get("model_name")
+        embedding_model = SentenceTransformer(embedding_model_name)
+        print(f"✓ Embedding model initialized: {embedding_model_name}")
 
         _initialized = True
     except Exception as exc:
@@ -252,6 +261,7 @@ def evaluate_requirement(
             Score=0,
             Auditor_Notes="Failed to retrieve regulatory chunks from Qdrant.",
             Prompt=PROMPT_TEMPLATE.strip(),
+            
         )
 
     # 2. Select relevant document chunks by querying Qdrant with the requirement chunks as queries. This retrieves the most relevant parts of the document that pertain to the requirement being evaluated.
@@ -261,20 +271,30 @@ def evaluate_requirement(
     
     # Read the pre-rerank top-k parameter from params.yaml
     pre_rerank_top_k = int(rag_params.get("pre_rerank_top_k", 10)) 
-    
-    top_doc_chunks = _query_qdrant_for_requirement(doc_client, temp_collection, req_chunks_embeddings, top_k=pre_rerank_top_k) # Get pre-rerank-top-k most relevant document chunks for the requirement
 
-    # 3. LLM re-ranking
+    # La funzione ora restituisce un dizionario: articolo -> lista di chunk
+    top_doc_chunks_by_group = _query_qdrant_for_requirement(doc_client, temp_collection, req_chunks_embeddings, top_k=pre_rerank_top_k)
+
+    #Debug: print dimensions of top_doc_chunks_by_group
+    #print (f"Retrieved top {pre_rerank_top_k} document chunks for requirement '{requirement_name}':")
+    #print (f"Number of groups: {len(top_doc_chunks_by_group)}")
+    #for group, chunks in top_doc_chunks_by_group.items():
+    #    print(f"Group '{group}' has {len(chunks)} chunks retrieved from Qdrant.")
+
+    # Prepare a context that signals the chunks for each group (AI Act article or ISO section)
+    doc_context = ""
+    for group, chunks in top_doc_chunks_by_group.items():
+        doc_context += f"\n--- [{group}] ---\n"
+        for c in chunks:
+            doc_context += c['content'] + "\n"
+
+    # 3. re-ranking (skipped)
     top_k = int(rag_params.get("top_k", 4))
-    
-    
 
     # 4. Build the prompt and call the LLM
-    doc_context = "\n".join([c['content'] for c in top_doc_chunks]) # Combine the retrieved document chunks into a single context string for the prompt
-    
     regulatory_context = "\n".join([c.get('content', '') for c in req_chunks_embeddings])
     prompt = PROMPT_TEMPLATE.format(
-        document_text=doc_context,
+        document_text=doc_context.strip(),
         requirement_name=requirement_name,
         requirement_references=_build_requirement_text(requirement_data),
         regulatory_references=regulatory_context,
@@ -309,13 +329,14 @@ def audit_document(
     assert requirement_chunks is not None
 
     # 1. Chunk and embed the document under test ONCE
+    if embedding_model is None:
+        raise RuntimeError("Embedding model not initialized")
     model_name = vect_params['model_name']
-    model = SentenceTransformer(model_name)
     document_chunk_size = precompute_params.get("document_chunk_size", 512)
     document_chunk_overlap = precompute_params.get("document_chunk_overlap", 64)
 
-    doc_chunks = _chunk_document(document_text, model_name, chunk_size=document_chunk_size, chunk_overlap=document_chunk_overlap) 
-    doc_embs = _embed_chunks(doc_chunks, model)
+    doc_chunks = _chunk_document(document_text, chunk_size=document_chunk_size, chunk_overlap=document_chunk_overlap)
+    doc_embs = _embed_chunks(doc_chunks, embedding_model)
 
 
     #Store document chunks and embeddings in a temporary in-memory Qdrant collection for efficient retrieval during requirement evaluation. This avoids the need for file-based storage and cleanup issues, while still allowing us to leverage Qdrant's vector search capabilities.
@@ -323,7 +344,7 @@ def audit_document(
     # Use in-memory Qdrant for doc_client to avoid file locking and cleanup issues
     doc_client = QdrantClient(":memory:")
 
-    vector_size = model.get_sentence_embedding_dimension()
+    vector_size = embedding_model.get_sentence_embedding_dimension()
     doc_client.recreate_collection(
         collection_name=temp_collection,
         vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
@@ -415,27 +436,47 @@ def _embed_chunks(chunks: List[str], model: SentenceTransformer):
 
 def _query_qdrant_for_requirement(doc_client: QdrantClient, doc_collection: str, req_chunks_embeddings: List[dict], top_k: int = 4):
     """
-    For each requirement chunk, retrieve the pre-rerank_top_k most similar document chunks from Qdrant.
+    For each requirement chunk, retrieve the top_k most similar document chunks from Qdrant, grouped by both AI Act articles and ISO 42001 sections.
+    Returns a dictionary: group (AI Act article or ISO section) -> list of chunks (each with score, content, chunk_id)
     """
-    all_results = []
-    # req_chunks_embeddings is a list of dicts, each with at least 'embedding' (vector) and 'content' (text)
+    from collections import defaultdict
+    group_to_chunks = defaultdict(list)
+    print(req_chunks_embeddings[0].keys() if req_chunks_embeddings else "Empty list")
     for req in req_chunks_embeddings:
-        #print(f"Debug: req type = {type(req)}, keys = {req.keys()}")
-        req_emb = req['embedding']  # Already embedded vector
-        hits = doc_client.query_points(collection_name=doc_collection, query=req_emb, limit=top_k).points 
-        for hit in hits:
-            all_results.append({
-                'score': hit.score,
-                'content': hit.payload.get('content', ''),
-                'chunk_id': hit.payload.get('chunk_id', None)
-            })
-    # Deduplicate by chunk_id, keep highest score
-    seen = {}
-    for r in all_results:
-        cid = r['chunk_id']
-        if cid not in seen or r['score'] > seen[cid]['score']:
-            seen[cid] = r
-    # Return top N by score
-    results = list(seen.values())
-    results.sort(key=lambda x: x['score'], reverse=True)
-    return results[:top_k]
+        reference = req.get("reference")
+        source = req.get("source")
+        assigned = False
+        if reference and source:
+            if source == "EU_AI_ACT":
+                group_to_chunks[f"AI_ACT::{reference}"].append(req)
+                assigned = True
+            elif source == "ISO_42001":
+                group_to_chunks[f"ISO_42001::{reference}"].append(req)
+                assigned = True
+        if not assigned:
+            group_to_chunks['NO_GROUP'].append(req)
+
+    results_by_group = {}
+    for group, chunks in group_to_chunks.items():
+        group_results = []
+        for req in chunks:
+            req_emb = req['embedding']
+            hits = doc_client.query_points(collection_name=doc_collection, query=req_emb, limit=top_k).points
+            for hit in hits:
+                group_results.append({
+                    'score': hit.score,
+                    'content': hit.payload.get('content', ''),
+                    'chunk_id': hit.payload.get('chunk_id', None)
+                })
+        # Deduplicate by chunk_id, keep only the highest score
+        seen = {}
+        for r in group_results:
+            cid = r['chunk_id']
+            if cid not in seen or r['score'] > seen[cid]['score']:
+                seen[cid] = r
+        # Take top_k for each group
+        top_chunks = list(seen.values())
+        top_chunks.sort(key=lambda x: x['score'], reverse=True)
+        results_by_group[group] = top_chunks[:top_k]
+
+    return results_by_group

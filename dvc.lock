@@ -35,8 +35,8 @@ stages:
       size: 211658
     - path: vectorize_data.py
       hash: md5
-      md5: 85712003cf54f1e1f87141e92ad86e01
-      size: 6688
+      md5: 8b6b043f8f68a56b789d49aa3c35c468
+      size: 6690
     params:
       params.yaml:
         vectorization:
@@ -84,10 +84,14 @@ stages:
   evaluate_rag:
     cmd: python evaluate_rag.py
     deps:
+    - path: backend/rag_engine.py
+      hash: md5
+      md5: 84ae7fc8486f39db0369729e298a6e80
+      size: 22167
     - path: data/ground_truth
       hash: md5
-      md5: e085866d442ac8b651e409a6b8f28547.dir
-      size: 30778
+      md5: dc4fc92eaa927e4c0fe493a55ff96f18.dir
+      size: 30777
       nfiles: 10
     - path: data/processed/requirement_chunks.json
       hash: md5
@@ -126,11 +130,14 @@ stages:
             document_path: 
               data/ground_truth/raw_data/Evaluation4/documentation.txt
             report_path: data/ground_truth/raw_data/Evaluation4/report.CSV
-        llm:
+        rag:
+          document_chunk_size: 512
+          document_chunk_overlap: 64
+          pre_rerank_top_k: 2
           llm_model: gpt-4o-mini
           llm_temperature: 0.0
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: 7666517d49c077171d7dfc70e7a6b0a0
+      md5: f4023cd41e89b05e30375b61fd2a8a2b
       size: 1233

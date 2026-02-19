@@ -383,8 +383,9 @@ if st.session_state.audit_results is not None:
             
             # Retrieve Mapping Info
             map_info = MAPPING_DATA.get(req['name'], {})
-            iso_ui = map_info.get("iso_ref", "N/A")
-            ai_act_list = map_info.get("ai_act_articles", [])
+            iso_ui_list = map_info.get("iso_42001_sections", "N/A")
+            ai_act_list = map_info.get("eu_ai_act_articles", [])
+            iso_ui = ", ".join(iso_ui_list) if isinstance(iso_ui_list, list) else iso_ui_list
             ai_act_ui = ", ".join([item.get("ref", "") for item in ai_act_list])
             if not ai_act_ui: ai_act_ui = "N/A"
             

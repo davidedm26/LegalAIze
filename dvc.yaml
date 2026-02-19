@@ -20,27 +20,16 @@ stages:
     outs:
       - data/processed/vector_index
 
-#  precompute_rag:
-#    cmd: python precompute_rag.py
-#    deps:
-#      - precompute_rag.py
-#      - data/mapping.json
-#      - data/processed/vector_index
-#    params:
-#      - vectorization
-#      - ingestion
-#    outs:
-#      - data/processed/requirement_chunks.json
-
   evaluate_rag:
     cmd: python evaluate_rag.py
     deps:
+      - backend/rag_engine.py
       - evaluate_rag.py
       - evaluation/ 
       - data/processed/requirement_chunks.json
       - data/ground_truth
     params:
       - evaluation
-      - llm
+      - rag
     outs:
       - metrics/rag_eval.json
