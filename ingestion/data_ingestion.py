@@ -14,8 +14,6 @@ import os
 import re
 import json
 import yaml
-import fitz  
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from parse_aia import parse_ai_act_file_to_json  # Custom parser for AI Act HTML
 from parse_iso import parse_iso_file_to_json  # Custom parser for ISO PDF
 
@@ -23,162 +21,239 @@ def load_params():
     with open("params.yaml", "r") as f:
         return yaml.safe_load(f)
 
-def extract_text_from_pdf(pdf_path):
-    """Extracts text from a PDF file and returns a list of dictionaries (page, text)."""
-    doc = fitz.open(pdf_path)
-    text_content = []
-    for page_num in range(len(doc)):
-        page = doc.load_page(page_num)
-        text_content.append({
-            "page": page_num + 1,
-            "text": page.get_text()
-        })
-    return text_content
 
-def process_law_text(raw_pages):
+# --- Refactored Ingestion: Requirement-centric Extraction ---
+def load_json(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def extract_ai_act_section(ref, ai_act_sections):
     """
-    Merges pages while maintaining paragraph structure.
+    Extracts the full text for a given AI Act reference (e.g., 'Article 15 Para 1d', 'Annex XI Section 2').
+    Handles paragraph/point extraction if specified.
     """
-    full_text = ""
-    for p in raw_pages: # for each page add its text
-        full_text += f"\n{p['text']}"
-    
-    # Cleaning text
-    full_text = re.sub(r'[ \t]+', ' ', full_text) # replace multiple spaces/tabs with single space
-    full_text = re.sub(r'\n\s*\n+', '\n\n', full_text) # keep double line breaks for paragraphs
-    
-    return full_text.strip() # return cleaned text
+    ref = ref.strip()
+    # Article extraction
+    m = re.match(r"Article (\d+)(?:\s*Para\s*([\d\w/.,]+))?", ref, re.I)
+    if m:
+        art_num = m.group(1)
+        para = m.group(2)
+        for section in ai_act_sections:
+            name = section.get("name", "").lower()
+            content = section.get("content", "")
+            if name == f"art_{art_num}":
+                if para:
+                    # Support for multiple paras/points (e.g. 1/3d)
+                    paras = re.split(r"[ /,\.]+", para)
+                    found = []
+                    for p in paras:
+                        p = p.strip()
+                        if not p:
+                            continue
+                        # Paragraph extraction (e.g. 1.)
+                        para_regex = rf"\n\s*{re.escape(p)}\."
+                        matches = list(re.finditer(para_regex, content))
+                        for match in matches:
+                            start = match.end()
+                            next_match = re.search(r"\n\s*[0-9a-zA-Z]+\." , content[start:])
+                            end = start + next_match.start() if next_match else len(content)
+                            found.append(content[start:end].strip())
+                        # Point extraction (e.g. (d))
+                        point_match = re.search(rf"\({p}\)[^\n]*", content)
+                        if point_match:
+                            found.append(point_match.group(0).strip())
+                    if found:
+                        return "\n".join(found)
+                    else:
+                        return content
+                else:
+                    return content
+    # Annex extraction (e.g. 'Annex XI Section 2', 'Annex IV Para 2g')
+    annex_match = re.match(r"Annex ([A-Z]+)\s*(Section\s*\d+)?\s*(Para\s*[\d/\w]+)?\s*(\([\w]+\))?", ref, re.I)
+    if annex_match:
+        annex_id = annex_match.group(1)
+        section_part = annex_match.group(2)
+        para_part = annex_match.group(3)
+        point_part = annex_match.group(4)
+        for section in ai_act_sections:
+            annex_name = section.get("name", "").lower()
+            annex_title = section.get("title", "").lower()
+            annex_field = section.get("annex", "").lower()
+            if f"anx_{annex_id.lower()}" == annex_name or f"annex {annex_id.lower()}" in annex_title or f"annex {annex_id.lower()}" in annex_field:
+                content = section.get("content", "")
+                # Section extraction for Annex XI (and similar)
+                if section_part:
+                    section_num = re.findall(r"\d+", section_part)
+                    if section_num:
+                        # Find all Section headers
+                        section_headers = list(re.finditer(r"Section\s*\d+", content, re.I))
+                        # Find the requested section
+                        for idx, header in enumerate(section_headers):
+                            header_num = re.findall(r"\d+", header.group())
+                            if header_num and header_num[0] == section_num[0]:
+                                start = header.end()
+                                # End at next section or end of content
+                                end = section_headers[idx+1].start() if idx+1 < len(section_headers) else len(content)
+                                section_content = content[start:end].strip()
+                                # Para extraction
+                                if para_part:
+                                    para_nums = re.findall(r"[\d\w]+", para_part)
+                                    found = []
+                                    for p in para_nums:
+                                        para_regex = rf"\n\s*{p}\.[^\n]*"
+                                        para_match = re.search(para_regex, section_content)
+                                        if para_match:
+                                            found.append(para_match.group(0).strip())
+                                        point_match = re.search(rf"\({p}\)[^\n]*", section_content)
+                                        if point_match:
+                                            found.append(point_match.group(0).strip())
+                                    if found:
+                                        return "\n".join(found)
+                                    else:
+                                        return section_content
+                                # Point extraction
+                                if point_part:
+                                    point_letter = re.findall(r"\w+", point_part)
+                                    if point_letter:
+                                        point_regex = rf"\({point_letter[0]}\)[^\n]*"
+                                        point_match = re.search(point_regex, section_content)
+                                        if point_match:
+                                            return point_match.group(0).strip()
+                                return section_content
+                        # If section not found, fallback to full annex content
+                        return content
+                # Para extraction at annex level
+                if para_part:
+                    para_nums = re.findall(r"[\d\w]+", para_part)
+                    found = []
+                    for p in para_nums:
+                        para_regex = rf"\n\s*{p}\.[^\n]*"
+                        para_match = re.search(para_regex, content)
+                        if para_match:
+                            found.append(para_match.group(0).strip())
+                        point_match = re.search(rf"\({p}\)[^\n]*", content)
+                        if point_match:
+                            found.append(point_match.group(0).strip())
+                    if found:
+                        return "\n".join(found)
+                    else:
+                        return content
+                # Point extraction at annex level
+                if point_part:
+                    point_letter = re.findall(r"\w+", point_part)
+                    if point_letter:
+                        point_regex = rf"\({point_letter[0]}\)[^\n]*"
+                        point_match = re.search(point_regex, content)
+                        if point_match:
+                            return point_match.group(0).strip()
+                return content
+    # Recital extraction
+    if ref.lower().startswith("recital"):
+        num = re.findall(r"\d+", ref)
+        if num:
+            name = f"rct {num[0]}"
+            for section in ai_act_sections:
+                if section.get("name", "").lower() == name:
+                    return section.get("content", "")
+    # Fallback: match in title or name
+    for section in ai_act_sections:
+        if ref.lower() in section.get("title", "").lower() or ref.lower() in section.get("name", "").lower():
+            return section.get("content", "")
+    return ""
+
+def extract_iso_sections(ref, iso_sections):
+    """
+    For ISO: if ref is a section like '9.1', return all sections whose section_id starts with '9.1' (e.g. 9.1.1, 9.1.2, ...)
+    Otherwise, match by section_id or in section_title.
+    Returns a list of (section_id, section_title, content).
+    """
+    ref = ref.strip()
+    results = []
+    # Hierarchical match: e.g. 9.1 matches 9.1, 9.1.1, 9.1.2, ...
+    if re.match(r"^\d+(\.\d+)+$", ref):
+        for section in iso_sections:
+            sid = section.get("section_id", "")
+            if sid.startswith(ref):
+                results.append((sid, section.get("section_title", ""), section.get("content", "")))
+        return results
+    # Exact match
+    for section in iso_sections:
+        if section.get("section_id", "").lower() == ref.lower():
+            results.append((section.get("section_id", ""), section.get("section_title", ""), section.get("content", "")))
+    if results:
+        return results
+    # Fallback: match in title
+    for section in iso_sections:
+        if ref.lower() in section.get("section_title", "").lower():
+            results.append((section.get("section_id", ""), section.get("section_title", ""), section.get("content", "")))
+    return results
+
+def build_requirement_chunks(mapping, ai_act_sections, iso_sections):
+    """
+    For each requirement in mapping.json, build a chunk with full text for each referenced section (AI Act and ISO).
+    Each chunk includes the title and the reference string.
+    """
+    requirement_chunks = []
+    for principle in mapping.get("eu_ai_act_ethical_principle", []):
+        ethical_principle = principle.get("ethical_principle", "")
+        for req in principle.get("technical_requirements", []):
+            req_name = req.get("name", "")
+            id = req.get("id", "")
+            eu_refs = req.get("eu_ai_act_articles", [])
+            iso_refs = req.get("iso_42001_sections", [])
+            eu_contents = []
+            for ref in eu_refs:
+                text = extract_ai_act_section(ref, ai_act_sections)
+                eu_contents.append({
+                    "reference": ref,
+                    #"content": f"[SOURCE: AI ACT - {ref}]\n{text.strip()}"
+                    "content": text.strip()
+                })
+            iso_contents = []
+            for ref in iso_refs:
+                iso_texts = extract_iso_sections(ref, iso_sections)
+                for sid, stitle, scontent in iso_texts:
+                    iso_contents.append({
+                        "reference": f"{ref} (matched: {sid})",
+                        #"content": f"[SOURCE: ISO 42001 - {sid}] [TITLE: {stitle}]\n{scontent.strip()}"
+                        "content": f"[TITLE: {stitle}]\n{scontent.strip()}"
+                        
+                    })
+            requirement_chunks.append({
+                "id": id,
+                "ethicalPrinciple": ethical_principle,
+                "requirementName": req_name,
+                "euAiActArticles": eu_contents,
+                "iso42001Reference": iso_contents
+            })
+    return requirement_chunks
 
 def main():
-    params = load_params() # Load parameters from params.yaml
-    ingestion_params = params['ingestion'] # Ingestion parameters
-    
-    raw_dir = ingestion_params['raw_data_dir'] # Directory with raw PDFs
-    processed_dir = ingestion_params['processed_data_dir'] # Directory for processed data
-    
-    if not os.path.exists(processed_dir): # Create processed data directory if not exists
-        os.makedirs(processed_dir)
-        
-    # Semantic separators for laws (Articles)
-    custom_separators = [
-        "\n\n", "\n", " ", ""
-    ]
-    
-    splitter = RecursiveCharacterTextSplitter( # Initialize text splitter
-        chunk_size=ingestion_params['chunk_size'], # Chunk size from params
-        chunk_overlap=ingestion_params['chunk_overlap'], # Chunk overlap from params
-        separators=custom_separators # Custom separators
+    # Refactored logic: only requirement-centric extraction
+    mapping_path = os.path.join("data", "mapping.json")
+    processed_dir = "data/processed"
+
+    parse_ai_act_file_to_json(
+        filepath="data/raw_data/ai_act.html",
+        output_path=os.path.join(processed_dir, "ai_act_parsed.json")
     )
+    parse_iso_file_to_json(
+        filepath="data/raw_data/iso.pdf",
+        output_path=os.path.join(processed_dir, "iso_parsed.json")
+    )
+
+    ai_act_json_path = os.path.join(processed_dir, "ai_act_parsed.json")
+    iso_json_path = os.path.join(processed_dir, "iso_parsed.json")
+    requirement_output_path = os.path.join(processed_dir, "requirement_chunks.json")
+
+    mapping = load_json(mapping_path)
+    ai_act_sections = load_json(ai_act_json_path)
+    iso_sections = load_json(iso_json_path)
+
+    requirement_chunks = build_requirement_chunks(mapping, ai_act_sections, iso_sections)
+
+    with open(requirement_output_path, "w", encoding="utf-8") as f:
+        json.dump(requirement_chunks, f, indent=2, ensure_ascii=False)
+    print(f"✓ requirement_chunks.json generated with {len(requirement_chunks)} requirement.")
     
-    all_docs = [] # To store all document chunks
-    all_docs_aia = [] # Separate list for AI Act chunks
-    all_docs_iso = [] # Separate list for ISO chunks
-    
-
-    # --- Custom ingestion for AI Act  ---
-    ai_act_html_path = os.path.join(raw_dir, "ai_act.html")
-    if not os.path.exists(ai_act_html_path):
-        print(f"⚠ AI Act HTML file not found at {ai_act_html_path}. Make sure you have run 'dvc pull'.")
-    else:
-        parse_ai_act_file_to_json(ai_act_html_path, os.path.join(processed_dir, "ai_act_parsed.json")) # Parse AI Act HTML and save as JSON
-        ai_act_json_path = os.path.join(processed_dir, "ai_act_parsed.json")
-        if os.path.exists(ai_act_json_path):
-            with open(ai_act_json_path, "r", encoding="utf-8") as f:
-                ai_act_sections = json.load(f)
-            for section in ai_act_sections: # Process each section of AI Act and create enriched chunks
-                s_name = section.get("name", "unknown")
-                s_type = section.get("type", "unknown")
-                s_title = section.get("title", "No Title")
-                annex = section.get("annex", "")
-                content = section.get("content", "")
-
-                chunks = splitter.split_text(content) # Split content into chunks using the text splitter
-
-                for i, chunk in enumerate(chunks): # Add enriched context to each chunk (e.g. section name, type, title, annex reference)
-                    header = f"[SOURCE : AI ACT]"
-                    if annex:
-                        header += f" [ANNEX {annex}]"
-                    header += f" [PART {i+1}/{len(chunks)}]"
-                    header += f" [TYPE: {s_type.upper()}] [NAME: {s_name}] [TITLE: {s_title}]\n"
-                    enriched_content = header + chunk
-                    all_docs_aia.append({
-                        "source": f"ai_act::{s_name}",
-                        "section_type": s_type,
-                        "section_title": s_title,
-                        "chunk_id": i,
-                        "content": enriched_content
-                    })
-            print(f"✓ AI Act ingestion completed. {len(all_docs_aia)} enriched chunks.") 
-
-    # --- Custom ingestion for ISO  ---
-    iso_pdf_path = os.path.join(raw_dir, "iso.pdf")
-    if not os.path.exists(iso_pdf_path):
-        print(f"⚠ ISO PDF file not found at {iso_pdf_path}. Make sure you have run 'dvc pull'.")
-    else:
-        parse_iso_file_to_json(iso_pdf_path, os.path.join(processed_dir, "iso_parsed.json")) # Parse ISO PDF and save as JSON
-        iso_json_path = os.path.join(processed_dir, "iso_parsed.json")
-        if os.path.exists(iso_json_path):
-            with open(iso_json_path, "r", encoding="utf-8") as f:
-                iso_sections = json.load(f)
-
-            annex_a_map = {}
-            for section in iso_sections: 
-                # Annex A and Annex B are strongly linked, so we create a mapping of Annex A controls to enrich Annex B chunks
-                if section.get("section_type") == "control_requirement" or section.get("section_type") == "control_objective": 
-                    annex_a_map[section.get("section_id")] = section.get("content", "")
-
-                s_id = section.get("section_id", "unknown")
-                s_title = section.get("section_title", "No Title")
-                s_type = section.get("section_type", "unknown")
-                content = section.get("content", "")
-                
-                if s_type == "management_requirement": # Remaining sections
-                    chunks = splitter.split_text(content)
-                    for i, chunk in enumerate(chunks):
-                        header = f"[SOURCE : ISO 42001] [ID: {s_id}] [TYPE: {s_type.upper()}] [Part {i+1}/{len(chunks)}] [TITLE: {s_title}]\n"
-                        enriched_content = header + chunk
-                        all_docs_iso.append({
-                            "source": f"iso42001::{s_id}",
-                            "section_type": s_type,
-                            "section_title": s_title,
-                            "chunk_id": i,
-                            "content": enriched_content
-                        })
-                elif s_type == "implementation_guidance": # Annex B sections
-                    
-                    mapping_target = section.get("metadata", {}).get("maps_to_control", "")
-                    annex_a_content = annex_a_map.get(mapping_target, "")
-                    chunks = splitter.split_text(content)
-
-                    # Add enriched context to each chunk, including reference to mapped Annex A control and its content if available (since Annex B is guidance for Annex A controls)
-                    for i, chunk in enumerate(chunks):
-                        header = f"[SOURCE : ISO 42001] [ID: {s_id}] [TYPE: {s_type.upper()}] [Part {i+1}/{len(chunks)}] [TITLE: {s_title}]"
-                        if mapping_target:
-                            header += f" [ANNEX A REF: {mapping_target}]"
-                        if annex_a_content:
-                            header += f" [ CORRISPONDENT ANNEX A CONTENT: {annex_a_content}...]"
-                        header += "\n"
-                        enriched_content = header + chunk
-                        all_docs_iso.append({
-                            "source": f"iso42001::{s_id}",
-                            "section_type": s_type,
-                            "section_title": s_title,
-                            "chunk_id": i,
-                            "content": enriched_content
-                        })
-            print(f"✓ ISO 42001 ingestion completed. {len(all_docs_iso)} enriched chunks.")
-
-
-    # Combine custom ingestions
-    all_docs.extend(all_docs_aia) # Add AI Act chunks
-    all_docs.extend(all_docs_iso) # Add ISO chunks
-
-
-    # Save all chunks to a JSON file
-    output_path = os.path.join(processed_dir, "chunks.json")
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(all_docs, f, indent=2, ensure_ascii=False)
-    print(f"✓ Ingestion completed. {len(all_docs)} chunks saved in {output_path}")
-
-if __name__ == "__main__":
-    main()
+main()

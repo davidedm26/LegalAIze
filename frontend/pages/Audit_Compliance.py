@@ -167,6 +167,7 @@ def create_pdf_report(requirements, global_score, total_points, max_points):
 
         name = clean_text(req['name'])
         notes = clean_text(req['notes'])
+        rationale = clean_text(req.get('rationale', ''))
         
         mapping_info = MAPPING_DATA.get(req['name'], {})
         iso_ref = clean_text(mapping_info.get("iso_ref", "N/A"))
@@ -194,6 +195,12 @@ def create_pdf_report(requirements, global_score, total_points, max_points):
         pdf.set_draw_color(240, 240, 240)
         pdf.line(10, pdf.get_y(), 200, pdf.get_y())
         pdf.ln(5)
+
+        pdf.set_font("Arial", 'I', 9)
+        pdf.set_text_color(100, 100, 100)
+        pdf.multi_cell(0, 5, f"Rationale: {rationale}")
+        pdf.ln(10)
+        
 
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
@@ -302,13 +309,14 @@ if analyze_btn and doc_text:
                 st.write("📊 Calculating compliance scores...")
                 for item in req_list:
                     r_name = item.get("Requirement_Name", "Unnamed Requirement")
-                    r_id = item.get("Mapped_ID", "N/A")
+                    r_id = item.get("Requirement_ID", "N/A")
                     r_notes = item.get("Auditor_Notes", "No notes available.")
+                    r_rationale = item.get("Rationale", "No rationale provided.")
                     score = item.get("Score", 0) 
                     
                     processed_reqs.append({
                         "name": r_name, "id": r_id, "score_display": f"{score}/5", 
-                        "progress": score / 5.0, "notes": r_notes
+                        "progress": score / 5.0, "notes": r_notes, "rationale": r_rationale
                     })
                     total += score
                     maxim += 5
@@ -383,10 +391,13 @@ if st.session_state.audit_results is not None:
             
             # Retrieve Mapping Info
             map_info = MAPPING_DATA.get(req['name'], {})
-            iso_ui = map_info.get("iso_ref", "N/A")
-            ai_act_list = map_info.get("ai_act_articles", [])
+            iso_ui_list = map_info.get("iso_42001_sections", "N/A")
+            ai_act_list = map_info.get("eu_ai_act_articles", [])
+
+            iso_ui = ", ".join(iso_ui_list) if isinstance(iso_ui_list, list) else iso_ui_list
             ai_act_ui = ", ".join([item.get("ref", "") for item in ai_act_list])
             if not ai_act_ui: ai_act_ui = "N/A"
+            if not iso_ui: iso_ui = "N/A"
             
             with st.expander(f"{icon} {req['name']} ({req['score_display']})"):
                 col_A, col_B = st.columns([1, 2])
@@ -403,6 +414,9 @@ if st.session_state.audit_results is not None:
                 with col_B:
                     st.caption("AI FINDINGS")
                     st.write(req["notes"])
+
+                    st.caption("Rationale")
+                    st.text(req.get("rationale", "No rationale provided."))
 
 elif analyze_btn and not doc_text:
     st.warning("Please upload a file or paste text.")

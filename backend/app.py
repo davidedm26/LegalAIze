@@ -56,6 +56,7 @@ async def audit(document_text: str = Body(..., embed=True)): # Audit endpoint
     if not rag_engine.rag_ready():
         raise HTTPException(status_code=503, detail="RAG system not initialized")
 
+    import traceback
     try:
         return rag_engine.audit_document(
             document_text,
@@ -64,7 +65,9 @@ async def audit(document_text: str = Body(..., embed=True)): # Audit endpoint
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Audit failed: {exc}")
+        tb = traceback.format_exc()
+        print(f"[ERROR] 500 Internal Server Error in /audit: {exc}\nTraceback:\n{tb}")
+        raise HTTPException(status_code=500, detail=f"Audit failed: {exc}\nTraceback: {tb}")
 
 
 @app.get("/model_info") # Endpoint to retrieve information about the loaded models and components in the RAG engine, useful for debugging and monitoring
