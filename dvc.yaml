@@ -3,6 +3,7 @@ stages:
     cmd: 
       - python ingestion/data_ingestion.py
     deps:
+      - data/mapping.json
       - ingestion/
       - data/raw_data/
     params:

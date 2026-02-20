@@ -233,68 +233,27 @@ def main():
     mapping_path = os.path.join("data", "mapping.json")
     processed_dir = "data/processed"
 
-    print("[DEBUG] Starting AI Act parsing...")
-    try:
-        parse_ai_act_file_to_json(
-            filepath="data/raw_data/ai_act.html",
-            output_path=os.path.join(processed_dir, "ai_act_parsed.json")
-        )
-        print("[DEBUG] ai_act_parsed.json written.")
-    except Exception as e:
-        print("[ERROR] Failed to parse AI Act HTML:", e)
-    print("[DEBUG] Starting ISO parsing...")
-    try:
-        parse_iso_file_to_json(
-            filepath="data/raw_data/iso.pdf",
-            output_path=os.path.join(processed_dir, "iso_parsed.json")
-        )
-        print("[DEBUG] iso_parsed.json written.")
-    except Exception as e:
-        print("[ERROR] Failed to parse ISO PDF:", e)
+    parse_ai_act_file_to_json(
+        filepath="data/raw_data/ai_act.html",
+        output_path=os.path.join(processed_dir, "ai_act_parsed.json")
+    )
+    parse_iso_file_to_json(
+        filepath="data/raw_data/iso.pdf",
+        output_path=os.path.join(processed_dir, "iso_parsed.json")
+    )
 
     ai_act_json_path = os.path.join(processed_dir, "ai_act_parsed.json")
     iso_json_path = os.path.join(processed_dir, "iso_parsed.json")
     requirement_output_path = os.path.join(processed_dir, "requirement_chunks.json")
 
-    # Check file sizes and preview content
-    for path in [ai_act_json_path, iso_json_path]:
-        try:
-            size = os.path.getsize(path)
-            print(f"[DEBUG] {path} size: {size} bytes")
-            with open(path, "r", encoding="utf-8") as f:
-                preview = f.read(300)
-                print(f"[DEBUG] First 300 chars of {path}:\n{preview}\n---")
-        except Exception as e:
-            print(f"[ERROR] Could not read {path}: {e}")
-
-    # Check mapping.json
-    try:
-        mapping = load_json(mapping_path)
-        print("[DEBUG] mapping.json keys:", list(mapping.keys()))
-        print("[DEBUG] Number of eu_ai_act_ethical_principle:", len(mapping.get("eu_ai_act_ethical_principle", [])))
-        for i, principle in enumerate(mapping.get("eu_ai_act_ethical_principle", [])):
-            print(f"[DEBUG] Principle {i} - technical_requirements: {len(principle.get('technical_requirements', []))}")
-    except Exception as e:
-        print("[ERROR] Could not load mapping.json:", e)
-        mapping = {}
-
-    try:
-        ai_act_sections = load_json(ai_act_json_path)
-        print(f"[DEBUG] Loaded {len(ai_act_sections)} AI Act sections.")
-    except Exception as e:
-        print("[ERROR] Could not load ai_act_parsed.json:", e)
-        ai_act_sections = []
-    try:
-        iso_sections = load_json(iso_json_path)
-        print(f"[DEBUG] Loaded {len(iso_sections)} ISO sections.")
-    except Exception as e:
-        print("[ERROR] Could not load iso_parsed.json:", e)
-        iso_sections = []
+    mapping = load_json(mapping_path)
+    ai_act_sections = load_json(ai_act_json_path)
+    iso_sections = load_json(iso_json_path)
 
     requirement_chunks = build_requirement_chunks(mapping, ai_act_sections, iso_sections)
 
     with open(requirement_output_path, "w", encoding="utf-8") as f:
         json.dump(requirement_chunks, f, indent=2, ensure_ascii=False)
     print(f"✓ requirement_chunks.json generated with {len(requirement_chunks)} requirement.")
-
+    
 main()
