@@ -10,6 +10,8 @@ stages:
       - ingestion
     outs:
       - data/processed/requirement_chunks.json
+      - data/processed/ai_act_parsed.json
+      - data/processed/iso_parsed.json
 
   vectorize:
     cmd: python vectorize_data.py

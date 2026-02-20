@@ -4,6 +4,10 @@ stages:
     cmd:
     - python ingestion/data_ingestion.py
     deps:
+    - path: data/mapping.json
+      hash: md5
+      md5: a5a35650d07688602879ba8501446a5f
+      size: 6071
     - path: data/raw_data/
       hash: md5
       md5: f941a48344d6b4813c536e7eeb258564.dir
@@ -22,6 +26,14 @@ stages:
           raw_data_dir: data/raw_data
           processed_data_dir: data/processed
     outs:
+    - path: data/processed/ai_act_parsed.json
+      hash: md5
+      md5: 99d76fc87f440d9d30e0f0f5240983b0
+      size: 615187
+    - path: data/processed/iso_parsed.json
+      hash: md5
+      md5: e1d3a69253c930137a97789bae8b427f
+      size: 133519
     - path: data/processed/requirement_chunks.json
       hash: md5
       md5: 35fb86fbc8049e66299976f364be1781
@@ -46,7 +58,7 @@ stages:
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: 0d89578f1277a3a5be00fa4626f905fc.dir
+      md5: 20f53e0cb8143a5fbd532fe84cf3b5fa.dir
       size: 639533
       nfiles: 4
   precompute_rag:
@@ -86,8 +98,8 @@ stages:
     deps:
     - path: backend/rag_engine.py
       hash: md5
-      md5: b13d52bb3304399ae401a246fd5d2d5c
-      size: 24403
+      md5: ee4c3114a621d78f9b962b6b924f3caa
+      size: 24342
     - path: data/ground_truth
       hash: md5
       md5: 46db1a03a34b6049f683b2c6a12b9dfa.dir
@@ -103,7 +115,7 @@ stages:
       size: 18270
     - path: evaluation/
       hash: md5
-      md5: 8554da18250edeb731a45749b5a9da77.dir
+      md5: 05ceed758717dcb06d0ce3ea2b1c6698.dir
       size: 54923
       nfiles: 13
     params:
@@ -147,5 +159,5 @@ stages:
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: 3a5e79633647a0364704cb95bcf00edc
-      size: 1103
+      md5: b2861dc02d76d94865cab598472c65bf
+      size: 1137

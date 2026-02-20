@@ -320,8 +320,8 @@ def evaluate_requirement(
     )
 
     # Debug for only one requirement to avoid too much logs, we can focus on the "Data Governance" requirement as an example, or if the retrieved context is empty (which is a critical case to debug)
-    if (requirement_name == "Risks" ):
-        print(f"Evaluating requirement '{requirement_name}' with prompt:\n{prompt}\n") # Debug: print the prompt being sent to the LLM
+    #if (requirement_name == "Risks" ):
+    #    print(f"Evaluating requirement '{requirement_name}' with prompt:\n{prompt}\n") # Debug: print the #prompt being sent to the LLM
 
     assert llm is not None
     llm_response = llm.invoke(prompt).content.strip()
