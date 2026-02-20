@@ -3,6 +3,8 @@
 import yaml
 import csv
 from typing import Any, Dict
+import os
+import fitz  # PyMuPDF
 
 
 def load_params() -> Dict[str, Any]:
@@ -11,10 +13,20 @@ def load_params() -> Dict[str, Any]:
         return yaml.safe_load(f)
 
 
+
 def load_text(path: str) -> str:
-    """Load text content from a file."""
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
+    """Load text content from a file. Supports .txt and .pdf files using PyMuPDF."""
+    _, ext = os.path.splitext(path)
+    ext = ext.lower()
+    if ext == ".pdf":
+        text = ""
+        with fitz.open(path) as doc:
+            for page in doc:
+                text += page.get_text()
+        return text
+    else:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
 
 
 def load_ground_truth_csv(path: str) -> Dict[str, Dict[str, Any]]:

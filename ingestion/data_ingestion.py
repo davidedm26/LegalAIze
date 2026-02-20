@@ -206,7 +206,8 @@ def build_requirement_chunks(mapping, ai_act_sections, iso_sections):
                 text = extract_ai_act_section(ref, ai_act_sections)
                 eu_contents.append({
                     "reference": ref,
-                    "content": f"[TITLE: {req_name}] [REF: {ref}]\n{text.strip()}"
+                    #"content": f"[SOURCE: AI ACT - {ref}]\n{text.strip()}"
+                    "content": text.strip()
                 })
             iso_contents = []
             for ref in iso_refs:
@@ -214,7 +215,9 @@ def build_requirement_chunks(mapping, ai_act_sections, iso_sections):
                 for sid, stitle, scontent in iso_texts:
                     iso_contents.append({
                         "reference": f"{ref} (matched: {sid})",
-                        "content": f"[TITLE: {req_name}] [REF: {ref}] [ISO SECTION: {sid}] [TITLE: {stitle}]\n{scontent.strip()}"
+                        #"content": f"[SOURCE: ISO 42001 - {sid}] [TITLE: {stitle}]\n{scontent.strip()}"
+                        "content": f"[TITLE: {stitle}]\n{scontent.strip()}"
+                        
                     })
             requirement_chunks.append({
                 "id": id,

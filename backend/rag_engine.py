@@ -34,47 +34,42 @@ def load_params(path: Optional[str] = None) -> Dict[str, Any]:
 params = load_params()
 vect_params = params.get("vectorization", {})
 rag_params = params.get("rag", {})
-precompute_params = params.get("precompute", {})
 
 
 # Static prompt template 
 PROMPT_TEMPLATE = """
-You are a Senior AI Compliance Auditor. Your task is to perform a professional gap analysis using a "Guidance-based Assessment" logic.
+You are a Senior AI Compliance Auditor. Your task is to perform a strict, evidence-based gap analysis using a "Guidance-based Assessment" logic.
 
-DOCUMENT TO EVALUATE:
+DOCUMENT TO EVALUATE (chunks from the original document, retrieved based on relevance to the requirement being evaluated, and tagged with [[Next chunk is relevant for: ...]] to indicate which regulatory requirement(s) they pertain to):
 {document_text}
 
 REQUIREMENT SUMMARY:
-Requirement name:{requirement_name}
-Requirement references:
-{requirement_references}
+Requirement name: {requirement_name}
 
-REGULATORY CONTEXT:
+This requirement is associated with the following regulatory references (AI Act articles and ISO 42001 sections). Use these as the basis for your evaluation.
+Requirement references: {requirement_references}
+
+REGULATORY CONTEXT (The ONLY source of truth for your evaluation. Use this to understand the requirement and to identify what evidence in the document would correspond to different levels of compliance):
 {regulatory_references}
 
 AUDIT RULES (MANDATORY):
-1. ANCHORING: The compliance score and verdict MUST be based ONLY on 'AI ACT' Articles and 'ISO Annex A' (ID: A.x.x). You must NEVER declare non-compliance against Annex B, as it is not mandatory.
-2. GUIDANCE DEPENDENCY: Use 'ISO Annex B' (ID: B.x.x) as the lens to evaluate the mandatory 'ISO Annex A' requirement. 
-   - Example: To judge if ISO A.3.2 (Roles) is met, use the details in ISO B.3.2 to verify if the document provides sufficient implementation evidence.
-3. EVIDENCE RECOGNITION: Recognize specific metrics (e.g., %, F1-score), named tools, or documented procedures as high-level evidence.
+1. STRICT ANCHORING (Faithfulness): The compliance score and verdict MUST be derived EXCLUSIVELY from the provided 'REGULATORY CONTEXT'. Do NOT use external knowledge, prior training, or general AI Act/ISO assumptions. If a requirement is not in the provided text, do not evaluate it.
+2. NO HALLUCINATION: Do not deduce, infer, or assume missing procedures. If an objective, metric, or procedure is not explicitly written in the DOCUMENT TO EVALUATE, it does not exist.
+3. EXPLICIT MAPPING (Groundedness): You must explicitly quote the REGULATORY CONTEXT and map it directly to the tagged evidence ([[Next chunk is relevant for: ...]]) in the DOCUMENT TO EVALUATE.
 
 SCORING CRITERIA:
-5 (Full Compliance): Meets the AI Act/ISO Annex A requirement perfectly, providing the specific technical evidence (metrics/tools) suggested in the corresponding ISO Annex B.
-4 (Substantial Compliance): Meets the mandatory AI Act/ISO Annex A requirement. The implementation is solid, though it may lack some secondary details described in Annex B.
-3 (Partial Compliance): The mandatory Annex A requirement is addressed, but the implementation lacks the procedural depth or metrics recommended in Annex B to be truly effective.
-2 (Major Gap): The mandatory Annex A requirement is mentioned, but the document lacks the technical substance or the "how-to" described in Annex B.
-1 (Negligible): Mentioned only in passing without any alignment with Annex A.
+5 (Full Compliance): Perfect alignment with the provided regulatory context; specific technical evidence is present.
+4 (Substantial Compliance): Solid implementation, but lacks secondary details requested by the regulation.
+3 (Partial Compliance): Some evidence present, but significant procedural gaps exist against the regulation.
+2 (Major Gap): Minimal evidence; major aspects of the regulation are ignored.
+1 (Negligible): The requirement is mentioned, but without substantive evidence.
 0 (No Compliance): The document is completely silent on the requirement.
 
-OUTPUT INSTRUCTIONS:
-- Start 'auditor_notes' with: "Compliance/Non-compliance with [AI Act Art. / ISO Annex A ID]". 
-- DO NOT cite ISO B as the violated requirement. Instead, state: "Non-compliant with ISO A.x.x because [Evidence from B.x.x] is missing."
-- Respond ONLY in valid JSON format.
-
-RESPONSE FORMAT:
+RESPONSE FORMAT (JSON ONLY):
 {{
-    "score": integer (0-5),
-    "auditor_notes": "General Verdict caused by Verdicts vs AI_ACT/ISO_42001 sections. Cite regulatory references and why they are met or not met. Max 100 words."
+    "rationale": "For each claim about compliance or non-compliance, use the following format, separating each claim with two newlines. For each claim: \n\nClaim: <state the claim concisely>\nSupported by: <quote or cite specific document chunks using the provided tags, e.g. [[Next chunk is relevant for: ...]] ...chunk text...; if not supported, write 'None'>\nRegulatory reference: <quote the exact requirement/guidance from the Regulatory Context>\n\nRepeat for each claim. If a claim is not supported by any chunk, 'Supported by' must be 'None'.",
+    "score": integer (0-5) or "N/A",
+    "auditor_notes": "Start EXACTLY with 'The document is [compliant / partially compliant / not compliant] with {requirement_name}.' Then provide a direct, concise summary of the evidence and gaps. Max 80 words."
 }}
 """
 
@@ -85,9 +80,10 @@ class RequirementReport(BaseModel):
     Requirement_Category: str
     Requirement_Name: str
     Score: RequirementScore
+    Rationale: Optional[str] = None
     Auditor_Notes: str
     Prompt: str  # static prompt included for monitoring/debugging purposes
-    
+    Context: Optional[List[str]] = None # We can include the providex doc context for debug steps
     
 
 
@@ -261,7 +257,7 @@ def evaluate_requirement(
             Score=0,
             Auditor_Notes="Failed to retrieve regulatory chunks from Qdrant.",
             Prompt=PROMPT_TEMPLATE.strip(),
-            
+            Context=None
         )
 
     # 2. Select relevant document chunks by querying Qdrant with the requirement chunks as queries. This retrieves the most relevant parts of the document that pertain to the requirement being evaluated.
@@ -272,7 +268,7 @@ def evaluate_requirement(
     # Read the pre-rerank top-k parameter from params.yaml
     pre_rerank_top_k = int(rag_params.get("pre_rerank_top_k", 10)) 
 
-    # La funzione ora restituisce un dizionario: articolo -> lista di chunk
+    
     top_doc_chunks_by_group = _query_qdrant_for_requirement(doc_client, temp_collection, req_chunks_embeddings, top_k=pre_rerank_top_k)
 
     #Debug: print dimensions of top_doc_chunks_by_group
@@ -281,24 +277,52 @@ def evaluate_requirement(
     #for group, chunks in top_doc_chunks_by_group.items():
     #    print(f"Group '{group}' has {len(chunks)} chunks retrieved from Qdrant.")
 
-    # Prepare a context that signals the chunks for each group (AI Act article or ISO section)
-    doc_context = ""
+
+    # Optimization: deduplication of retrieved chunks across groups
+    unique_chunks = {}  # chunk_id -> {"content": str, "refs": set}
     for group, chunks in top_doc_chunks_by_group.items():
-        doc_context += f"\n--- [{group}] ---\n"
         for c in chunks:
-            doc_context += c['content'] + "\n"
+            cid = c['chunk_id']
+            if cid not in unique_chunks:
+                unique_chunks[cid] = {
+                    "content": c['content'],
+                    "refs": {group}
+                }
+            else:
+                unique_chunks[cid]["refs"].add(group)
+
+    # Build context
+    doc_context_list = []
+    for cid, data in unique_chunks.items():
+        refs_str = ", ".join(sorted(list(data['refs'])))
+        chunk_entry = f"[[Next chunk is relevant for: {refs_str}]]\n{data['content']}"
+        doc_context_list.append(chunk_entry)
+
+    doc_context = "\n\n".join(doc_context_list)
+    #all_doc_chunks = [data['content'] for data in unique_chunks.values()]
 
     # 3. re-ranking (skipped)
     top_k = int(rag_params.get("top_k", 4))
 
     # 4. Build the prompt and call the LLM
+    regulatory_context_list = [f"[{c.get('reference', '')}] {c.get('content', '')}" for c in req_chunks_embeddings]
+
+    # Build a list that cointains the whole provided context for RAGAS purposes
+    eval_context_list = doc_context_list + regulatory_context_list 
+    
     regulatory_context = "\n".join([c.get('content', '') for c in req_chunks_embeddings])
+
     prompt = PROMPT_TEMPLATE.format(
         document_text=doc_context.strip(),
         requirement_name=requirement_name,
         requirement_references=_build_requirement_text(requirement_data),
         regulatory_references=regulatory_context,
     )
+
+    # Debug for only one requirement to avoid too much logs, we can focus on the "Data Governance" requirement as an example, or if the retrieved context is empty (which is a critical case to debug)
+    if (requirement_name == "Risks" ):
+        print(f"Evaluating requirement '{requirement_name}' with prompt:\n{prompt}\n") # Debug: print the prompt being sent to the LLM
+
     assert llm is not None
     llm_response = llm.invoke(prompt).content.strip()
     try:
@@ -306,6 +330,7 @@ def evaluate_requirement(
         response_json = json.loads(cleaned_response)
         score_0_5 = int(response_json["score"])
         auditor_notes = response_json["auditor_notes"]
+        rationale = response_json.get("rationale", "")
     except Exception:
         score_0_5 = 0
         auditor_notes = f"LLM response parsing failed. Response was: {llm_response}"
@@ -315,7 +340,9 @@ def evaluate_requirement(
         Requirement_Name=requirement_name,
         Score=score_0_5 if isinstance(score_0_5, int) else "N/A",
         Auditor_Notes=auditor_notes,
+        Rationale=rationale,
         Prompt=PROMPT_TEMPLATE.strip(),
+        Context= eval_context_list, 
     )
 
 # Main function to perform a full audit of a document by evaluating all requirements in the mapping
@@ -331,9 +358,9 @@ def audit_document(
     # 1. Chunk and embed the document under test ONCE
     if embedding_model is None:
         raise RuntimeError("Embedding model not initialized")
-    model_name = vect_params['model_name']
-    document_chunk_size = precompute_params.get("document_chunk_size", 512)
-    document_chunk_overlap = precompute_params.get("document_chunk_overlap", 64)
+    
+    document_chunk_size = rag_params.get("document_chunk_size", 512)
+    document_chunk_overlap = rag_params.get("document_chunk_overlap", 64)
 
     doc_chunks = _chunk_document(document_text, chunk_size=document_chunk_size, chunk_overlap=document_chunk_overlap)
     doc_embs = _embed_chunks(doc_chunks, embedding_model)
@@ -385,7 +412,6 @@ def audit_document(
         os.makedirs(debug_dir, exist_ok=True)
         with open(debug_dump_path, "w", encoding="utf-8") as f:
             json.dump([r.model_dump() for r in requirements_reports], f, ensure_ascii=False, indent=4)
-
 
 
     # Cleanup in-memory Qdrant client
@@ -441,7 +467,7 @@ def _query_qdrant_for_requirement(doc_client: QdrantClient, doc_collection: str,
     """
     from collections import defaultdict
     group_to_chunks = defaultdict(list)
-    print(req_chunks_embeddings[0].keys() if req_chunks_embeddings else "Empty list")
+    #print(req_chunks_embeddings[0].keys() if req_chunks_embeddings else "Empty list")
     for req in req_chunks_embeddings:
         reference = req.get("reference")
         source = req.get("source")

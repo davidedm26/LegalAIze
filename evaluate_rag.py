@@ -170,49 +170,56 @@ def main() -> None:
 
         # Loop through evaluation cases
         for i, case in enumerate(filtered_cases):
+            ground_truth_present = True
+
             name = case.get("name", "unknown") # Evaluation case name for logging
             doc_path = case["document_path"] # Path to the document for this case
-            report_path = case["report_path"] # Path to the ground truth report for this case
+            report_path = case.get("report_path", None) # Path to the ground truth report for this case
             case_slug = slugify_case_name(name) # Create a slug for this case to use in artifact paths and logging
 
             print(f"Evaluating case: {name}")
             if not os.path.exists(doc_path):
                 print(f"⚠ Document not found: {doc_path}")
                 continue # Skip this case if document is missing
-            if not os.path.exists(report_path):
-                print(f"⚠ Ground truth report not found: {report_path}")
-                continue # Skip this case if ground truth report is missing
+            if report_path is None or not os.path.exists(report_path):
+                print(f"⚠ Ground truth report not found, Score MAE, Note Similarity and RAGAS Correctness metrics will be skipped for case: {doc_path}")
+                report_path_for_eval = None
+                ground_truth_present = False
+            else:
+                report_path_for_eval = report_path
 
             if run_ctx is not None:
                 log_case_input_artifacts(name, doc_path, report_path) # Log input documents (documentation and ground truth report) to MLflow for this case
-
 
             # Use a temporary directory for any artifacts related to this case (like backend predictions)
             with tempfile.TemporaryDirectory(prefix=f"case_{case_slug}_") as tmpdir:
                 res, case_ragas_records = evaluate_single_case(
                     case_name=name,
-                    gt_path=report_path,
+                    gt_path=report_path_for_eval,
                     doc_path=doc_path,
                     case_artifact_dir=tmpdir,
                     embedding_model=embedding_model,
+                    ground_truth=ground_truth_present,
                 ) # Evaluate this evaluation case
                 res["name"] = name # Add case name to results
                 all_results.append(res) # Append to all results
 
                 ragas_records.extend(case_ragas_records) # Collect groundedness samples for potential further analysis or separate logging
 
-
-
                 if run_ctx is not None:
                     # Log per-case metrics with a step index (for easier aggregation in MLflow UI charts)
-                    mlflow.log_metric("mae_score_list", res["mae_score"], step=i)
-                    mlflow.log_metric("note_similarity_list",res.get("mean_note_similarity", 0.0),step=i)
+                    if res.get("mae_score") is not None:
+                        mlflow.log_metric("mae_score_list", res["mae_score"], step=i)
+                    if res.get("mean_note_similarity") is not None:
+                        mlflow.log_metric("note_similarity_list", res["mean_note_similarity"], step=i)
                     if res.get("groundedness_score") is not None:
                         mlflow.log_metric("groundedness_list", res["groundedness_score"], step=i)
                     if res.get("faithfulness_score") is not None:
                         mlflow.log_metric("faithfulness_list", res["faithfulness_score"], step=i)
                     if res.get("relevancy_score") is not None:
                         mlflow.log_metric("relevancy_list", res["relevancy_score"], step=i)
+                    if res.get("correctness_score") is not None:
+                        mlflow.log_metric("correctness_list", res["correctness_score"], step=i)
 
                     # Log any artifacts produced during evaluation (like model predictions, intermediate files, etc.) for this case
                     artifact_paths = res.get("artifacts", {})
@@ -332,10 +339,11 @@ def main() -> None:
 
         if run_ctx is not None:
             mlflow.log_metric("mae_score_pairs", total_score_pairs)
-            mlflow.log_metric("mae_weighted_score", weighted_mae)
+            if weighted_mae is not None:
+                mlflow.log_metric("mae_weighted_score", weighted_mae)
             mlflow.log_metric("note_similarity_pairs", total_note_pairs)
-            mlflow.log_metric("note_similarity_mean", weighted_note_similarity)
-
+            if weighted_note_similarity is not None:
+                mlflow.log_metric("note_similarity_mean", weighted_note_similarity)
 
             if weighted_groundedness is not None:
                 mlflow.log_metric("groundedness_score", weighted_groundedness)

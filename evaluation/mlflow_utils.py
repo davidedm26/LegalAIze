@@ -16,7 +16,7 @@ def log_case_input_artifacts(case_name: str, doc_path: str, report_path: str) ->
     artifact_prefix = f"cases/{slugify_case_name(case_name)}/inputs"
     if os.path.exists(doc_path):
         mlflow.log_artifact(doc_path, artifact_path=artifact_prefix)
-    if os.path.exists(report_path):
+    if report_path is not None and os.path.exists(report_path):
         # Load and convert CSV report to JSON format
         report_data = load_ground_truth_csv(report_path)
         with tempfile.NamedTemporaryFile("w", delete=False, suffix=".json", encoding="utf-8") as tmp_json:
