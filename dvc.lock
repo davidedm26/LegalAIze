@@ -46,7 +46,7 @@ stages:
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: 20f53e0cb8143a5fbd532fe84cf3b5fa.dir
+      md5: 0d89578f1277a3a5be00fa4626f905fc.dir
       size: 639533
       nfiles: 4
   precompute_rag:
