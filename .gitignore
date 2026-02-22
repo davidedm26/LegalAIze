@@ -53,3 +53,7 @@ data/ground_truth/raw_data/**
 data/unused/**
 data/raw_data/*.pdf
 data/raw_data/*.html
+data/processed/*
+
+# Metrics
+metrics/**

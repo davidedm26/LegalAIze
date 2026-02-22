@@ -19,6 +19,7 @@ from typing import List
 def load_params():
     with open("params.yaml", "r") as f:
         return yaml.safe_load(f)
+
     
 
 def main():
@@ -34,8 +35,13 @@ def main():
         return
 
     with open(chunks_path, "r", encoding="utf-8") as f: # Load chunks from JSON file
-        chunks = json.load(f)
+        requirements = json.load(f)
     
+    if (not requirements) or (not isinstance(requirements, list)): # Validate chunks data
+        print(f"⚠ No valid chunks file found in {chunks_path}. Check the ingestion output.")
+        return
+    else:
+        print(f"Loaded {len(requirements)} requirements from {chunks_path}.")
 
     # Decide mode: local qdrant process (path) or remote service (host:port)
     # If the QDRANT_HOST environment variable is set, we assume remote service mode; otherwise, we use local path-based storage. This allows flexibility for different deployment scenarios (local development vs production).
@@ -89,10 +95,12 @@ def main():
         vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
     )
 
-    print(f"Generating embeddings for {len(chunks)} chunks...")
+    print(f"Generating embeddings for {len(requirements)} requirements...")
 
     flat_chunks = []
-    for req in chunks:
+    ai_act_counter = 0
+    iso_counter = 0
+    for req in requirements:
         principle = req.get("ethicalPrinciple")
         req_name = req.get("requirementName")
         id = req.get("id", "")
@@ -106,20 +114,39 @@ def main():
                 "reference": art.get("reference"),
                 "content": art.get("content"),
             })
+            ai_act_counter += 1
+        
         # ISO references
         for iso in req.get("iso42001Reference", []):
-            flat_chunks.append({
+            new_chunk = ({
                 "source": "ISO_42001",
                 "ethicalPrinciple": principle,
                 "requirementId": id,
                 "requirementName": req_name,
                 "reference": iso.get("reference"),
-                "content": iso.get("content"),
+                "content": iso.get("content", ""),
+                "control": iso.get("control", ""),
+                "implementation_guidance": iso.get("implementation_guidance", ""),
             })
+            if new_chunk["content"] or new_chunk["control"] or new_chunk["implementation_guidance"]:
+                flat_chunks.append(new_chunk)
+                iso_counter += 1
+            else:
+                print(f"⚠ Skipping empty ISO chunk for requirement '{req_name}' (ID: {id}) with reference '{iso.get('reference')}'.")
 
+    print (f"Total chunks to embed: {len(flat_chunks)} (EU AI Act: {ai_act_counter}, ISO 42001: {iso_counter})")
     print(f"Generating embeddings for {len(flat_chunks)} atomic chunks...")
 
-    texts = [c.get("content", "") for c in flat_chunks]
+    texts = []
+    for c in flat_chunks:
+        content = c.get("content", "")
+        if not content:
+            # If no content, try control + implementation_guidance
+            control = c.get("control", "")
+            guidance = c.get("implementation_guidance", "")
+            content = f"{control}\n{guidance}".strip()
+        texts.append(content)
+
     embeddings = model.encode(texts, convert_to_numpy=True, show_progress_bar=True)
 
     batch_size = vect_params.get('batch_size', 128)
@@ -133,6 +160,8 @@ def main():
             "requirementName": chunk.get('requirementName'),
             "reference": chunk.get('reference'),
             "content": chunk.get('content'),
+            "control": chunk.get('control'),
+            "implementation_guidance": chunk.get('implementation_guidance'),
         }))
 
     for i in range(0, len(points), batch_size):
@@ -143,7 +172,7 @@ def main():
     if vector_index_path:
         status_path = os.path.join(vector_index_path, "status.json")
         with open(status_path, "w", encoding="utf-8") as f:
-            json.dump({"status": "indexed", "count": len(chunks)}, f)
+            json.dump({"status": "indexed", "count": len(requirements)}, f)
         
     else:
         print("Note: no local vector_index_path configured; skipping snapshot creation for remote Qdrant.")

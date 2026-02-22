@@ -244,9 +244,10 @@ def evaluate_requirement(
     """
     if not rag_ready():
         raise RuntimeError("RAG system not initialized")
-    # 1. Retrieve already embedded regulatory chunks for the requirement from Qdrant
+    # 1. Retrieve already embedded regulatory chunks for the requirement from Qdrant regulatory collection.
     if _regulatory_client and _regulatory_collection:
         req_chunks_embeddings = _get_requirement_chunks_from_qdrant(requirement_name, _regulatory_client, _regulatory_collection)
+        print(f"Retrieved {len(req_chunks_embeddings)} regulatory chunks for requirement '{requirement_name}' from Qdrant collection '{_regulatory_collection}'.")
     else:
         # Manage failure, return error 
         print("⚠ Regulatory client or collection not provided, cannot retrieve requirement chunks from Qdrant. ")
@@ -506,3 +507,13 @@ def _query_qdrant_for_requirement(doc_client: QdrantClient, doc_collection: str,
         results_by_group[group] = top_chunks[:top_k]
 
     return results_by_group
+
+
+if __name__ == "__main__":
+    init_rag()
+    # check qdrant regulatory retrieval for a sample requirement
+    points = _get_requirement_chunks_from_qdrant("transparency", vector_db, vect_params.get("regulatory_collection", "legal_docs"))
+
+    print (f"Retrieved {len(points)} regulatory chunks for 'Transparency' requirement:")
+    for p in points:
+        print(p)
