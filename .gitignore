@@ -54,6 +54,8 @@ data/unused/**
 data/raw_data/*.pdf
 data/raw_data/*.html
 data/processed/*
+data/debug/*
+
 
 # Metrics
 metrics/**
