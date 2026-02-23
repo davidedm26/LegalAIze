@@ -169,30 +169,18 @@ def extract_iso_sections(ref, iso_sections):
     """
     ref = ref.strip()
     results = []
-    # Hierarchical match: e.g. 9.1 matches 9.1, 9.1.1, 9.1.2, ...
-    if re.match(r"^\d+(\.\d+)+$", ref):
-        for section in iso_sections:
-            sid = section.get("section_id", "")
-            if sid.startswith(ref):
-                results.append((sid, section.get("section_title", ""), section.get("content", "")))
-        return results
-    # Exact match
+    # Solo match esatto tra i numeri di section (section_id)
     for section in iso_sections:
         if section.get("section_id", "").lower() == ref.lower():
             results.append((section.get("section_id", ""), section.get("section_title", ""), section.get("content", "")))
-    if results:
-        return results
-    # Fallback: match in title
-    for section in iso_sections:
-        if ref.lower() in section.get("section_title", "").lower():
-            results.append((section.get("section_id", ""), section.get("section_title", ""), section.get("content", "")))
     return results
 
-def build_requirement_chunks(mapping, ai_act_sections, iso_sections):
+def collect_chunks_for_requirement(mapping, ai_act_sections, iso_sections):
     """
-    For each requirement in mapping.json, build a chunk with full text for each referenced section (AI Act and ISO).
-    Each chunk includes the title and the reference string.
+    For each requirement in the mapping, collect the relevant AI Act and ISO sections as chunks.
+    Returns a list of dicts with requirement metadata and associated content chunks.
     """
+
     requirement_chunks = []
     for principle in mapping.get("eu_ai_act_ethical_principle", []):
         ethical_principle = principle.get("ethical_principle", "")
@@ -213,12 +201,20 @@ def build_requirement_chunks(mapping, ai_act_sections, iso_sections):
             for ref in iso_refs:
                 iso_texts = extract_iso_sections(ref, iso_sections)
                 for sid, stitle, scontent in iso_texts:
-                    iso_contents.append({
-                        "reference": f"{ref} (matched: {sid})",
-                        #"content": f"[SOURCE: ISO 42001 - {sid}] [TITLE: {stitle}]\n{scontent.strip()}"
-                        "content": f"[TITLE: {stitle}]\n{scontent.strip()}"
-                        
-                    })
+                    # Cerca la sezione corrispondente in iso_sections
+                    section_obj = next((s for s in iso_sections if s.get("section_id", "") == sid), None)
+                    if sid.startswith("B.") and section_obj:
+                        iso_contents.append({
+                            "reference": sid,
+                            "control": section_obj.get("control", ""),
+                            "implementation_guidance": section_obj.get("implementation_guidance", "")
+                        })
+                    else:
+                        iso_contents.append({
+                            "reference": sid,
+                            #"content": f"[SOURCE: ISO 42001 - {sid}] [TITLE: {stitle}]\n{scontent.strip()}"
+                            "content": f"[TITLE: {stitle}]\n{scontent.strip()}"
+                        })
             requirement_chunks.append({
                 "id": id,
                 "ethicalPrinciple": ethical_principle,
@@ -231,8 +227,9 @@ def build_requirement_chunks(mapping, ai_act_sections, iso_sections):
 def main():
     # Refactored logic: only requirement-centric extraction
     mapping_path = os.path.join("data", "mapping.json")
-    processed_dir = "data/processed"
-
+    processed_dir = os.path.join("data", "processed")
+    
+    # Step 1: Parse raw files into structured JSON 
     parse_ai_act_file_to_json(
         filepath="data/raw_data/ai_act.html",
         output_path=os.path.join(processed_dir, "ai_act_parsed.json")
@@ -250,7 +247,7 @@ def main():
     ai_act_sections = load_json(ai_act_json_path)
     iso_sections = load_json(iso_json_path)
 
-    requirement_chunks = build_requirement_chunks(mapping, ai_act_sections, iso_sections)
+    requirement_chunks = collect_chunks_for_requirement(mapping, ai_act_sections, iso_sections)
 
     with open(requirement_output_path, "w", encoding="utf-8") as f:
         json.dump(requirement_chunks, f, indent=2, ensure_ascii=False)

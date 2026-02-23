@@ -18,14 +18,15 @@ LegalAIze is an auditing tool designed to assess technical documentation for com
 ---
 
 ## Key Features
-
-- Automated Compliance Checks (EU AI Act, ISO 42001)
+- Automated compliance checks for EU AI Act and ISO 42001
 - Retrieval-Augmented Generation (RAG) implementation
-- PDF and TXT parsing with chunking
 - Experiment tracking with MLflow and DagsHub
-- Semantic search with Qdrant
-- Streamlit UI for document upload and results
-- FastAPI backend for scalable audit logic
+- Artifact versioning using DVC
+- Vector database powered by Qdrant
+- Streamlit UI for document upload and results visualization
+- FastAPI backend
+- Deployment via Docker container environment
+- GitOps operations to support development
 
 ---
 
@@ -33,18 +34,27 @@ LegalAIze is an auditing tool designed to assess technical documentation for com
 
 ```mermaid
 flowchart TD
-	User((User)) --> Streamlit["Streamlit UI"]
-	subgraph Frontend ["Streamlit Container"]
-		Streamlit
-	end
-	subgraph Backend ["FastAPI Backend Container"]
-		FastAPI["FastAPI Backend"]
-	end
-	Streamlit -- REST API --> FastAPI
-	FastAPI -- read --> ReqChunks["requirements_chunks.json"]
-	FastAPI -- build prompt --> OpenAI["OpenAI LLM"]
-	OpenAI -- response --> FastAPI
-	FastAPI -- REST response --> Streamlit
+    User((User)) --> Streamlit["Streamlit UI"]
+
+    subgraph Frontend ["Streamlit Container"]
+        Streamlit
+    end
+
+    subgraph Backend ["FastAPI Backend Container"]
+        FastAPI["FastAPI Backend"]
+    end
+
+    subgraph VectorDB ["Qdrant Container"]
+        Qdrant["Qdrant Vector DB"]
+    end
+
+    Streamlit -- REST API --> FastAPI
+    FastAPI -- embedding query --> OpenAI["OpenAI Embeddings"]
+    FastAPI -- vector search --> Qdrant
+    Qdrant -- top-k chunks --> FastAPI
+    FastAPI -- build prompt --> OpenAI["OpenAI LLM"]
+    OpenAI -- response --> FastAPI
+    FastAPI -- REST response --> Streamlit
 ```
 
 ---
@@ -54,19 +64,33 @@ flowchart TD
 ```text
 LegalAIze/
 ├── backend/
+│   ├── app/
+│   ├── requirements.txt
+│   └── ...
 ├── frontend/
+│   ├── app.py
+│   ├── requirements.txt
+│   └── ...
 ├── data/
+│   └── ...
 ├── models/
+│   └── ...
 ├── notebooks/
+│   └── ...
 ├── evaluation/
+│   ├── evaluate_rag.py
+│   └── ...
 ├── ingestion/
+│   └── ...
 ├── metrics/
+│   └── ...
 ├── qdrant_init/
+│   └── ...
 ├── params.yaml
 ├── dvc.yaml
 ├── docker-compose.yml
 ├── requirements.txt
-```
+└── .env.example
 
 ---
 
@@ -140,17 +164,7 @@ DAGSHUB_TOKEN=YOUR_TOKEN
 ## 5. Artifact Initialization
 
 ### Quick Demo Mode (uses precomputed artifacts)
-
-Initialize DVC (required for new setups):
-
-```bash
-dvc init
-dvc remote add origin https://dagshub.com/YOUR_USERNAME/YOUR_REPO.dvc
-dvc remote modify origin --local auth basic
-dvc remote modify origin --local user YOUR_USERNAME
-dvc remote modify origin --local password YOUR_TOKEN
-```
-
+The git repo is already set with the required dvc. configuration (pointing to our DVC repo).
 Download all required artifacts:
 ```bash
 dvc pull
@@ -165,6 +179,24 @@ dvc repro --force
 ```
 > **Note:** Requirements download and artifacts initialization may take several minutes.
 ---
+
+Only for collaborations:
+
+Initialize DVC:
+
+```bash
+dvc remote add origin https://dagshub.com/YOUR_USERNAME/YOUR_REPO.dvc
+dvc remote modify origin --local auth basic
+dvc remote modify origin --local user YOUR_USERNAME
+dvc remote modify origin --local password YOUR_TOKEN
+```
+Now you can reproduce the pipeline and push a new version of the code, linked with the new artifacts, with:
+```bash
+git add .
+git commit -m "Update pipeline and artifacts"
+git push
+dvc push
+```
 
 ## 6. Container Build and Start
 

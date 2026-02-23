@@ -68,8 +68,8 @@ SCORING CRITERIA:
 RESPONSE FORMAT (JSON ONLY):
 {{
     "rationale": "For each claim about compliance or non-compliance, use the following format, separating each claim with two newlines. For each claim: \n\nClaim: <state the claim concisely>\nSupported by: <quote or cite specific document chunks using the provided tags, e.g. [[Next chunk is relevant for: ...]] ...chunk text...; if not supported, write 'None'>\nRegulatory reference: <quote the exact requirement/guidance from the Regulatory Context>\n\nRepeat for each claim. If a claim is not supported by any chunk, 'Supported by' must be 'None'.",
-    "score": integer (0-5) or "N/A",
-    "auditor_notes": "Start EXACTLY with 'The document is [compliant / partially compliant / not compliant] with {requirement_name}.' Then provide a direct, concise summary of the evidence and gaps. Max 80 words."
+    "score": "integer (0-5) or 'N/A'",
+    "auditor_notes": "Start EXACTLY with 'The document is [compliant / partially compliant / not compliant] with {requirement_name}.' Then provide a comprehensive summary that explicitly names the regulatory reference driving your conclusion (e.g., 'As required by ISO 42001 B.3.2...') and explicitly states what specific evidence was found or is missing in the evaluated document. Ensure the language is natural and conversational. Max 120 words."
 }}
 """
 
@@ -231,7 +231,6 @@ def _get_requirement_chunks_from_qdrant(requirement_name: str, regulatory_client
 
 
 def evaluate_requirement(
-    requirement_name: str,
     requirement_data: Dict[str, Any],
     _doc_client: Any = None,
     _temp_collection: str = None,
@@ -244,9 +243,14 @@ def evaluate_requirement(
     """
     if not rag_ready():
         raise RuntimeError("RAG system not initialized")
-    # 1. Retrieve already embedded regulatory chunks for the requirement from Qdrant
+    # 1. Retrieve already embedded regulatory chunks for the requirement from Qdrant regulatory collection.
     if _regulatory_client and _regulatory_collection:
+        requirement_name = requirement_data.get("requirementName", "unknown")
+        requirement_ethical_principle = requirement_data.get("ethicalPrinciple", "unknown")
         req_chunks_embeddings = _get_requirement_chunks_from_qdrant(requirement_name, _regulatory_client, _regulatory_collection)
+        # Giving the particular requirement we obtain a list of regolatory chunks (with their embeddings) that are relevant for that requirement.
+
+        print(f"Retrieved {len(req_chunks_embeddings)} regulatory chunks for requirement '{requirement_name}' ({requirement_ethical_principle}) from Qdrant collection '{_regulatory_collection}'.")
     else:
         # Manage failure, return error 
         print("⚠ Regulatory client or collection not provided, cannot retrieve requirement chunks from Qdrant. ")
@@ -269,14 +273,17 @@ def evaluate_requirement(
     pre_rerank_top_k = int(rag_params.get("pre_rerank_top_k", 10)) 
 
     
+    # We pass the list of regulatory chunks (with their embeddings) to query Qdrant and retrieve the most relevant document chunks for that requirement. The retrieved chunks are grouped by the regulatory chunk they are relevant to, which allows us to maintain the mapping between the regulatory context and the evidence in the document.
     top_doc_chunks_by_group = _query_qdrant_for_requirement(doc_client, temp_collection, req_chunks_embeddings, top_k=pre_rerank_top_k)
 
-    #Debug: print dimensions of top_doc_chunks_by_group
-    #print (f"Retrieved top {pre_rerank_top_k} document chunks for requirement '{requirement_name}':")
-    #print (f"Number of groups: {len(top_doc_chunks_by_group)}")
-    #for group, chunks in top_doc_chunks_by_group.items():
-    #    print(f"Group '{group}' has {len(chunks)} chunks retrieved from Qdrant.")
+    # e.g Data Governance requirement has 3 regulatory chunks (e.g. 3 AI Act articles), for each of them we query Qdrant and we obtain a list of the most relevant document chunks for each regulatory chunk, so we have a mapping like this:
+    # {
+    #     "AI Act Article 1": [chunk1, chunk2, ...],
+    #     "AI Act Article 2": [chunk3, chunk4, ...],
+    #     "ISO 42001 Section 5.1": [chunk5, chunk6, ...],
+    # }
 
+    # Now, in order to reduce redunancy in the prompt we organize the data structure for chunks, keeping track for each of the retrieved document chunk which regulatory chunk(s) it was relevant for. 
 
     # Optimization: deduplication of retrieved chunks across groups
     unique_chunks = {}  # chunk_id -> {"content": str, "refs": set}
@@ -291,6 +298,14 @@ def evaluate_requirement(
             else:
                 unique_chunks[cid]["refs"].add(group)
 
+    # E.g if chunk1 was relevant for both "AI Act Article 1" and "ISO 42001 Section 5.1", we will have:
+    # unique_chunks = {
+    #     "chunk1_id": {
+    #         "content": "text of chunk1",
+    #         "refs": {"AI Act Article 1", "ISO 42001 Section 5.1"}
+    #     },
+    #     ...
+
     # Build context
     doc_context_list = []
     for cid, data in unique_chunks.items():
@@ -302,7 +317,7 @@ def evaluate_requirement(
     #all_doc_chunks = [data['content'] for data in unique_chunks.values()]
 
     # 3. re-ranking (skipped)
-    top_k = int(rag_params.get("top_k", 4))
+    # top_k = int(rag_params.get("top_k", 4))
 
     # 4. Build the prompt and call the LLM
     regulatory_context_list = [f"[{c.get('reference', '')}] {c.get('content', '')}" for c in req_chunks_embeddings]
@@ -341,7 +356,7 @@ def evaluate_requirement(
         Score=score_0_5 if isinstance(score_0_5, int) else "N/A",
         Auditor_Notes=auditor_notes,
         Rationale=rationale,
-        Prompt=PROMPT_TEMPLATE.strip(),
+        Prompt=prompt,
         Context= eval_context_list, 
     )
 
@@ -396,9 +411,7 @@ def audit_document(
 
     # For each requirement in requirement_chunks (list), call evaluate_requirement to get the report for that requirement and collect all reports in a list.
     for req_data in requirement_chunks:
-        req_name = req_data.get("requirementName", "unknown")
         requirement_report = evaluate_requirement(
-            requirement_name=req_name,
             requirement_data=req_data,
             _doc_client=doc_client,
             _temp_collection=temp_collection,
@@ -461,16 +474,13 @@ def _embed_chunks(chunks: List[str], model: SentenceTransformer):
 
 
 def _query_qdrant_for_requirement(doc_client: QdrantClient, doc_collection: str, req_chunks_embeddings: List[dict], top_k: int = 4):
-    """
-    For each requirement chunk, retrieve the top_k most similar document chunks from Qdrant, grouped by both AI Act articles and ISO 42001 sections.
-    Returns a dictionary: group (AI Act article or ISO section) -> list of chunks (each with score, content, chunk_id)
-    """
+    
     from collections import defaultdict
     group_to_chunks = defaultdict(list)
     #print(req_chunks_embeddings[0].keys() if req_chunks_embeddings else "Empty list")
-    for req in req_chunks_embeddings:
-        reference = req.get("reference")
-        source = req.get("source")
+    for req in req_chunks_embeddings: # For each requirement
+        reference = req.get("reference") # 
+        source = req.get("source") 
         assigned = False
         if reference and source:
             if source == "EU_AI_ACT":
@@ -506,3 +516,13 @@ def _query_qdrant_for_requirement(doc_client: QdrantClient, doc_collection: str,
         results_by_group[group] = top_chunks[:top_k]
 
     return results_by_group
+
+
+if __name__ == "__main__":
+    init_rag()
+    # check qdrant regulatory retrieval for a sample requirement
+    points = _get_requirement_chunks_from_qdrant("transparency", vector_db, vect_params.get("regulatory_collection", "legal_docs"))
+
+    print (f"Retrieved {len(points)} regulatory chunks for 'Transparency' requirement:")
+    for p in points:
+        print(p)
