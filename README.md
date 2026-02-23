@@ -64,19 +64,33 @@ flowchart TD
 ```text
 LegalAIze/
 ├── backend/
+│   ├── app/
+│   ├── requirements.txt
+│   └── ...
 ├── frontend/
+│   ├── app.py
+│   ├── requirements.txt
+│   └── ...
 ├── data/
+│   └── ...
 ├── models/
+│   └── ...
 ├── notebooks/
+│   └── ...
 ├── evaluation/
+│   ├── evaluate_rag.py
+│   └── ...
 ├── ingestion/
+│   └── ...
 ├── metrics/
+│   └── ...
 ├── qdrant_init/
+│   └── ...
 ├── params.yaml
 ├── dvc.yaml
 ├── docker-compose.yml
 ├── requirements.txt
-```
+└── .env.example
 
 ---
 
@@ -150,17 +164,7 @@ DAGSHUB_TOKEN=YOUR_TOKEN
 ## 5. Artifact Initialization
 
 ### Quick Demo Mode (uses precomputed artifacts)
-
-Initialize DVC (required for new setups):
-
-```bash
-dvc init
-dvc remote add origin https://dagshub.com/YOUR_USERNAME/YOUR_REPO.dvc
-dvc remote modify origin --local auth basic
-dvc remote modify origin --local user YOUR_USERNAME
-dvc remote modify origin --local password YOUR_TOKEN
-```
-
+The git repo is already set with the required dvc. configuration (pointing to our DVC repo).
 Download all required artifacts:
 ```bash
 dvc pull
@@ -175,6 +179,24 @@ dvc repro --force
 ```
 > **Note:** Requirements download and artifacts initialization may take several minutes.
 ---
+
+Only for collaborations:
+
+Initialize DVC:
+
+```bash
+dvc remote add origin https://dagshub.com/YOUR_USERNAME/YOUR_REPO.dvc
+dvc remote modify origin --local auth basic
+dvc remote modify origin --local user YOUR_USERNAME
+dvc remote modify origin --local password YOUR_TOKEN
+```
+Now you can reproduce the pipeline and push a new version of the code, linked with the new artifacts, with:
+```bash
+git add .
+git commit -m "Update pipeline and artifacts"
+git push
+dvc push
+```
 
 ## 6. Container Build and Start
 
