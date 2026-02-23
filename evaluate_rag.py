@@ -130,7 +130,7 @@ def main() -> None:
 
     mapping_path = ingestion_params.get(
         "mapping_path",
-        os.path.join(ingestion_params.get("raw_data_dir", "data"), "mapping.json"),
+        os.path.join(ingestion_params.get("data_dir", "data"), "mapping.json"),
     )
 
 
@@ -220,6 +220,7 @@ def main() -> None:
                         mlflow.log_metric("relevancy_list", res["relevancy_score"], step=i)
                     if res.get("correctness_score") is not None:
                         mlflow.log_metric("correctness_list", res["correctness_score"], step=i)
+
 
                     # Log any artifacts produced during evaluation (like model predictions, intermediate files, etc.) for this case
                     artifact_paths = res.get("artifacts", {})

@@ -40,8 +40,8 @@ def evaluate_single_case(
     audit_response  = rag_engine.audit_document(document_text) # Get predictions (list of RequirementReport objects) from the RAG engine for this document
 
 
-    # Exclude the prompt from logged artifacts, it may contain sensitive info and is not needed for evaluation analysis. Only log the structured predictions.
-    predictions = [report.model_dump(exclude={"Prompt"}) for report in audit_response.requirements]
+    # Include the prompt in logged artifacts for downstream analysis and MLflow logging.
+    predictions = [report.model_dump() for report in audit_response.requirements]
 
 
     # Log input artifacts to MLflow (document and ground truth report) for this case, if MLflow is active. The predictions will be logged as a separate artifact (backend_predictions.json) for easier analysis and debugging.
@@ -52,6 +52,15 @@ def evaluate_single_case(
         with open(predictions_path, "w", encoding="utf-8") as f:
             json.dump(predictions, f, ensure_ascii=False, indent=2)
         artifacts["backend_predictions"] = predictions_path
+
+        # Save prompt for each requirement
+        for pred in predictions:
+            req_id = pred.get("Requirement_ID", "unknown")
+            prompt_text = pred.get("Prompt", "")
+            prompt_file = os.path.join(case_artifact_dir, f"prompt_{req_id}.txt")
+            with open(prompt_file, "w", encoding="utf-8") as pf:
+                pf.write(prompt_text)
+            artifacts[f"prompt_{req_id}"] = prompt_file
 
 
     # Initialize accumulators for metrics
@@ -106,8 +115,9 @@ def evaluate_single_case(
             gt_note = extract_ground_truth_note(gt_row)
 
             auditor_notes = pred.get("Auditor_Notes") or pred.get("auditor_notes")
-            rationale = pred.get("Rationale") or pred.get("rationale")
-            pred_note = auditor_notes + ("\nRationale: " + rationale if rationale else "")
+            #rationale = pred.get("Rationale") or pred.get("rationale")
+            #pred_note = auditor_notes + ("\nRationale: " + rationale if rationale else "")
+            pred_note = auditor_notes
             if gt_note and pred_note:
                 try:
                     similarity = compute_note_similarity(gt_note, pred_note, embedding_model)
@@ -144,9 +154,12 @@ def evaluate_single_case(
             requirement_name = pred.get("Requirement_Name")
             title = requirement_name or ""
             question_text = f"Is the provided document compliant with the requirement '{title}', according with the provided regulatory chunks from UE AI ACT and ISO standard 42001:2023?"
+            
             auditor_notes = pred.get("Auditor_Notes") or pred.get("auditor_notes")
-            rationale = pred.get("Rationale") or pred.get("rationale")
-            pred_note = auditor_notes + ("\nRationale: " + rationale if rationale else "")
+            #rationale = pred.get("Rationale") or pred.get("rationale")
+            #pred_note = auditor_notes + ("\nRationale: " + rationale if rationale else "")
+            pred_note = auditor_notes
+            
             ragas_records.append(
                 {
                     "question": question_text,

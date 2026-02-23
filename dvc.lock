@@ -23,7 +23,7 @@ stages:
         ingestion:
           chunk_size: 1000
           chunk_overlap: 150
-          raw_data_dir: data/raw_data
+          data_dir: data/
           processed_data_dir: data/processed
     outs:
     - path: data/processed/ai_act_parsed.json
@@ -98,25 +98,25 @@ stages:
     deps:
     - path: backend/rag_engine.py
       hash: md5
-      md5: 5dc4b3de02d5361c1cf8cbc3e9514ebb
-      size: 24906
+      md5: 9bd4d9cdc74b19329d2bef5125189ab9
+      size: 25989
     - path: data/ground_truth
       hash: md5
-      md5: 46db1a03a34b6049f683b2c6a12b9dfa.dir
-      size: 7448160
-      nfiles: 13
+      md5: 37a99a0188b1ae0b612991c5a892eb5c.dir
+      size: 7448149
+      nfiles: 12
     - path: data/processed/requirement_chunks.json
       hash: md5
       md5: 16b6d0d3c497bcc8e45c091ea69260af
       size: 121766
     - path: evaluate_rag.py
       hash: md5
-      md5: 2ed3f1493010435cc1c332ce984472dd
-      size: 18270
+      md5: 57fc8276fa1eca300cf4ab5f4b549c43
+      size: 18268
     - path: evaluation/
       hash: md5
-      md5: 76fa86034dd510f1a6924a11e298f545.dir
-      size: 54923
+      md5: 60eef5401d278b575f654cc07b664b6f.dir
+      size: 55642
       nfiles: 13
     params:
       params.yaml:
@@ -124,7 +124,9 @@ stages:
           llm_model: gpt-4o-mini
           llm_temperature: 0.0
           mlflow_experiment: rag_evaluation
-          case_selector: 7
+          case_selector:
+          - 6
+          - 7
           ground_truth:
           - name: Evaluation1
             document_path: 
@@ -145,19 +147,18 @@ stages:
           - name: Evaluation5
             document_path: 
               data/ground_truth/raw_data/Evaluation5/documentation.pdf
-          - name: Evaluation6
-            document_path: 
-              data/ground_truth/raw_data/Evaluation6/documentation.pdf
+          - name: Gullon
+            document_path: data/ground_truth/raw_data/Gullon/documentation.pdf
           - name: Prysmian
             document_path: data/ground_truth/raw_data/Prysmian/documentation.pdf
         rag:
-          document_chunk_size: 512
-          document_chunk_overlap: 64
+          document_chunk_size: 1100
+          document_chunk_overlap: 110
           pre_rerank_top_k: 1
           llm_model: gpt-4o-mini
           llm_temperature: 0.0
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: e7e6fd46759c920791d3188d3164251d
-      size: 1135
+      md5: e56f8fe0178fecd7e99082ae902cbac6
+      size: 6258

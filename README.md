@@ -18,14 +18,15 @@ LegalAIze is an auditing tool designed to assess technical documentation for com
 ---
 
 ## Key Features
-
-- Automated Compliance Checks (EU AI Act, ISO 42001)
+- Automated compliance checks for EU AI Act and ISO 42001
 - Retrieval-Augmented Generation (RAG) implementation
-- PDF and TXT parsing with chunking
 - Experiment tracking with MLflow and DagsHub
-- Semantic search with Qdrant
-- Streamlit UI for document upload and results
-- FastAPI backend for scalable audit logic
+- Artifact versioning using DVC
+- Vector database powered by Qdrant
+- Streamlit UI for document upload and results visualization
+- FastAPI backend
+- Deployment via Docker container environment
+- GitOps operations to support development
 
 ---
 
@@ -33,18 +34,27 @@ LegalAIze is an auditing tool designed to assess technical documentation for com
 
 ```mermaid
 flowchart TD
-	User((User)) --> Streamlit["Streamlit UI"]
-	subgraph Frontend ["Streamlit Container"]
-		Streamlit
-	end
-	subgraph Backend ["FastAPI Backend Container"]
-		FastAPI["FastAPI Backend"]
-	end
-	Streamlit -- REST API --> FastAPI
-	FastAPI -- read --> ReqChunks["requirements_chunks.json"]
-	FastAPI -- build prompt --> OpenAI["OpenAI LLM"]
-	OpenAI -- response --> FastAPI
-	FastAPI -- REST response --> Streamlit
+    User((User)) --> Streamlit["Streamlit UI"]
+
+    subgraph Frontend ["Streamlit Container"]
+        Streamlit
+    end
+
+    subgraph Backend ["FastAPI Backend Container"]
+        FastAPI["FastAPI Backend"]
+    end
+
+    subgraph VectorDB ["Qdrant Container"]
+        Qdrant["Qdrant Vector DB"]
+    end
+
+    Streamlit -- REST API --> FastAPI
+    FastAPI -- embedding query --> OpenAI["OpenAI Embeddings"]
+    FastAPI -- vector search --> Qdrant
+    Qdrant -- top-k chunks --> FastAPI
+    FastAPI -- build prompt --> OpenAI["OpenAI LLM"]
+    OpenAI -- response --> FastAPI
+    FastAPI -- REST response --> Streamlit
 ```
 
 ---
