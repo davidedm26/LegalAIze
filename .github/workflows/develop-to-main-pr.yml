@@ -20,6 +20,8 @@ env:
   THRESHOLD_GROUNDEDNESS: "0.5"      # adjust to desired min groundedness
   THRESHOLD_FAITHFULNESS: "0.5"      # adjust to desired min faithfulness
   THRESHOLD_NOTE_SIMILARITY: "0.35"  # adjust to desired min note similarity
+  THRESHOLD_ANSWER_RELEVANCY: "0.5"  # adjust to desired min answer relevancy
+  THRESHOLD_CORRECTNESS: "0.5"       # adjust to desired min correctness
 
 jobs:
   release-checks:
@@ -60,16 +62,16 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-      - name: Configure DVC remote (read-only)
-        env:
-          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
-          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
-        run: |
-          dvc remote list | grep -q '^origin' || dvc remote add -d origin https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/${{ github.event.repository.name }}.dvc
-          dvc remote default origin
-          dvc remote modify origin --local auth basic
-          dvc remote modify origin --local user ${{ secrets.DAGSHUB_USERNAME }}
-          dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
+      #- name: Configure DVC remote (read-only)
+      #  env:
+      #    DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+      #    DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+      #  run: |
+      #    dvc remote list | grep -q '^origin' || dvc remote add -d origin https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/${{ github.event.repository.name }}.dvc
+      #    dvc remote default origin
+      #    dvc remote modify origin --local auth basic
+      #    dvc remote modify origin --local user ${{ secrets.DAGSHUB_USERNAME }}
+      #    dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
 
       - name: Pull data from DVC
         run: dvc pull
@@ -84,45 +86,17 @@ jobs:
           python evaluate_rag.py
 
       - name: Check metric thresholds
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          THRESHOLD_MAE: ${{ env.THRESHOLD_MAE }}
+          THRESHOLD_GROUNDEDNESS: ${{ env.THRESHOLD_GROUNDEDNESS }}
+          THRESHOLD_FAITHFULNESS: ${{ env.THRESHOLD_FAITHFULNESS }}
+          THRESHOLD_NOTE_SIMILARITY: ${{ env.THRESHOLD_NOTE_SIMILARITY }}
+          THRESHOLD_ANSWER_RELEVANCY: ${{ env.THRESHOLD_ANSWER_RELEVANCY }}
+          THRESHOLD_CORRECTNESS: ${{ env.THRESHOLD_CORRECTNESS }}
         run: |
-          python - <<'PY'
-          import json, os, sys
-
-          mae_max = float(os.getenv("THRESHOLD_MAE", "inf"))
-          grounded_min = float(os.getenv("THRESHOLD_GROUNDEDNESS", "-inf"))
-          faithful_min = float(os.getenv("THRESHOLD_FAITHFULNESS", "-inf"))
-          note_min = float(os.getenv("THRESHOLD_NOTE_SIMILARITY", "-inf"))
-
-          with open("metrics/rag_eval.json", "r", encoding="utf-8") as f:
-              data = json.load(f)
-
-          mae = float(data.get("weighted_mae_score", 0.0))
-          grounded = data.get("mean_groundedness_score")
-          faithful = data.get("mean_faithfulness_score")
-          note_sim = data.get("mean_note_similarity")
-
-          errors = []
-          if mae > mae_max:
-              errors.append(f"weighted_mae_score {mae:.4f} > max {mae_max}")
-          if grounded is None:
-              errors.append("mean_groundedness_score missing")
-          elif grounded < grounded_min:
-              errors.append(f"mean_groundedness_score {grounded:.4f} < min {grounded_min}")
-          if faithful is None:
-              errors.append("mean_faithfulness_score missing")
-          elif faithful < faithful_min:
-              errors.append(f"mean_faithfulness_score {faithful:.4f} < min {faithful_min}")
-            if note_sim is None:
-              errors.append("mean_note_similarity missing")
-            elif note_sim < note_min:
-              errors.append(f"mean_note_similarity {note_sim:.4f} < min {note_min}")
-
-          if errors:
-              print("Threshold check failed:\n - " + "\n - ".join(errors))
-              sys.exit(1)
-          else:
-              print("Threshold check passed")
-          PY
+          python .github/scripts/check_and_issue.py "develop-to-main-pr"
 
       - name: Upload evaluation metrics
         uses: actions/upload-artifact@v4

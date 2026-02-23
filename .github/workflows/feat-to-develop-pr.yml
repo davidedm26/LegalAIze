@@ -96,16 +96,16 @@ jobs:
     #      exit 1
 
       # Configure DVC remote with Dagshub credentials (per-run, not persisted)
-      - name: Configure DVC remote
-        env:
-          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
-          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
-        run: |
-          dvc remote list | grep -q '^origin' || dvc remote add -d origin https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/${{ github.event.repository.name }}.dvc
-          dvc remote default origin
-          dvc remote modify origin --local auth basic
-          dvc remote modify origin --local user ${{ secrets.DAGSHUB_USERNAME }}
-          dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
+      #- name: Configure DVC remote
+      #  env:
+      #    DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+      #    DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+      #  run: |
+      #    dvc remote list | grep -q '^origin' || dvc remote add -d origin https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/${{ github.event.repository.name }}.dvc
+      #    dvc remote default origin
+      #    dvc remote modify origin --local auth basic
+      #    dvc remote modify origin --local user ${{ secrets.DAGSHUB_USERNAME }}
+      #    dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
 
       # Bring data/artifacts needed for repro
       - name: Pull data from DVC
