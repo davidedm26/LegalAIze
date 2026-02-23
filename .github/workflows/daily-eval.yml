@@ -2,7 +2,7 @@ name: Daily Evaluation & Alert
 
 on:
   schedule:
-    - cron: '59 10 * * *'  
+    - cron: '30 11 * * *'  
   workflow_dispatch:
 
 env:
@@ -11,6 +11,8 @@ env:
   THRESHOLD_GROUNDEDNESS: "0.5"
   THRESHOLD_FAITHFULNESS: "0.5"
   THRESHOLD_NOTE_SIMILARITY: "0.35"
+  THRESHOLD_ANSWER_RELEVANCY: "0.5"
+  THRESHOLD_CORRECTNESS: "0.5"
 
 jobs:
   daily-eval:
@@ -45,5 +47,7 @@ jobs:
           THRESHOLD_GROUNDEDNESS: ${{ env.THRESHOLD_GROUNDEDNESS }}
           THRESHOLD_FAITHFULNESS: ${{ env.THRESHOLD_FAITHFULNESS }}
           THRESHOLD_NOTE_SIMILARITY: ${{ env.THRESHOLD_NOTE_SIMILARITY }}
+          THRESHOLD_ANSWER_RELEVANCY: ${{ env.THRESHOLD_ANSWER_RELEVANCY }}
+          THRESHOLD_CORRECTNESS: ${{ env.THRESHOLD_CORRECTNESS }}
         run: |
-          python .github/scripts/check_and_issue.py
+          python .github/scripts/check_and_issue.py "daily check"

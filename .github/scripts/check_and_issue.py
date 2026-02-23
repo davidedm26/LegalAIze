@@ -1,9 +1,9 @@
 # USAGE:
 #   set GITHUB_TOKEN=... (cmd)   or   $env:GITHUB_TOKEN="..." (PowerShell)
 #   set GITHUB_REPOSITORY=user/repo
-#   python .github/scripts/check_and_issue.py
+#   python .github/scripts/check_and_issue.py [launcher_name]
 
-import os, json
+import os, json, sys
 from github import Github 
 
 with open("metrics/rag_eval.json", "r", encoding="utf-8") as f:
@@ -30,6 +30,12 @@ default_thresholds = {
     # You can add more custom thresholds here
 }
 
+# Get launcher name from command line or environment
+if len(sys.argv) > 1:
+    launcher = sys.argv[1]
+else:
+    launcher = os.getenv("LAUNCHER_NAME", "daily check")
+
 errors = []
 for key in metric_keys:
     value = data.get(key)
@@ -47,8 +53,8 @@ for key in metric_keys:
 if errors:
     gh = Github(os.environ["GITHUB_TOKEN"])
     repo = gh.get_repo(os.environ["GITHUB_REPOSITORY"])
-    title = "[ALERT] Daily Evaluation: Metrics below threshold"
-    body = "The following metrics are below threshold:\n\n" + "\n".join(f"- {e}" for e in errors)
+    title = f"[ALERT] Evaluation: Metrics below threshold ({launcher})"
+    body = f"Launcher: {launcher}\n\nThe following metrics are below threshold:\n\n" + "\n".join(f"- {e}" for e in errors)
     repo.create_issue(title=title, body=body)
     print("Issue created.")
 else:
