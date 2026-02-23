@@ -15,7 +15,7 @@ stages:
       nfiles: 4
     - path: ingestion/
       hash: md5
-      md5: 155ca1461b4ec34533a39e4eaa5d63de.dir
+      md5: d0f9f210b9bbfc8d4073c63f1840ac33.dir
       size: 42672
       nfiles: 5
     params:
@@ -102,9 +102,9 @@ stages:
       size: 25989
     - path: data/ground_truth
       hash: md5
-      md5: 37a99a0188b1ae0b612991c5a892eb5c.dir
-      size: 7448149
-      nfiles: 12
+      md5: c1562a57843be1eb01429eec95014c3b.dir
+      size: 7448160
+      nfiles: 13
     - path: data/processed/requirement_chunks.json
       hash: md5
       md5: 16b6d0d3c497bcc8e45c091ea69260af
@@ -115,7 +115,7 @@ stages:
       size: 18268
     - path: evaluation/
       hash: md5
-      md5: 60eef5401d278b575f654cc07b664b6f.dir
+      md5: e7f0745952a56339d84b755753a1a377.dir
       size: 55642
       nfiles: 13
     params:
@@ -125,7 +125,6 @@ stages:
           llm_temperature: 0.0
           mlflow_experiment: rag_evaluation
           case_selector:
-          - 6
           - 7
           ground_truth:
           - name: Evaluation1
@@ -160,5 +159,5 @@ stages:
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: e56f8fe0178fecd7e99082ae902cbac6
-      size: 6258
+      md5: b97858afbf4f15ce9142f65205491764
+      size: 3392
