@@ -91,6 +91,7 @@ LegalAIze/
 ├── docker-compose.yml
 ├── requirements.txt
 └── .env.example
+```
 
 ---
 
@@ -105,12 +106,13 @@ LegalAIze/
 
 Create a `.env` file in the project root. Example configuration:
 
-| Variable                | Description                                 | Example Value                                 |
-|-------------------------|---------------------------------------------|-----------------------------------------------|
-| OPENAI_API_KEY          | OpenAI API key for LLM access               | sk-...                                        |
-| MLFLOW_TRACKING_URI     | MLflow tracking URI (local or remote)        | http://localhost:5000                         |
-| DAGSHUB_USERNAME        | DagsHub username (if using DagsHub)          | your_username                                 |
-| DAGSHUB_TOKEN           | DagsHub token (if using DagsHub)             | your_token                                    |
+| Variable                | Description                                 | Example Value                                 | Mandatory |
+|-------------------------|---------------------------------------------|-----------------------------------------------|-----------|
+| OPENAI_API_KEY          | OpenAI API key for LLM access               | sk-...                                        | ✅        |
+| MLFLOW_TRACKING_URI     | MLflow tracking URI (local or remote)       | http://localhost:5000                         | ❌         |
+| DAGSHUB_USERNAME        | DagsHub username (if using DagsHub)         | your_username                                 | ❌         |
+| DAGSHUB_TOKEN           | DagsHub token (if using DagsHub)            | your_token                                    | ❌         |
+
 
 
 Refer to `.env.example` for all available options.
@@ -129,7 +131,7 @@ pip install dvc
 
 ---
 
-## 4. MLflow Setup
+## 4. MLflow Setup (facultative)
 
 By default, use a local MLflow instance for experiment tracking:
 
@@ -163,34 +165,35 @@ DAGSHUB_TOKEN=YOUR_TOKEN
 
 ## 5. Artifact Initialization
 
-### Quick Demo Mode (uses precomputed artifacts)
+### A.  Quick Demo Mode (uses precomputed artifacts) [RECOMMENDED]
 The git repo is already set with the required dvc. configuration (pointing to our DVC repo).
 Download all required artifacts:
 ```bash
 dvc pull
 ```
 
-### Complete Demo Mode (recomputes all artifacts)
+### B.  Complete Demo Mode (recomputes all artifacts)
 
 Force full pipeline execution and artifact generation:
 ```bash
 pip install -r requirements.txt
+dvc pull
 dvc repro --force
 ```
 > **Note:** Requirements download and artifacts initialization may take several minutes.
 ---
 
-Only for collaborations:
+**Collaboration Mode**
+
+> **Note:** It is imperative that you have collaboration access to the dagshub and github repositories.
 
 Initialize DVC:
-
 ```bash
-dvc remote add origin https://dagshub.com/YOUR_USERNAME/YOUR_REPO.dvc
 dvc remote modify origin --local auth basic
 dvc remote modify origin --local user YOUR_USERNAME
 dvc remote modify origin --local password YOUR_TOKEN
 ```
-Now you can reproduce the pipeline and push a new version of the code, linked with the new artifacts, with:
+Now you can eventually change the parameters, reproduce the pipeline and push a new version of the code, linked with the new artifacts, with:
 ```bash
 git add .
 git commit -m "Update pipeline and artifacts"
@@ -218,9 +221,9 @@ Open the following link in your browser:
 
 ---
 
-## 8. Local Development (No Docker)
+## 8. Local Run (No Docker)
 
-You can run the backend and frontend separately for development:
+You can run the backend and frontend separately without the use of docker:
 
 **Backend (FastAPI):**
 ```bash
@@ -254,7 +257,7 @@ You can provide input documents in two ways:
 
 **Requirements:**
 - An active internet connection is required
-- Uploaded files should not exceed 50 pages (this limit is subject to revision)
+
 
 **Important Notice:**
 - All input documents are processed by an OpenAI Large Language Model (LLM) via API
