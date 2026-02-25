@@ -349,6 +349,7 @@ def evaluate_requirement(
     except Exception:
         score_0_5 = 0
         auditor_notes = f"LLM response parsing failed. Response was: {llm_response}"
+        rationale = ""
     return RequirementReport(
         Requirement_ID=requirement_data.get("id", ""),
         Requirement_Category=requirement_data.get("ethicalPrinciple", "unknown"),

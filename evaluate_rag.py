@@ -244,17 +244,14 @@ def main() -> None:
 
             # Weighted MAE by number of pairs
             weighted_mae = (
-                sum(r["mae_score"] * r["num_pairs"] for r in all_results) / total_score_pairs
+                sum((r["mae_score"] or 0) * r["num_pairs"] for r in all_results if r.get("num_pairs") is not None) / total_score_pairs
                 if total_score_pairs > 0
                 else 0.0
             )
 
             # Weighted note similarity by number of note pairs
             weighted_note_similarity = (
-                sum(
-                    r.get("mean_note_similarity", 0.0) * r.get("note_similarity_count", 0)
-                    for r in all_results
-                ) / total_note_pairs
+                sum((r.get("mean_note_similarity") or 0.0) * (r.get("note_similarity_count") or 0) for r in all_results) / total_note_pairs
                 if total_note_pairs > 0
                 else 0.0
             )
@@ -264,10 +261,7 @@ def main() -> None:
             groundedness_results = [r for r in all_results if r.get("groundedness_score") is not None]
             if groundedness_results and total_groundedness_samples > 0:
                 weighted_groundedness = (
-                    sum(
-                        r["groundedness_score"] * r.get("groundedness_sample_count", 0)
-                        for r in groundedness_results
-                    ) / total_groundedness_samples
+                    sum((r.get("groundedness_score") or 0) * (r.get("groundedness_sample_count") or 0) for r in groundedness_results) / total_groundedness_samples
                 )
 
             # Weighted faithfulness by sample count
@@ -275,10 +269,7 @@ def main() -> None:
             faithfulness_results = [r for r in all_results if r.get("faithfulness_score") is not None]
             if faithfulness_results and total_faithfulness_samples > 0:
                 weighted_faithfulness = (
-                    sum(
-                        r["faithfulness_score"] * r.get("faithfulness_sample_count", 0)
-                        for r in faithfulness_results
-                    ) / total_faithfulness_samples
+                    sum((r.get("faithfulness_score") or 0) * (r.get("faithfulness_sample_count") or 0) for r in faithfulness_results) / total_faithfulness_samples
                 )
 
             # Weighted relevancy by sample count
@@ -286,10 +277,7 @@ def main() -> None:
             relevancy_results = [r for r in all_results if r.get("relevancy_score") is not None]
             if relevancy_results and total_relevancy_samples > 0:
                 weighted_relevancy = (
-                    sum(
-                        r["relevancy_score"] * r.get("relevancy_sample_count", 0)
-                        for r in relevancy_results
-                    ) / total_relevancy_samples
+                    sum((r.get("relevancy_score") or 0) * (r.get("relevancy_sample_count") or 0) for r in relevancy_results) / total_relevancy_samples
                 )
 
             # Weighted correctness by sample count
@@ -297,10 +285,7 @@ def main() -> None:
             correctness_results = [r for r in all_results if r.get("correctness_score") is not None]
             if correctness_results and total_correctness_samples > 0:
                 weighted_correctness = (
-                    sum(
-                        r["correctness_score"] * r.get("correctness_sample_count", 0)
-                        for r in correctness_results
-                    ) / total_correctness_samples
+                    sum((r.get("correctness_score") or 0) * (r.get("correctness_sample_count") or 0) for r in correctness_results) / total_correctness_samples
                 )
 
         else: # Fallback values if no results were processed (e.g., all cases were skipped due to missing files)
