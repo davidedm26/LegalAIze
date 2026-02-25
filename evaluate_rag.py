@@ -72,6 +72,7 @@ def setup_mlflow():
 setup_mlflow()
 
 def main() -> None:
+
     params = load_params()
     eval_params = params.get("evaluation", {})
     precompute_params = params.get("precompute", {})
@@ -114,13 +115,7 @@ def main() -> None:
         else None
     )
 
-    prompt_template_path = None
 
-    # Save prompt template locally for next steps (artifact logging) if available in rag_engine.
-    if run_ctx is not None and rag_engine is not None:
-        with tempfile.NamedTemporaryFile("w", suffix="_prompt_template.txt", delete=False, encoding="utf-8") as f:
-            f.write(getattr(rag_engine, "PROMPT_TEMPLATE", "").strip())
-            prompt_template_path = f.name
     
     if rag_engine is None:
         raise RuntimeError("backend.rag_engine is not available. Run evaluate_rag from the repository root.")
@@ -161,13 +156,35 @@ def main() -> None:
             mlflow.log_param("llm_temperature", llm_temperature)
             mlflow.log_param("embedding_model",vect_params.get("model_name", ""))
             mlflow.log_param("precompute_top_k", precompute_params.get("top_k", 3))
-            mlflow.log_param("chunk_size", ingestion_params.get("chunk_size"))
-            mlflow.log_param("chunk_overlap", ingestion_params.get("chunk_overlap"))
-            if prompt_template_path and os.path.exists(prompt_template_path):
-                mlflow.log_artifact(prompt_template_path, artifact_path="inputs")
+            # Log the actual chunk_size and chunk_overlap used by the backend
+            mlflow.log_param("chunk_size", rag_engine.rag_params.get("document_chunk_size"))
+            mlflow.log_param("chunk_overlap", rag_engine.rag_params.get("document_chunk_overlap"))
+
+            # Log prompt templates to MLflow after run initialization
+
+            try:
+                # Example values for template logging
+                example_reference = "EXAMPLE_REFERENCE"
+                example_content = "EXAMPLE_CONTENT"
+                example_chunks = ["EXAMPLE_CHUNK_1", "EXAMPLE_CHUNK_2"]
+                sub_prompt_template = rag_engine.get_sub_prompt(example_reference, example_content, example_chunks)
+                with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix="_sub_prompt_template.txt", encoding="utf-8") as tf:
+                    tf.write(sub_prompt_template)
+                    tf.flush()
+                    mlflow.log_artifact(tf.name, artifact_path="prompt_templates")
+                agg_prompt_template = rag_engine.get_aggregate_prompt([
+                    {"reference": example_reference, "content": example_content, "chunks": example_chunks}
+                ])
+                with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix="_aggregate_prompt_template.txt", encoding="utf-8") as tf:
+                    tf.write(agg_prompt_template)
+                    tf.flush()
+                    mlflow.log_artifact(tf.name, artifact_path="prompt_templates")
+            except Exception as e:
+                print(f"⚠ Failed to log prompt templates to MLflow: {e}")
 
         filtered_cases = select_cases(gt_cases, case_selector) # Select cases based on case_selector (params)
 
+        
         # Loop through evaluation cases
         for i, case in enumerate(filtered_cases):
             ground_truth_present = True

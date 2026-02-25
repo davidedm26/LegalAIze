@@ -37,11 +37,33 @@ def evaluate_single_case(
     if rag_engine is None:
         raise RuntimeError("backend.rag_engine is not available. Run evaluate_rag from the project root.")
 
-    audit_response  = rag_engine.audit_document(document_text) # Get predictions (list of RequirementReport objects) from the RAG engine for this document
+    audit_response  = rag_engine.audit_document(document_text, requirement_limit=5) # Get predictions (list of RequirementReport objects) from the RAG engine for this document
 
 
     # Include the prompt in logged artifacts for downstream analysis and MLflow logging.
     predictions = [report.model_dump() for report in audit_response.requirements]
+
+    # Collect sub-requirement prompts for RAGAS metrics
+    sub_ragas_records: List[Dict[str, Any]] = []
+    for pred in predictions:
+        context_list = pred.get("Context") or []
+        for sub_json in context_list:
+            try:
+                sub = json.loads(sub_json)
+            except Exception:
+                continue
+            # Only add if there is at least some context or a non-trivial answer
+            if (sub.get("contexts") and any(c.strip() for c in sub.get("contexts", []))) or (sub.get("answer") and sub.get("answer").strip() and "no information" not in sub.get("answer").lower()):
+                sub_ragas_records.append({
+                    "question": sub.get("ragas_question") or sub.get("prompt", ""),
+                    "answer": sub.get("answer", ""),
+                    "contexts": sub.get("contexts", []),
+                    "ground_truth": "",  # Not available at sub-requirement level
+                    "requirement_id": pred.get("Requirement_ID", "unknown"),
+                    "sub_requirement_name": sub.get("reference", ""),
+                    "source": sub.get("source", "unknown"),
+                    "case": case_name,
+                })
 
 
     # Log input artifacts to MLflow (document and ground truth report) for this case, if MLflow is active. The predictions will be logged as a separate artifact (backend_predictions.json) for easier analysis and debugging.
@@ -53,13 +75,13 @@ def evaluate_single_case(
             json.dump(predictions, f, ensure_ascii=False, indent=2)
         artifacts["backend_predictions"] = predictions_path
 
-        # Save prompt for each requirement
+        # Save only the aggregation prompt actually used for each requirement
         for pred in predictions:
             req_id = pred.get("Requirement_ID", "unknown")
-            prompt_text = pred.get("Prompt", "")
+            agg_prompt = pred.get("Prompt", "")
             prompt_file = os.path.join(case_artifact_dir, f"prompt_{req_id}.txt")
             with open(prompt_file, "w", encoding="utf-8") as pf:
-                pf.write(prompt_text)
+                pf.write(agg_prompt)
             artifacts[f"prompt_{req_id}"] = prompt_file
 
 
@@ -179,7 +201,7 @@ def evaluate_single_case(
             if note_similarities
             else 0.0
         )
-        ragas_metrics = compute_ragas_metrics(ragas_records)
+        ragas_metrics = compute_ragas_metrics(sub_ragas_records)
         case_groundedness_score = ragas_metrics.get("groundedness")
         case_faithfulness_score = ragas_metrics.get("faithfulness")
         case_relevancy_score = ragas_metrics.get("relevancy")
@@ -202,23 +224,22 @@ def evaluate_single_case(
                 "note_similarity_count": len(note_similarities),
                 "mean_note_similarity": mean_note_similarity,
                 "groundedness_score": case_groundedness_score,
-                "groundedness_sample_count": len(ragas_records),
+                "groundedness_sample_count": len(sub_ragas_records),
                 "faithfulness_score": case_faithfulness_score,
-                "faithfulness_sample_count": len(ragas_records),
+                "faithfulness_sample_count": len(sub_ragas_records),
                 "relevancy_score": case_relevancy_score,
-                "relevancy_sample_count": len(ragas_records),
+                "relevancy_sample_count": len(sub_ragas_records),
                 "correctness_score": case_correctness_score,
-                "correctness_sample_count": len(ragas_records),
+                "correctness_sample_count": len(sub_ragas_records),
             },
-            ragas_records,
+            sub_ragas_records,
         )
     else:
         # No Ground Truth available, we can only compute RAGAS metrics that do not require GT
-        ragas_metrics = compute_ragas_metrics(ragas_records)
+        ragas_metrics = compute_ragas_metrics(sub_ragas_records)
         case_groundedness_score = ragas_metrics.get("groundedness")
         case_faithfulness_score = ragas_metrics.get("faithfulness")
         case_relevancy_score = ragas_metrics.get("relevancy")
-
 
         return (
             {
@@ -228,13 +249,13 @@ def evaluate_single_case(
                 "note_similarity_count": 0,
                 "mean_note_similarity": None,
                 "groundedness_score": case_groundedness_score,
-                "groundedness_sample_count": len(ragas_records),
+                "groundedness_sample_count": len(sub_ragas_records),
                 "faithfulness_score": case_faithfulness_score,
-                "faithfulness_sample_count": len(ragas_records),
+                "faithfulness_sample_count": len(sub_ragas_records),
                 "relevancy_score": case_relevancy_score,
-                "relevancy_sample_count": len(ragas_records),
+                "relevancy_sample_count": len(sub_ragas_records),
                 "correctness_score": None,
                 "correctness_sample_count": 0,
             },
-            ragas_records,
+            sub_ragas_records,
         )
