@@ -465,6 +465,17 @@ def evaluate_requirement(
     except Exception:
         agg_result = {"score": "N/A", "auditor_notes": "Parsing failed", "rationale": agg_response}
 
+    # Helper: ensure auditor_notes is a string
+    notes_val = agg_result.get("auditor_notes", "")
+    if isinstance(notes_val, (dict, list)):
+        try:
+            # If it's a dict/list, dump it as formatted JSON text
+            notes_str = json.dumps(notes_val, indent=2, ensure_ascii=False)
+        except:
+            notes_str = str(notes_val)
+    else:
+        notes_str = str(notes_val)
+
     # Convert sub_results (list of dicts) to list of JSON strings for Pydantic validation
     context_strings = [json.dumps(sr, ensure_ascii=False) for sr in sub_results]
     return RequirementReport(
@@ -472,7 +483,7 @@ def evaluate_requirement(
         Requirement_Category=requirement_data.get("ethicalPrinciple", "unknown"),
         Requirement_Name=requirement_name,
         Score=agg_result.get("score", "N/A"),
-        Auditor_Notes=agg_result.get("auditor_notes", ""),
+        Auditor_Notes=notes_str,
         Rationale=agg_result.get("rationale", ""),
         Prompt=agg_prompt,
         Context=context_strings,
