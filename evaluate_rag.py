@@ -163,22 +163,28 @@ def main() -> None:
             # Log prompt templates to MLflow after run initialization
 
             try:
-                # Example values for template logging
-                example_reference = "EXAMPLE_REFERENCE"
-                example_content = "EXAMPLE_CONTENT"
-                example_chunks = ["EXAMPLE_CHUNK_1", "EXAMPLE_CHUNK_2"]
-                sub_prompt_template = rag_engine.get_sub_prompt(example_reference, example_content, example_chunks)
-                with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix="_sub_prompt_template.txt", encoding="utf-8") as tf:
-                    tf.write(sub_prompt_template)
-                    tf.flush()
-                    mlflow.log_artifact(tf.name, artifact_path="prompt_templates")
-                agg_prompt_template = rag_engine.get_aggregate_prompt([
-                    {"reference": example_reference, "content": example_content, "chunks": example_chunks}
-                ])
-                with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix="_aggregate_prompt_template.txt", encoding="utf-8") as tf:
-                    tf.write(agg_prompt_template)
-                    tf.flush()
-                    mlflow.log_artifact(tf.name, artifact_path="prompt_templates")
+                # Use the EvaluationEngine from rag_engine to access prompt templates
+                if rag_engine.evaluation_engine:
+                    # Example values for template logging
+                    example_reference = "EXAMPLE_REFERENCE"
+                    example_content = "EXAMPLE_CONTENT"
+                    example_chunks = ["EXAMPLE_CHUNK_1", "EXAMPLE_CHUNK_2"]
+
+                    # Access private methods or use a public method to get template if available
+                    # Since methods are semi-private (_get_sub_prompt), we access them for logging purposes
+                    sub_prompt_template = rag_engine.evaluation_engine._get_sub_prompt(example_reference, example_content, example_chunks)
+                    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix="_sub_prompt_template.txt", encoding="utf-8") as tf:
+                        tf.write(sub_prompt_template)
+                        tf.flush()
+                        mlflow.log_artifact(tf.name, artifact_path="prompt_templates")
+
+                    agg_prompt_template = rag_engine.evaluation_engine._get_aggregate_prompt([
+                        {"reference": example_reference, "score": 5, "answer": "Good"}
+                    ])
+                    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix="_aggregate_prompt_template.txt", encoding="utf-8") as tf:
+                        tf.write(agg_prompt_template)
+                        tf.flush()
+                        mlflow.log_artifact(tf.name, artifact_path="prompt_templates")
             except Exception as e:
                 print(f"⚠ Failed to log prompt templates to MLflow: {e}")
 
