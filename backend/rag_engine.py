@@ -18,36 +18,64 @@ def _remove_law_names(text):
     for pat in law_patterns:
         text = re.sub(pat, "", text, flags=re.IGNORECASE)
     return text.strip()
+
 # Sub-requirement prompt template function
 def get_sub_prompt(reference, content, relevant_chunks):
     return f"""
-You are an AI auditor. Assess whether the following chunks demonstrate coverage of the sub-requirement:
+You are an expert AI auditor specializing in EU AI Act and ISO 42001 compliance.
+Your task is to assess whether the provided document chunks demonstrate specific coverage of the following sub-requirement.
 
 SUB-REQUIREMENT: {reference}
-REGULATORY REFERENCE: {content}
-CHUNKS:
+REGULATORY CONTEXT: {content}
+
+DOCUMENT CHUNKS:
 {chr(10).join(relevant_chunks)}
 
-Respond in JSON:
+INSTRUCTIONS:
+1. Analyze the chunks carefully. Look for explicit mentions or implicit evidence that addresses the sub-requirement.
+2. Be critical. If the chunks mention the topic but do not satisfy the specific requirement, note it.
+3. If no relevant information is found in the chunks, score as 0 and state "No evidence found".
+
+Respond in JSON format:
 {{
-    \"rationale\": \"Explain if and how the chunks cover the sub-requirement.\",
-    \"score\": \"0-5 or 'N/A'\",
-    \"auditor_notes\": \"Summary of the coverage.\"
+    "rationale": "Detailed explanation of findings.",
+    "score": "Integer 0-5 (0=No evidence, 5=Fully compliant) or 'N/A'",
+    "auditor_notes": "Concise summary for the final report."
 }}
 """
 
 # Aggregate prompt template function
 def get_aggregate_prompt(sub_results):
     import json
-    return f"""
-You are an AI auditor. Here are the evaluation results for the sub-requirements:
-{json.dumps(sub_results, indent=2, ensure_ascii=False)}
+    # Filter sub_results to avoid token limit if necessary, but here we include all
+    # simplifying the structure for the prompt
+    simplified_results = []
+    for res in sub_results:
+        simplified_results.append({
+            "reference": res.get("reference"),
+            "score": res.get("score"),
+            "auditor_notes": res.get("answer") # referencing the sub-result auditor_notes
+        })
 
-Aggregate the results and provide:
+    return f"""
+You are a Lead AI Auditor consolidating findings for a main requirement based on several sub-requirement evaluations.
+
+SUB-REQUIREMENT FINDINGS:
+{json.dumps(simplified_results, indent=2, ensure_ascii=False)}
+
+TASK:
+Aggregate these findings into a final assessment for the main requirement.
+
+INSTRUCTIONS:
+1. The overall score should reflect the weakest links. If critical sub-requirements are missing, the score should be low.
+2. The 'auditor_notes' must be a structured summary listing the status of key sub-requirements (e.g., "Article 10: Covered; Article 13: Missing").
+3. The 'rationale' should provide a high-level justification.
+
+Respond in JSON format:
 {{
-    \"score\": \"0-5 or 'N/A'\",
-    \"auditor_notes\": \"Final summary of the main requirement's coverage.\",
-    \"rationale\": \"Reasoned summary.\"
+    "score": "Integer 0-5 or 'N/A'",
+    "auditor_notes": "Structured summary of coverage across sub-requirements.",
+    "rationale": "High-level justification for the overall score."
 }}
 """
 
@@ -92,6 +120,14 @@ rag_params = params.get("rag", {})
 
 RequirementScore = Union[int, str] # Score can be an integer from 0 to 5, or "N/A" if not applicable or if parsing fails
 
+class SubRequirementReport(BaseModel):
+    Reference: str
+    Source: str
+    Score: RequirementScore
+    Rationale: str
+    Auditor_Notes: str
+    Contexts: List[str]
+
 class RequirementReport(BaseModel):
     Requirement_ID: str
     Requirement_Category: str
@@ -101,7 +137,7 @@ class RequirementReport(BaseModel):
     Auditor_Notes: str
     Prompt: str  # aggregation prompt used for this requirement
     Context: Optional[List[str]] = None # We can include the providex doc context for debug steps
-    
+    SubRequirements: List[SubRequirementReport] = []
 
 
 class AuditResponse(BaseModel):
@@ -278,7 +314,8 @@ def evaluate_requirement(
             Score=0,
             Auditor_Notes="Failed to retrieve regulatory chunks from Qdrant.",
             Prompt="",
-            Context=None
+            Context=None,
+            SubRequirements=[]
         )
 
     # 2. Select relevant document chunks by querying Qdrant with the requirement chunks as queries. This retrieves the most relevant parts of the document that pertain to the requirement being evaluated.
@@ -291,7 +328,8 @@ def evaluate_requirement(
 
     
     # We pass the list of regulatory chunks (with their embeddings) to query Qdrant and retrieve the most relevant document chunks for that requirement. The retrieved chunks are grouped by the regulatory chunk they are relevant to, which allows us to maintain the mapping between the regulatory context and the evidence in the document.
-    top_doc_chunks_by_group = _query_qdrant_for_requirement(doc_client, temp_collection, req_chunks_embeddings, top_k=pre_rerank_top_k)
+    # Pass embedding_model explicitly to allow re-embedding of cleaned text
+    top_doc_chunks_by_group = _query_qdrant_for_requirement(doc_client, temp_collection, req_chunks_embeddings, embedding_model=embedding_model, top_k=pre_rerank_top_k)
 
     # e.g Data Governance requirement has 3 regulatory chunks (e.g. 3 AI Act articles), for each of them we query Qdrant and we obtain a list of the most relevant document chunks for each regulatory chunk, so we have a mapping like this:
     # {
@@ -339,6 +377,8 @@ def evaluate_requirement(
 
     # New logic: multi-prompt evaluation for each sub-requirement
     sub_results = []
+    sub_reports = [] # For structured reporting
+
     for reg_chunk in req_chunks_embeddings:
         reference = reg_chunk.get("reference", "")
         content = reg_chunk.get("content", "")
@@ -395,6 +435,7 @@ def evaluate_requirement(
             # Fallback: include all document chunks
             for cid, data in unique_chunks.items():
                 ragas_contexts.append(f"[DOCUMENT] {data['content']}")
+
         sub_results.append({
             "reference": reference,
             "source": reg_chunk.get("source", ""),
@@ -405,6 +446,15 @@ def evaluate_requirement(
             "score": result.get("score", "N/A"),
             "rationale": result.get("rationale", "")
         })
+
+        sub_reports.append(SubRequirementReport(
+            Reference=reference,
+            Source=reg_chunk.get("source", ""),
+            Score=result.get("score", "N/A"),
+            Rationale=result.get("rationale", ""),
+            Auditor_Notes=result.get("auditor_notes", ""),
+            Contexts=ragas_contexts
+        ))
 
     # Final prompt: aggregate sub-requirement results using global template function
     agg_prompt = get_aggregate_prompt(sub_results)
@@ -426,6 +476,7 @@ def evaluate_requirement(
         Rationale=agg_result.get("rationale", ""),
         Prompt=agg_prompt,
         Context=context_strings,
+        SubRequirements=sub_reports
     )
 
 
@@ -581,7 +632,7 @@ def _embed_chunks(chunks: List[str], model: SentenceTransformer):
     return model.encode(chunks, convert_to_numpy=True, show_progress_bar=False)
 
 
-def _query_qdrant_for_requirement(doc_client: QdrantClient, doc_collection: str, req_chunks_embeddings: List[dict], top_k: int = 4):
+def _query_qdrant_for_requirement(doc_client: QdrantClient, doc_collection: str, req_chunks_embeddings: List[dict], embedding_model: Optional[SentenceTransformer] = None, top_k: int = 4):
     
     from collections import defaultdict
     group_to_chunks = defaultdict(list)
@@ -611,9 +662,9 @@ def _query_qdrant_for_requirement(doc_client: QdrantClient, doc_collection: str,
             query_text = reference_clean if reference_clean else req.get('reference', '')
             if content_clean:
                 query_text += " " + content_clean
-            # Re-embed cleaned query text
-            if hasattr(doc_client, 'embedding_model'):
-                req_emb = doc_client.embedding_model.encode([query_text])[0]
+            # Re-embed cleaned query text if embedding_model is provided
+            if embedding_model:
+                req_emb = embedding_model.encode([query_text])[0]
             else:
                 # Fallback: use original embedding
                 req_emb = req['embedding']
