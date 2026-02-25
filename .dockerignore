@@ -1,0 +1,43 @@
+# Escludi file di sistema e cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Escludi file IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Escludi file OS
+.DS_Store
+Thumbs.db
+
+# SECURITY: EXCLUDE KEYS AND SECRETS
+.env
+dagshub_token.txt
+*.log
+
+# Exclude data, models, output, DVC, git, etc.
+data/
+models/
+mlruns/
+mlartifacts/
+.dvc/
+.git/
+*.dvc
+*.gz
+*.zip
+*.tar
+*.tar.gz
+*.ipynb
+output/
+tmp/
+logs/
+notebooks/

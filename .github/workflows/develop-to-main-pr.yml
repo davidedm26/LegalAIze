@@ -1,0 +1,106 @@
+# This workflow runs checks on pull requests from develop to main, ensuring that only well-tested and linted code is merged into the main branch. It measures metrics with the evaluation pipeline and logs results to MLflow and checks if they meet the expected thresholds before allowing the merge.
+
+name: Develop → Main PR Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+  #push:
+    #branches:
+      #- feat/** # Added for testing, to be removed afterwards
+
+permissions:
+  contents: read 
+  issues: write
+
+env:
+  PYTHON_VERSION: '3.11'
+  THRESHOLD_MAE: "1.0"               # adjust to desired max MAE
+  THRESHOLD_GROUNDEDNESS: "0.5"      # adjust to desired min groundedness
+  THRESHOLD_FAITHFULNESS: "0.5"      # adjust to desired min faithfulness
+  THRESHOLD_NOTE_SIMILARITY: "0.35"  # adjust to desired min note similarity
+  THRESHOLD_ANSWER_RELEVANCY: "0.5"  # adjust to desired min answer relevancy
+  THRESHOLD_CORRECTNESS: "0.5"       # adjust to desired min correctness
+
+jobs:
+  release-checks:
+    name: Release Gate
+    # Only run this job if the PR is from develop to main
+    if: github.head_ref == 'develop' 
+    runs-on: ubuntu-latest
+
+    steps:
+      # Download the code
+      - uses: actions/checkout@v4
+
+      # Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      # Try to restore pip cache
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # Install dependencies if cache is not hit
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8 pytest
+      
+      # Lint the codebase with flake8
+      - name: Lint with flake8
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Configure DVC remote (read-only)
+        env:
+          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          dvc remote list | grep -q '^origin' || dvc remote add -d origin https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/${{ github.event.repository.name }}.dvc
+          dvc remote default origin
+          dvc remote modify origin --local auth basic
+          dvc remote modify origin --local user ${{ secrets.DAGSHUB_USERNAME }}
+          dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
+
+      - name: Pull data from DVC
+        run: dvc pull
+
+      - name: Run evaluation (no writes)
+        env:
+          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+        run: |
+          python evaluate_rag.py
+
+      - name: Check metric thresholds
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          THRESHOLD_MAE: ${{ env.THRESHOLD_MAE }}
+          THRESHOLD_GROUNDEDNESS: ${{ env.THRESHOLD_GROUNDEDNESS }}
+          THRESHOLD_FAITHFULNESS: ${{ env.THRESHOLD_FAITHFULNESS }}
+          THRESHOLD_NOTE_SIMILARITY: ${{ env.THRESHOLD_NOTE_SIMILARITY }}
+          THRESHOLD_ANSWER_RELEVANCY: ${{ env.THRESHOLD_ANSWER_RELEVANCY }}
+          THRESHOLD_CORRECTNESS: ${{ env.THRESHOLD_CORRECTNESS }}
+        run: |
+          python .github/scripts/check_and_issue.py "develop-to-main-pr"
+
+      - name: Upload evaluation metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: rag-eval-metrics
+          path: metrics/rag_eval.json

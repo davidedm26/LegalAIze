@@ -1,0 +1,162 @@
+schema: '2.0'
+stages:
+  ingest:
+    cmd:
+    - python ingestion/data_ingestion.py
+    deps:
+    - path: data/mapping.json
+      hash: md5
+      md5: ca560cb920ae54ed03e552adfb1fb06f
+      size: 6054
+    - path: data/raw_data/
+      hash: md5
+      md5: f941a48344d6b4813c536e7eeb258564.dir
+      size: 3911604
+      nfiles: 4
+    - path: ingestion/
+      hash: md5
+      md5: d0f9f210b9bbfc8d4073c63f1840ac33.dir
+      size: 42672
+      nfiles: 5
+    params:
+      params.yaml:
+        ingestion:
+          chunk_size: 1000
+          chunk_overlap: 150
+          data_dir: data/
+          processed_data_dir: data/processed
+    outs:
+    - path: data/processed/ai_act_parsed.json
+      hash: md5
+      md5: 99d76fc87f440d9d30e0f0f5240983b0
+      size: 615187
+    - path: data/processed/iso_parsed.json
+      hash: md5
+      md5: 83d3401d4853dd15a401551c2bdb75de
+      size: 97874
+    - path: data/processed/requirement_chunks.json
+      hash: md5
+      md5: 16b6d0d3c497bcc8e45c091ea69260af
+      size: 121766
+  vectorize:
+    cmd: python vectorize_data.py
+    deps:
+    - path: data/processed/requirement_chunks.json
+      hash: md5
+      md5: 16b6d0d3c497bcc8e45c091ea69260af
+      size: 121766
+    - path: vectorize_data.py
+      hash: md5
+      md5: 1a20e218449ca0e8451247d73de33920
+      size: 8127
+    params:
+      params.yaml:
+        vectorization:
+          model_name: all-MiniLM-L6-v2
+          collection_name: legal_docs
+          vector_index_path: data/processed/vector_index
+    outs:
+    - path: data/processed/vector_index
+      hash: md5
+      md5: f7867f184b501f88194ec9f9d0f2c501.dir
+      size: 406061
+      nfiles: 4
+  precompute_rag:
+    cmd: python precompute_rag.py
+    deps:
+    - path: data/mapping.json
+      hash: md5
+      md5: 69351bcd3ca7db431ca50d43bd2a6820
+      size: 13552
+    - path: data/processed/vector_index
+      hash: md5
+      md5: 6db0afb58a5ec62ad39b9f5431925851.dir
+      size: 4678190
+      nfiles: 4
+    - path: precompute_rag.py
+      hash: md5
+      md5: f35371c1af7262b79650b6d679fd06de
+      size: 7124
+    params:
+      params.yaml:
+        ingestion:
+          chunk_size: 1000
+          chunk_overlap: 150
+          raw_data_dir: data/raw_data
+          processed_data_dir: data/processed
+        vectorization:
+          model_name: all-MiniLM-L6-v2
+          collection_name: legal_docs
+          vector_index_path: data/processed/vector_index
+    outs:
+    - path: data/processed/requirement_chunks.json
+      hash: md5
+      md5: 26696b751ddbf98000d396e6a7383ac7
+      size: 96634
+  evaluate_rag:
+    cmd: python evaluate_rag.py
+    deps:
+    - path: backend/rag_engine.py
+      hash: md5
+      md5: 3da7169654b878e85e7e933617012b3c
+      size: 26013
+    - path: data/ground_truth
+      hash: md5
+      md5: c1562a57843be1eb01429eec95014c3b.dir
+      size: 7448160
+      nfiles: 13
+    - path: data/processed/requirement_chunks.json
+      hash: md5
+      md5: 16b6d0d3c497bcc8e45c091ea69260af
+      size: 121766
+    - path: evaluate_rag.py
+      hash: md5
+      md5: e49e6d596cc5ed58544c3718b2488d44
+      size: 18024
+    - path: evaluation/
+      hash: md5
+      md5: e7f0745952a56339d84b755753a1a377.dir
+      size: 55642
+      nfiles: 13
+    params:
+      params.yaml:
+        evaluation:
+          llm_model: gpt-4o-mini
+          llm_temperature: 0.0
+          mlflow_experiment: rag_evaluation
+          case_selector: []
+          ground_truth:
+          - name: Evaluation1
+            document_path: 
+              data/ground_truth/raw_data/Evaluation1/documentation.txt
+            report_path: data/ground_truth/raw_data/Evaluation1/report.CSV
+          - name: Evaluation2
+            document_path: 
+              data/ground_truth/raw_data/Evaluation2/documentation.txt
+            report_path: data/ground_truth/raw_data/Evaluation2/report.CSV
+          - name: Evaluation3
+            document_path: 
+              data/ground_truth/raw_data/Evaluation3/documentation.txt
+            report_path: data/ground_truth/raw_data/Evaluation3/report.CSV
+          - name: Evaluation4
+            document_path: 
+              data/ground_truth/raw_data/Evaluation4/documentation.txt
+            report_path: data/ground_truth/raw_data/Evaluation4/report.CSV
+          - name: Evaluation5
+            document_path: 
+              data/ground_truth/raw_data/Evaluation5/documentation.pdf
+          - name: Gullon
+            document_path: data/ground_truth/raw_data/Gullon/documentation.pdf
+          - name: Prysmian
+            document_path: data/ground_truth/raw_data/Prysmian/documentation.pdf
+        rag:
+          document_chunk_size: 1100
+          document_chunk_overlap: 110
+          pre_rerank_top_k: 1
+          llm_model: gpt-4o-mini
+          llm_temperature: 0.0
+    outs:
+    - path: metrics/rag_eval.json
+      hash: md5
+      md5: d6e5319e90d3b6c4bfbbdeb515490e37
+      size: 21310

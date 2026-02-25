@@ -1,0 +1,69 @@
+name: Daily Evaluation & Alert
+
+on:
+  schedule:
+    - cron: '30 11 * * *'  
+  workflow_dispatch:
+
+permissions:
+  issues: write 
+
+env:
+  PYTHON_VERSION: '3.11'
+  THRESHOLD_MAE: "1.0"
+  THRESHOLD_GROUNDEDNESS: "0.5"
+  THRESHOLD_FAITHFULNESS: "0.5"
+  THRESHOLD_NOTE_SIMILARITY: "0.35"
+  THRESHOLD_ANSWER_RELEVANCY: "0.5"
+  THRESHOLD_CORRECTNESS: "0.5"
+
+jobs:
+  daily-eval:
+    runs-on: ubuntu-latest
+  
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install PyGitHub
+      
+      - name: Configure DVC remote (read-only)
+        env:
+          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          dvc remote list | grep -q '^origin' || dvc remote add -d origin https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/${{ github.event.repository.name }}.dvc
+          dvc remote default origin
+          dvc remote modify origin --local auth basic
+          dvc remote modify origin --local user ${{ secrets.DAGSHUB_USERNAME }}
+          dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
+
+      - name: Pull data from DVC
+        run: dvc pull
+
+      - name: Run evaluation
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python evaluate_rag.py
+
+      - name: Check metric thresholds and open issue if needed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          THRESHOLD_MAE: ${{ env.THRESHOLD_MAE }}
+          THRESHOLD_GROUNDEDNESS: ${{ env.THRESHOLD_GROUNDEDNESS }}
+          THRESHOLD_FAITHFULNESS: ${{ env.THRESHOLD_FAITHFULNESS }}
+          THRESHOLD_NOTE_SIMILARITY: ${{ env.THRESHOLD_NOTE_SIMILARITY }}
+          THRESHOLD_ANSWER_RELEVANCY: ${{ env.THRESHOLD_ANSWER_RELEVANCY }}
+          THRESHOLD_CORRECTNESS: ${{ env.THRESHOLD_CORRECTNESS }}
+        run: |
+          python .github/scripts/check_and_issue.py "daily check"

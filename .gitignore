@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+backend/backend_venv/
+frontend/frontend_venv/
+ENV/
+.venv
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# DVC
+/data/*.csv
+/data/*.pdf
+.dvc/config.local
+.dvc/tmp
+
+/models/*.pkl
+.dvc/cache
+
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+
+# Docker
+*.log
+
+# Token
+dagshub_token.txt
+
+backend/debug_responses/
+
+# Data
+data/mapping.json
+data/qdrant_storage/
+data/ground_truth/raw_data/**
+data/unused/**
+data/raw_data/*.pdf
+data/raw_data/*.html
+data/processed/*
+data/debug/*
+
+
+# Metrics
+metrics/**
