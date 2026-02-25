@@ -98,8 +98,8 @@ stages:
     deps:
     - path: backend/rag_engine.py
       hash: md5
-      md5: 9bd4d9cdc74b19329d2bef5125189ab9
-      size: 25989
+      md5: 3da7169654b878e85e7e933617012b3c
+      size: 26013
     - path: data/ground_truth
       hash: md5
       md5: c1562a57843be1eb01429eec95014c3b.dir
@@ -111,8 +111,8 @@ stages:
       size: 121766
     - path: evaluate_rag.py
       hash: md5
-      md5: 57fc8276fa1eca300cf4ab5f4b549c43
-      size: 18268
+      md5: e49e6d596cc5ed58544c3718b2488d44
+      size: 18024
     - path: evaluation/
       hash: md5
       md5: e7f0745952a56339d84b755753a1a377.dir
@@ -124,8 +124,7 @@ stages:
           llm_model: gpt-4o-mini
           llm_temperature: 0.0
           mlflow_experiment: rag_evaluation
-          case_selector:
-          - 7
+          case_selector: []
           ground_truth:
           - name: Evaluation1
             document_path: 
@@ -159,5 +158,5 @@ stages:
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: b97858afbf4f15ce9142f65205491764
-      size: 3392
+      md5: d6e5319e90d3b6c4bfbbdeb515490e37
+      size: 21310
