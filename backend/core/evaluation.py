@@ -70,7 +70,9 @@ Respond in JSON format:
         """
         prompt = self._get_sub_prompt(main_req_name, sub_req_name, source, regulatory_reference, associated_chunks)
         # Create a detailed RAGAS question aligned with the actual evaluation task to improve Relevancy
-        ragas_question = f"Analyze the compliance coverage for the '{main_req_name}' requirement's sub-requirement '{sub_req_name}' ({source}). What evidence does the document provide, and how does it address this regulatory requirement?"
+        
+        ragas_question = f"What is the detailed rationale and summary of compliance for the '{main_req_name}' sub-requirement '{sub_req_name}' ({source})?"
+
         response = self.llm.invoke(prompt).content.strip()
         try:
             cleaned = response.replace("```json", "").replace("```", "").strip()

@@ -115,8 +115,8 @@ stages:
       size: 19636
     - path: evaluation/
       hash: md5
-      md5: 461d68f9f945de2974ce81ded3f526bc.dir
-      size: 60635
+      md5: aee70493c850773d2750367bfd5e1e36.dir
+      size: 60493
       nfiles: 13
     params:
       params.yaml:
@@ -163,5 +163,5 @@ stages:
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: 2d8ac1023f47ee14f159c44b46c19212
+      md5: f17679efebbb631b49b0e8586eb77bda
       size: 2389
