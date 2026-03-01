@@ -21,11 +21,12 @@ DOCUMENT CHUNKS:
 INSTRUCTIONS:
 1. Analyze the chunks carefully. Look for explicit mentions or implicit evidence that addresses the sub-requirement.
 2. Be critical. If the chunks mention the topic but do not satisfy the specific requirement, note it.
-3. If no relevant information is found in the chunks, score as 0 and state "No evidence found".
+3. You MUST include direct quotes from the DOCUMENT CHUNKS in your rationale to prove your findings.
+4. If no relevant information is found in the chunks, score as 0 and state "No evidence found" in the rationale.
 
 Respond in JSON format:
 {{
-    "rationale": "Detailed explanation of findings.",
+    "rationale": "Detailed explanation of findings containing direct quotes from the text.",
     "score": "Integer 0-5 (0=No evidence, 5=Fully compliant) or 'N/A'",
     "auditor_notes": "Concise summary for the final report."
 }}
@@ -67,12 +68,15 @@ Respond in JSON format:
         Evaluates a single sub-requirement using the LLM.
         """
         prompt = self._get_sub_prompt(sub_req_name, regulatory_reference, associated_chunks)
+        ragas_question = f"Does the document provide evidence of compliance for the requirement '{sub_req_name}' which states: '{regulatory_reference}'?"
         response = self.llm.invoke(prompt).content.strip()
         try:
             cleaned = response.replace("```json", "").replace("```", "").strip()
             result = json.loads(cleaned)
         except Exception:
             result = {"score": "N/A", "rationale": "Parsing failed", "auditor_notes": response}
+
+        result["ragas_question"] = ragas_question
         return result
 
     def aggregate_results(self, sub_results: List[Dict[str, Any]]) -> Dict[str, Any]:

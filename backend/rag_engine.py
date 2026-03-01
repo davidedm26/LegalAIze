@@ -357,11 +357,15 @@ def evaluate_requirement(
                 ragas_contexts.append(f"[DOCUMENT] {data['content']}")
 
         # We need to reconstruct the result dict expected by aggregate_results
+        # Combine rationale and notes for RAGAS evaluation to improve groundedness
+        combined_answer = f"{result.get('rationale', '')}\n\nSummary: {result.get('auditor_notes', '')}"
+
         sub_results.append({
             "reference": reference,
             "source": reg_chunk.get("source", ""),
             "prompt": evaluator._get_sub_prompt(reference, content, relevant_chunks), # Re-generating prompt just for logging? Ideally EvaluationEngine returns it.
-            "answer": result.get("auditor_notes", ""),
+            "ragas_question": result.get("ragas_question", ""),
+            "answer": combined_answer,
             "contexts": ragas_contexts,
             "score": result.get("score", "N/A"),
             "rationale": result.get("rationale", "")
