@@ -125,10 +125,10 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]], embedding_model=None) -
 
         ragas_dataset = Dataset.from_list([
             {
-                "question": sample['question'],  # Use the question directly without redundant prefix
-                "answer": sample["answer"],
-                "contexts": sample["contexts"],
-                "ground_truth": sample.get("ground_truth", ""),
+                "user_input": sample['question'],  # Use the question directly without redundant prefix
+                "response": sample["answer"],
+                "retrieved_contexts": sample["contexts"],
+                "reference": sample.get("ground_truth", ""),
             }
             for sample in samples
         ])

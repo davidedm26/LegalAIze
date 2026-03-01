@@ -51,7 +51,7 @@ def evaluate_single_case(
         for sub in sub_reqs:
             # Use rationale for both faithfulness and relevancy
             # The rationale provides detailed, grounded analysis
-            combined_answer = sub.get('Rationale', '')
+            combined_answer = f"Rationale: {sub.get('Rationale', '')}\n\nSummary: {sub.get('Auditor_Notes', '')}"
 
             # The prompt/question logic needs to be reconstructed or we rely on contexts
             # Since we didn't save the explicit ragas_question in SubRequirementReport,
@@ -61,7 +61,7 @@ def evaluate_single_case(
             source = sub.get("Source", "")
 
             # Question format that matches analytical response style
-            ragas_question = f"What is the compliance status of sub-requirement '{sub_name}' from {source}?"
+            ragas_question = f"Is the document compliant with sub-requirement '{sub_name}' from {source}?"
 
 
             contexts = sub.get("Contexts", [])
@@ -180,7 +180,7 @@ def evaluate_single_case(
             requirement_name = pred.get("Requirement_Name") or gt_row.get("Requirement_Name")
             title = requirement_name 
             # Only use title and id, no metadata
-            question_text = f"Is the provided document compliant with the requirement '{title}', according with the provided regulatory chunks from UE AI ACT and ISO standard 42001:2023?"
+            question_text = f"Is the document compliant with the requirement '{title}'?"
 
             # Context is made up by the whole chunks extracted from the Document under Test for the particular requirement. This is the same context that the RAG engine used to produce the prediction, so it allows us to evaluate groundedness in a way that is consistent with the actual information available to the model at inference time.
             # We can reuse the already built context, passing it as a parameter to this function.
@@ -203,7 +203,7 @@ def evaluate_single_case(
             requirement_id = pred.get("Requirement_ID") or "Unknown requirement"
             requirement_name = pred.get("Requirement_Name")
             title = requirement_name or ""
-            question_text = f"Is the provided document compliant with the requirement '{title}', according with the provided regulatory chunks from UE AI ACT and ISO standard 42001:2023?"
+            question_text = f"Is the document compliant with the requirement '{title}'?"
             
             auditor_notes = pred.get("Auditor_Notes") or pred.get("auditor_notes")
             #rationale = pred.get("Rationale") or pred.get("rationale")
