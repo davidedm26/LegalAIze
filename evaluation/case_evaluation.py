@@ -58,7 +58,7 @@ def evaluate_single_case(
             sub_name = sub.get("Reference", "")
             source = sub.get("Source", "")
 
-            ragas_question = f"Does the document provide evidence of compliance for the '{req_name}' sub-requirement '{sub_name}' ({source})?"
+            ragas_question = f"What is the detailed rationale and summary of compliance for the '{req_name}' sub-requirement '{sub_name}' ({source})?"
 
             contexts = sub.get("Contexts", [])
 

@@ -110,7 +110,7 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]]) -> Dict[str, Optional[f
 
         ragas_dataset = Dataset.from_list([
             {
-                "question": f"Evaluate compliance for: {sample['question']}",
+                "question": sample["question"],
                 "answer": sample["answer"],
                 "contexts": sample["contexts"],
                 "ground_truth": sample.get("ground_truth", ""),

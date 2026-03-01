@@ -69,7 +69,7 @@ Respond in JSON format:
         """
         prompt = self._get_sub_prompt(main_req_name, sub_req_name, source, regulatory_reference, associated_chunks)
         # Simplify the RAGAS question to avoid redundancy and improve semantic matching (Relevancy)
-        ragas_question = f"Does the document provide evidence of compliance for the '{main_req_name}' sub-requirement '{sub_req_name}' ({source})?"
+        ragas_question = f"What is the detailed rationale and summary of compliance for the '{main_req_name}' sub-requirement '{sub_req_name}' ({source})?"
         response = self.llm.invoke(prompt).content.strip()
         try:
             cleaned = response.replace("```json", "").replace("```", "").strip()
