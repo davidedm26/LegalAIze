@@ -38,7 +38,7 @@ Respond in JSON format:
             simplified_results.append({
                 "reference": res.get("reference"),
                 "score": res.get("score"),
-                "auditor_notes": res.get("answer") # referencing the sub-result auditor_notes
+                "auditor_notes": res.get("auditor_notes", res.get("answer", "")) # Use concise auditor_notes
             })
 
         return f"""

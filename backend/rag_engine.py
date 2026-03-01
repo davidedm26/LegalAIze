@@ -366,7 +366,8 @@ def evaluate_requirement(
             "source": reg_chunk.get("source", ""),
             "prompt": evaluator._get_sub_prompt(requirement_name, reference, content, relevant_chunks), # Re-generating prompt just for logging
             "ragas_question": result.get("ragas_question", ""),
-            "answer": combined_answer,
+            "answer": combined_answer, # For RAGAS evaluation
+            "auditor_notes": result.get("auditor_notes", ""), # For aggregation prompt
             "contexts": ragas_contexts,
             "score": result.get("score", "N/A"),
             "rationale": result.get("rationale", "")
