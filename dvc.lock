@@ -98,8 +98,8 @@ stages:
     deps:
     - path: backend/rag_engine.py
       hash: md5
-      md5: 2b974013413dc0e9d2631911e19e401f
-      size: 23979
+      md5: f23451d4e9544675c49a90b9565f2724
+      size: 28812
     - path: data/ground_truth
       hash: md5
       md5: c8e46fa325205701cebd86ce733a0d86.dir
@@ -111,12 +111,12 @@ stages:
       size: 121766
     - path: evaluate_rag.py
       hash: md5
-      md5: aab8ac59f7703d582c17319a961c532d
-      size: 19636
+      md5: 5d0e49e8e4b85e914c60d21473a01bd8
+      size: 18932
     - path: evaluation/
       hash: md5
-      md5: 461d68f9f945de2974ce81ded3f526bc.dir
-      size: 60635
+      md5: ff69962b09bdd5fe61362beec98b907d.dir
+      size: 58810
       nfiles: 13
     params:
       params.yaml:
@@ -125,8 +125,7 @@ stages:
           llm_temperature: 0.0
           mlflow_experiment: rag_evaluation
           case_selector:
-          - 2
-          requirement_limit: 2
+          - 8
           ground_truth:
           - name: Evaluation1
             document_path: 
@@ -155,13 +154,13 @@ stages:
             document_path: 
               data/ground_truth/raw_data/Evaluation8/documentation.txt
         rag:
-          document_chunk_size: 300
-          document_chunk_overlap: 50
+          document_chunk_size: 500
+          document_chunk_overlap: 110
           pre_rerank_top_k: 3
           llm_model: gpt-4o-mini
           llm_temperature: 0.0
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: 2d8ac1023f47ee14f159c44b46c19212
-      size: 2389
+      md5: 40e579d9889d16cfa32fdd6e0f4727ad
+      size: 1743

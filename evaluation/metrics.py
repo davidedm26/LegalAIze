@@ -110,7 +110,7 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]]) -> Dict[str, Optional[f
 
         ragas_dataset = Dataset.from_list([
             {
-                "question": sample['question'],  # Use the question directly without redundant prefix
+                "question": f"Evaluate compliance for: {sample['question']}",
                 "answer": sample["answer"],
                 "contexts": sample["contexts"],
                 "ground_truth": sample.get("ground_truth", ""),
@@ -119,21 +119,19 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]]) -> Dict[str, Optional[f
         ])
         ragas_result = ragas_evaluate(
             dataset=ragas_dataset,
-            metrics=[Faithfulness(), AnswerRelevancy()],  # Temporarily disabled: ResponseGroundedness(), AnswerCorrectness()
+            metrics=[ResponseGroundedness(), Faithfulness(), AnswerRelevancy(), AnswerCorrectness()],
             llm=llm,
         )
         df = ragas_result.to_pandas()
-        # Groundedness temporarily disabled
-        groundedness = None
-        # # Extract groundedness
-        # if 'nv_response_groundedness' in df.columns:
-        #     groundedness = float(df['nv_response_groundedness'].mean())
-        # elif 'response_groundedness' in df.columns:
-        #     groundedness = float(df['response_groundedness'].mean())
-        # elif 'groundedness' in df.columns:
-        #     groundedness = float(df['groundedness'].mean())
-        # else:
-        #     groundedness = None
+        # Extract groundedness
+        if 'nv_response_groundedness' in df.columns:
+            groundedness = float(df['nv_response_groundedness'].mean())
+        elif 'response_groundedness' in df.columns:
+            groundedness = float(df['response_groundedness'].mean())
+        elif 'groundedness' in df.columns:
+            groundedness = float(df['groundedness'].mean())
+        else:
+            groundedness = None
         # Extract faithfulness
         if "nv_response_faithfulness" in df.columns:
             faithfulness = float(df["nv_response_faithfulness"].mean())
@@ -152,17 +150,15 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]]) -> Dict[str, Optional[f
             relevancy = float(df["answer_relevancy"].mean())
         else:
             relevancy = None
-        # Correctness temporarily disabled
-        correctness = None
-        # # Extract correctness
-        # if "nv_response_answer_correctness" in df.columns:
-        #     correctness = float(df["nv_response_answer_correctness"].mean())
-        # elif "response_answer_correctness" in df.columns:
-        #     correctness = float(df["response_answer_correctness"].mean())
-        # elif "answer_correctness" in df.columns:
-        #     correctness = float(df["answer_correctness"].mean())
-        # else:
-        #     correctness = None
+        # Extract correctness
+        if "nv_response_answer_correctness" in df.columns:
+            correctness = float(df["nv_response_answer_correctness"].mean())
+        elif "response_answer_correctness" in df.columns:
+            correctness = float(df["response_answer_correctness"].mean())
+        elif "answer_correctness" in df.columns:
+            correctness = float(df["answer_correctness"].mean())
+        else:
+            correctness = None
         return {"groundedness": groundedness, "faithfulness": faithfulness, "relevancy": relevancy, "correctness": correctness}
     except Exception as e:
         print(f"⚠ Failed to compute RAGAS metrics: {e}")
