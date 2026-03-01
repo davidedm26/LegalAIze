@@ -172,7 +172,7 @@ def main() -> None:
 
                     # Access private methods or use a public method to get template if available
                     # Since methods are semi-private (_get_sub_prompt), we access them for logging purposes
-                    sub_prompt_template = rag_engine.evaluation_engine._get_sub_prompt(example_reference, example_content, example_chunks)
+                    sub_prompt_template = rag_engine.evaluation_engine._get_sub_prompt("EXAMPLE_MAIN_REQ", example_reference, example_content, example_chunks)
                     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix="_sub_prompt_template.txt", encoding="utf-8") as tf:
                         tf.write(sub_prompt_template)
                         tf.flush()

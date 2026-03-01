@@ -7,10 +7,10 @@ class EvaluationEngine:
     def __init__(self, llm: ChatOpenAI):
         self.llm = llm
 
-    def _get_sub_prompt(self, reference: str, content: str, relevant_chunks: List[str]) -> str:
+    def _get_sub_prompt(self, main_req_name: str, reference: str, content: str, relevant_chunks: List[str]) -> str:
         return f"""
 You are an expert AI auditor specializing in EU AI Act and ISO 42001 compliance.
-Your task is to assess whether the provided document chunks demonstrate specific coverage of the following sub-requirement.
+Your task is to assess whether the provided document chunks demonstrate coverage of a specific sub-requirement, which is part of the broader requirement: '{main_req_name}'.
 
 SUB-REQUIREMENT: {reference}
 REGULATORY CONTEXT: {content}
@@ -19,14 +19,14 @@ DOCUMENT CHUNKS:
 {chr(10).join(relevant_chunks)}
 
 INSTRUCTIONS:
-1. Analyze the chunks carefully. Look for explicit mentions or implicit evidence that addresses the sub-requirement.
-2. Be critical. If the chunks mention the topic but do not satisfy the specific requirement, note it.
-3. You MUST include direct quotes from the DOCUMENT CHUNKS in your rationale to prove your findings.
-4. If no relevant information is found in the chunks, score as 0 and state "No evidence found" in the rationale.
+1. Analyze the chunks carefully. Look for ANY explicit mentions OR implicit evidence that addresses the regulatory context.
+2. Be objective. If the chunks provide partial or related evidence, explain how it relates to the requirement rather than just saying "no evidence".
+3. Support your reasoning by referencing specific parts of the text (e.g., "The document states that...").
+4. Only score as 0 if the chunks are completely irrelevant to the regulatory context.
 
 Respond in JSON format:
 {{
-    "rationale": "Detailed explanation of findings containing direct quotes from the text.",
+    "rationale": "Detailed explanation of findings referencing the provided text.",
     "score": "Integer 0-5 (0=No evidence, 5=Fully compliant) or 'N/A'",
     "auditor_notes": "Concise summary for the final report."
 }}
@@ -63,12 +63,13 @@ Respond in JSON format:
 }}
 """
 
-    def evaluate_sub_requirement(self, sub_req_name: str, regulatory_reference: str, associated_chunks: List[str]) -> Dict[str, Any]:
+    def evaluate_sub_requirement(self, main_req_name: str, sub_req_name: str, regulatory_reference: str, associated_chunks: List[str]) -> Dict[str, Any]:
         """
         Evaluates a single sub-requirement using the LLM.
         """
-        prompt = self._get_sub_prompt(sub_req_name, regulatory_reference, associated_chunks)
-        ragas_question = f"Does the document provide evidence of compliance for the requirement '{sub_req_name}' which states: '{regulatory_reference}'?"
+        prompt = self._get_sub_prompt(main_req_name, sub_req_name, regulatory_reference, associated_chunks)
+        # Simplify the RAGAS question to avoid redundancy and improve semantic matching (Relevancy)
+        ragas_question = f"Does the document provide evidence of compliance for the '{main_req_name}' sub-requirement '{sub_req_name}'?"
         response = self.llm.invoke(prompt).content.strip()
         try:
             cleaned = response.replace("```json", "").replace("```", "").strip()

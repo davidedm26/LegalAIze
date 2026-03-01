@@ -326,6 +326,7 @@ def evaluate_requirement(
         # def evaluate_sub_requirement(self, sub_req_name: str, regulatory_reference: str, associated_chunks: List[str]) -> Dict[str, Any]:
 
         result = evaluator.evaluate_sub_requirement(
+            main_req_name=requirement_name,
             sub_req_name=reference,
             regulatory_reference=content,
             associated_chunks=relevant_chunks
@@ -363,7 +364,7 @@ def evaluate_requirement(
         sub_results.append({
             "reference": reference,
             "source": reg_chunk.get("source", ""),
-            "prompt": evaluator._get_sub_prompt(reference, content, relevant_chunks), # Re-generating prompt just for logging? Ideally EvaluationEngine returns it.
+            "prompt": evaluator._get_sub_prompt(requirement_name, reference, content, relevant_chunks), # Re-generating prompt just for logging
             "ragas_question": result.get("ragas_question", ""),
             "answer": combined_answer,
             "contexts": ragas_contexts,
