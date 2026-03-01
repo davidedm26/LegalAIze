@@ -7,12 +7,12 @@ class EvaluationEngine:
     def __init__(self, llm: ChatOpenAI):
         self.llm = llm
 
-    def _get_sub_prompt(self, main_req_name: str, reference: str, content: str, relevant_chunks: List[str]) -> str:
+    def _get_sub_prompt(self, main_req_name: str, reference: str, source: str, content: str, relevant_chunks: List[str]) -> str:
         return f"""
 You are an expert AI auditor specializing in EU AI Act and ISO 42001 compliance.
 Your task is to assess whether the provided document chunks demonstrate coverage of a specific sub-requirement, which is part of the broader requirement: '{main_req_name}'.
 
-SUB-REQUIREMENT: {reference}
+SUB-REQUIREMENT: {reference} ({source})
 REGULATORY CONTEXT: {content}
 
 DOCUMENT CHUNKS:
@@ -63,13 +63,13 @@ Respond in JSON format:
 }}
 """
 
-    def evaluate_sub_requirement(self, main_req_name: str, sub_req_name: str, regulatory_reference: str, associated_chunks: List[str]) -> Dict[str, Any]:
+    def evaluate_sub_requirement(self, main_req_name: str, sub_req_name: str, source: str, regulatory_reference: str, associated_chunks: List[str]) -> Dict[str, Any]:
         """
         Evaluates a single sub-requirement using the LLM.
         """
-        prompt = self._get_sub_prompt(main_req_name, sub_req_name, regulatory_reference, associated_chunks)
+        prompt = self._get_sub_prompt(main_req_name, sub_req_name, source, regulatory_reference, associated_chunks)
         # Simplify the RAGAS question to avoid redundancy and improve semantic matching (Relevancy)
-        ragas_question = f"Does the document provide evidence of compliance for the '{main_req_name}' sub-requirement '{sub_req_name}'?"
+        ragas_question = f"Does the document provide evidence of compliance for the '{main_req_name}' sub-requirement '{sub_req_name}' ({source})?"
         response = self.llm.invoke(prompt).content.strip()
         try:
             cleaned = response.replace("```json", "").replace("```", "").strip()

@@ -59,7 +59,6 @@ class RequirementReport(BaseModel):
     Rationale: Optional[str] = None
     Auditor_Notes: str
     Prompt: str  # aggregation prompt used for this requirement
-    Context: Optional[List[str]] = None # We can include the providex doc context for debug steps
     SubRequirements: List[SubRequirementReport] = []
 
 
@@ -328,6 +327,7 @@ def evaluate_requirement(
         result = evaluator.evaluate_sub_requirement(
             main_req_name=requirement_name,
             sub_req_name=reference,
+            source=reg_chunk.get("source", ""),
             regulatory_reference=content,
             associated_chunks=relevant_chunks
         )
@@ -364,7 +364,7 @@ def evaluate_requirement(
         sub_results.append({
             "reference": reference,
             "source": reg_chunk.get("source", ""),
-            "prompt": evaluator._get_sub_prompt(requirement_name, reference, content, relevant_chunks), # Re-generating prompt just for logging
+            "prompt": evaluator._get_sub_prompt(requirement_name, reference, reg_chunk.get("source", ""), content, relevant_chunks), # Re-generating prompt just for logging
             "ragas_question": result.get("ragas_question", ""),
             "answer": combined_answer, # For RAGAS evaluation
             "auditor_notes": result.get("auditor_notes", ""), # For aggregation prompt
@@ -385,9 +385,6 @@ def evaluate_requirement(
     # 4. Aggregate results
     agg_result = evaluator.aggregate_results(sub_results)
 
-    # Convert sub_results (list of dicts) to list of JSON strings for Pydantic validation (legacy field)
-    context_strings = [json.dumps(sr, ensure_ascii=False) for sr in sub_results]
-
     return RequirementReport(
         Requirement_ID=requirement_data.get("id", ""),
         Requirement_Category=requirement_data.get("ethicalPrinciple", "unknown"),
@@ -396,7 +393,6 @@ def evaluate_requirement(
         Auditor_Notes=agg_result.get("auditor_notes", ""),
         Rationale=agg_result.get("rationale", ""),
         Prompt=agg_result.get("prompt", ""),
-        Context=context_strings,
         SubRequirements=sub_reports
     )
 
