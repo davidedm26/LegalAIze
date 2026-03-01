@@ -49,8 +49,9 @@ def evaluate_single_case(
     for pred in predictions:
         sub_reqs = pred.get("SubRequirements") or []
         for sub in sub_reqs:
-            # Reconstruct the "answer" used for RAGAS (rationale + summary)
-            combined_answer = f"{sub.get('Rationale', '')}\n\nSummary: {sub.get('Auditor_Notes', '')}"
+            # Use rationale for both faithfulness and relevancy
+            # The rationale provides detailed, grounded analysis
+            combined_answer = sub.get('Rationale', '')
 
             # The prompt/question logic needs to be reconstructed or we rely on contexts
             # Since we didn't save the explicit ragas_question in SubRequirementReport,
@@ -59,8 +60,8 @@ def evaluate_single_case(
             sub_name = sub.get("Reference", "")
             source = sub.get("Source", "")
 
-            
-            ragas_question = f"What is the detailed rationale and summary of compliance for the '{req_name}' sub-requirement '{sub_name}' ({source})?"
+            # Question format that matches analytical response style
+            ragas_question = f"What is the compliance status of sub-requirement '{sub_name}' from {source}?"
 
 
             contexts = sub.get("Contexts", [])
@@ -228,7 +229,7 @@ def evaluate_single_case(
             if note_similarities
             else 0.0
         )
-        ragas_metrics = compute_ragas_metrics(sub_ragas_records)
+        ragas_metrics = compute_ragas_metrics(sub_ragas_records, embedding_model=embedding_model)
         case_groundedness_score = ragas_metrics.get("groundedness")
         case_faithfulness_score = ragas_metrics.get("faithfulness")
         case_relevancy_score = ragas_metrics.get("relevancy")
@@ -263,7 +264,7 @@ def evaluate_single_case(
         )
     else:
         # No Ground Truth available, we can only compute RAGAS metrics that do not require GT
-        ragas_metrics = compute_ragas_metrics(sub_ragas_records)
+        ragas_metrics = compute_ragas_metrics(sub_ragas_records, embedding_model=embedding_model)
         case_groundedness_score = ragas_metrics.get("groundedness")
         case_faithfulness_score = ragas_metrics.get("faithfulness")
         case_relevancy_score = ragas_metrics.get("relevancy")
