@@ -37,7 +37,6 @@ Respond in JSON format:
         for res in sub_results:
             simplified_results.append({
                 "reference": res.get("reference"),
-                "source": res.get("source"),
                 "score": res.get("score"),
                 "auditor_notes": res.get("auditor_notes", res.get("answer", "")) # Use concise auditor_notes
             })
@@ -53,7 +52,7 @@ Aggregate these findings into a final assessment for the main requirement.
 
 INSTRUCTIONS:
 1. The overall score should reflect the weakest links. If critical sub-requirements are missing, the score should be low.
-2. The 'auditor_notes' must be a structured summary listing the status of key sub-requirements (e.g., "Article 10 (EU_AI_ACT): Covered; B.3.2 (ISO_42001): Missing").
+2. The 'auditor_notes' must be a structured summary listing the status of key sub-requirements (e.g., "Article 10: Covered; Article 13: Missing").
 3. The 'rationale' should provide a high-level justification.
 
 Respond in JSON format:
@@ -69,8 +68,8 @@ Respond in JSON format:
         Evaluates a single sub-requirement using the LLM.
         """
         prompt = self._get_sub_prompt(main_req_name, sub_req_name, source, regulatory_reference, associated_chunks)
-        # Create a detailed RAGAS question aligned with the actual evaluation task to improve Relevancy
-        ragas_question = f"Analyze the compliance coverage for the '{main_req_name}' requirement's sub-requirement '{sub_req_name}' ({source}). What evidence does the document provide, and how does it address this regulatory requirement?"
+        # Simplify the RAGAS question to avoid redundancy and improve semantic matching (Relevancy)
+        ragas_question = f"Does the document provide evidence of compliance for the '{main_req_name}' sub-requirement '{sub_req_name}' ({source})?"
         response = self.llm.invoke(prompt).content.strip()
         try:
             cleaned = response.replace("```json", "").replace("```", "").strip()
@@ -79,7 +78,6 @@ Respond in JSON format:
             result = {"score": "N/A", "rationale": "Parsing failed", "auditor_notes": response}
 
         result["ragas_question"] = ragas_question
-        result["prompt"] = prompt  # Save prompt for logging
         return result
 
     def aggregate_results(self, sub_results: List[Dict[str, Any]]) -> Dict[str, Any]:

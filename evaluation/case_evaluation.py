@@ -21,7 +21,6 @@ def evaluate_single_case(
     case_artifact_dir: Optional[str] = None,
     embedding_model=None,
     ground_truth: bool = False,
-    requirement_limit: Optional[int] = None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """Evaluate one ground-truth/report pair using the local RAG engine."""
     try:
@@ -38,7 +37,7 @@ def evaluate_single_case(
     if rag_engine is None:
         raise RuntimeError("backend.rag_engine is not available. Run evaluate_rag from the project root.")
 
-    audit_response  = rag_engine.audit_document(document_text, requirement_limit=requirement_limit) # Get predictions (list of RequirementReport objects) from the RAG engine for this document
+    audit_response  = rag_engine.audit_document(document_text, requirement_limit=5) # Get predictions (list of RequirementReport objects) from the RAG engine for this document
 
 
     # Include the prompt in logged artifacts for downstream analysis and MLflow logging.
@@ -59,7 +58,7 @@ def evaluate_single_case(
             sub_name = sub.get("Reference", "")
             source = sub.get("Source", "")
 
-            ragas_question = f"Analyze the compliance coverage for the '{req_name}' requirement's sub-requirement '{sub_name}' ({source}). What evidence does the document provide, and how does it address this regulatory requirement?"
+            ragas_question = f"Does the document provide evidence of compliance for the '{req_name}' sub-requirement '{sub_name}' ({source})?"
 
             contexts = sub.get("Contexts", [])
 
@@ -86,7 +85,7 @@ def evaluate_single_case(
             json.dump(predictions, f, ensure_ascii=False, indent=2)
         artifacts["backend_predictions"] = predictions_path
 
-        # Save aggregation prompt and sub-requirement prompts for each requirement
+        # Save only the aggregation prompt actually used for each requirement
         for pred in predictions:
             req_id = pred.get("Requirement_ID", "unknown")
             agg_prompt = pred.get("Prompt", "")
@@ -94,20 +93,6 @@ def evaluate_single_case(
             with open(prompt_file, "w", encoding="utf-8") as pf:
                 pf.write(agg_prompt)
             artifacts[f"prompt_{req_id}"] = prompt_file
-            
-            # Save sub-requirement prompts
-            sub_reqs = pred.get("SubRequirements", [])
-            for idx, sub in enumerate(sub_reqs):
-                sub_ref = sub.get("Reference", f"sub_{idx}")
-                sub_source = sub.get("Source", "unknown")
-                sub_prompt = sub.get("Prompt", "")
-                if sub_prompt:
-                    # Create a safe filename from reference and source
-                    safe_ref = sub_ref.replace("/", "_").replace(":", "_").replace(" ", "_")
-                    sub_prompt_file = os.path.join(case_artifact_dir, f"prompt_{req_id}_sub_{safe_ref}_{sub_source}.txt")
-                    with open(sub_prompt_file, "w", encoding="utf-8") as spf:
-                        spf.write(sub_prompt)
-                    artifacts[f"prompt_{req_id}_sub_{safe_ref}_{sub_source}"] = sub_prompt_file
 
 
     # Initialize accumulators for metrics

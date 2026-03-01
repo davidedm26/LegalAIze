@@ -50,7 +50,6 @@ class SubRequirementReport(BaseModel):
     Rationale: str
     Auditor_Notes: str
     Contexts: List[str]
-    Prompt: str  # evaluation prompt used for this sub-requirement
 
 class RequirementReport(BaseModel):
     Requirement_ID: str
@@ -63,22 +62,8 @@ class RequirementReport(BaseModel):
     SubRequirements: List[SubRequirementReport] = []
 
 
-# Lightweight model for API responses (excludes verbose fields)
-class RequirementReportAPI(BaseModel):
-    Requirement_ID: str
-    Requirement_Category: str
-    Requirement_Name: str
-    Score: RequirementScore
-    Rationale: Optional[str] = None
-    Auditor_Notes: str
-
-
 class AuditResponse(BaseModel):
     requirements: List[RequirementReport] #We can include the providex doc context for future steps
-
-
-class AuditResponseAPI(BaseModel):
-    requirements: List[RequirementReportAPI]
 
 
 
@@ -323,24 +308,10 @@ def evaluate_requirement(
             regulatory_parts.append(f"[IMPLEMENTATION_GUIDANCE] {guidance}")
         content = "\n".join(regulatory_parts).strip()
 
-        # Find document chunks associated with this reference using top_doc_chunks_by_group
-        # Build group_key based on source
-        group_key = None
-        if reg_chunk.get('source') == 'EU_AI_ACT':
-            group_key = f"AI_ACT::{reference}"
-        elif reg_chunk.get('source') == 'ISO_42001':
-            group_key = f"ISO_42001::{reference}"
-        else:
-            group_key = reference
-        
-        doc_chunks_for_group = top_doc_chunks_by_group.get(group_key, [])
+        # Find document chunks associated with this reference
         relevant_chunks = []
-        if doc_chunks_for_group:
-            for chunk in doc_chunks_for_group:
-                relevant_chunks.append(chunk['content'])
-        else:
-            # Fallback: include all document chunks
-            for cid, data in unique_chunks.items():
+        for cid, data in unique_chunks.items():
+            if reference in data["refs"]:
                 relevant_chunks.append(data["content"])
 
         sub_req_data = {
@@ -349,6 +320,10 @@ def evaluate_requirement(
         }
 
         # Use EvaluationEngine to evaluate
+        # Note: evaluate_sub_requirement in EvaluationEngine takes (sub_req_name, regulatory_reference, associated_chunks)
+        # wait, my EvaluationEngine.evaluate_sub_requirement signature in previous step:
+        # def evaluate_sub_requirement(self, sub_req_name: str, regulatory_reference: str, associated_chunks: List[str]) -> Dict[str, Any]:
+
         result = evaluator.evaluate_sub_requirement(
             main_req_name=requirement_name,
             sub_req_name=reference,
@@ -364,7 +339,16 @@ def evaluate_requirement(
             reg_source = reg_chunk.get("source", "")
             ragas_contexts.append(f"[REGULATORY] [NAME: {reg_name}] [SOURCE: {reg_source}] {content}")
 
-        # Add document chunks to RAGAS contexts (reuse the same chunks)
+        # Use top_doc_chunks_by_group to get relevant document chunks for this group
+        group_key = None
+        # Try both AI_ACT and ISO_42001 prefixes, fallback to reference only
+        if reg_chunk.get('source') == 'EU_AI_ACT':
+            group_key = f"AI_ACT::{reference}"
+        elif reg_chunk.get('source') == 'ISO_42001':
+            group_key = f"ISO_42001::{reference}"
+        else:
+            group_key = reference
+        doc_chunks_for_group = top_doc_chunks_by_group.get(group_key, [])
         if doc_chunks_for_group:
             for chunk in doc_chunks_for_group:
                 ragas_contexts.append(f"[DOCUMENT] {chunk['content']}")
@@ -380,7 +364,7 @@ def evaluate_requirement(
         sub_results.append({
             "reference": reference,
             "source": reg_chunk.get("source", ""),
-            "prompt": result.get("prompt", ""),  # Use prompt from evaluate_sub_requirement
+            "prompt": evaluator._get_sub_prompt(requirement_name, reference, reg_chunk.get("source", ""), content, relevant_chunks), # Re-generating prompt just for logging
             "ragas_question": result.get("ragas_question", ""),
             "answer": combined_answer, # For RAGAS evaluation
             "auditor_notes": result.get("auditor_notes", ""), # For aggregation prompt
@@ -395,8 +379,7 @@ def evaluate_requirement(
             Score=result.get("score", "N/A"),
             Rationale=result.get("rationale", ""),
             Auditor_Notes=result.get("auditor_notes", ""),
-            Contexts=ragas_contexts,
-            Prompt=result.get("prompt", "")
+            Contexts=ragas_contexts
         ))
 
     # 4. Aggregate results

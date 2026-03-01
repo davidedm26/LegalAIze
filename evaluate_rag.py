@@ -86,7 +86,6 @@ def main() -> None:
     metrics_output = eval_params.get("metrics_output", "metrics/rag_eval.json")
     gt_cases = eval_params.get("ground_truth", [])
     case_selector = normalize_case_selector(eval_params.get("case_selector"))
-    requirement_limit = eval_params.get("requirement_limit", None)
 
 
 
@@ -157,7 +156,6 @@ def main() -> None:
             mlflow.log_param("llm_temperature", llm_temperature)
             mlflow.log_param("embedding_model",vect_params.get("model_name", ""))
             mlflow.log_param("precompute_top_k", precompute_params.get("top_k", 3))
-            mlflow.log_param("requirement_limit", requirement_limit if requirement_limit is not None else "all")
             # Log the actual chunk_size and chunk_overlap used by the backend
             mlflow.log_param("chunk_size", rag_engine.rag_params.get("document_chunk_size"))
             mlflow.log_param("chunk_overlap", rag_engine.rag_params.get("document_chunk_overlap"))
@@ -225,7 +223,6 @@ def main() -> None:
                     case_artifact_dir=tmpdir,
                     embedding_model=embedding_model,
                     ground_truth=ground_truth_present,
-                    requirement_limit=requirement_limit,
                 ) # Evaluate this evaluation case
                 res["name"] = name # Add case name to results
                 all_results.append(res) # Append to all results
