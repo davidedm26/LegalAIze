@@ -70,7 +70,7 @@ Respond in JSON format:
         """
         prompt = self._get_sub_prompt(main_req_name, sub_req_name, source, regulatory_reference, associated_chunks)
         # Question format that matches analytical response style
-        ragas_question = f"What is the compliance status of sub-requirement '{sub_req_name}' from {source}?"
+        ragas_question = f"Is the provided document compliant with the sub-requirement '{sub_req_name}' from {source}?"
 
         response = self.llm.invoke(prompt).content.strip()
         try:

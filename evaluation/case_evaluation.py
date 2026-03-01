@@ -49,9 +49,10 @@ def evaluate_single_case(
     for pred in predictions:
         sub_reqs = pred.get("SubRequirements") or []
         for sub in sub_reqs:
-            # Use rationale for both faithfulness and relevancy
-            # The rationale provides detailed, grounded analysis
-            combined_answer = sub.get('Rationale', '')
+            # Reconstruct combined_answer from both Rationale and Auditor_Notes to improve relevancy
+            rationale = sub.get('Rationale', '')
+            auditor_notes = sub.get('Auditor_Notes', '')
+            combined_answer = f"{rationale}\n\nSummary: {auditor_notes}"
 
             # The prompt/question logic needs to be reconstructed or we rely on contexts
             # Since we didn't save the explicit ragas_question in SubRequirementReport,
@@ -61,8 +62,7 @@ def evaluate_single_case(
             source = sub.get("Source", "")
 
             # Question format that matches analytical response style
-            ragas_question = f"What is the compliance status of sub-requirement '{sub_name}' from {source}?"
-
+            ragas_question = f"Is the provided document compliant with the sub-requirement '{sub_name}' from {source}?"
 
             contexts = sub.get("Contexts", [])
 

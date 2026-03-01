@@ -60,3 +60,4 @@ data/debug/*
 # Metrics
 metrics/**
 metrics/ragas_records.json
+mlflow.db
