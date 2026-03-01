@@ -46,22 +46,32 @@ def evaluate_single_case(
     # Collect sub-requirement prompts for RAGAS metrics
     sub_ragas_records: List[Dict[str, Any]] = []
     for pred in predictions:
-        context_list = pred.get("Context") or []
-        for sub_json in context_list:
-            try:
-                sub = json.loads(sub_json)
-            except Exception:
-                continue
+        sub_reqs = pred.get("SubRequirements") or []
+        for sub in sub_reqs:
+            # Reconstruct the "answer" used for RAGAS (rationale + summary)
+            combined_answer = f"{sub.get('Rationale', '')}\n\nSummary: {sub.get('Auditor_Notes', '')}"
+
+            # The prompt/question logic needs to be reconstructed or we rely on contexts
+            # Since we didn't save the explicit ragas_question in SubRequirementReport,
+            # we will re-generate it here based on the available data.
+            req_name = pred.get("Requirement_Name", "Unknown")
+            sub_name = sub.get("Reference", "")
+            source = sub.get("Source", "")
+
+            ragas_question = f"Does the document provide evidence of compliance for the '{req_name}' sub-requirement '{sub_name}' ({source})?"
+
+            contexts = sub.get("Contexts", [])
+
             # Only add if there is at least some context or a non-trivial answer
-            if (sub.get("contexts") and any(c.strip() for c in sub.get("contexts", []))) or (sub.get("answer") and sub.get("answer").strip() and "no information" not in sub.get("answer").lower()):
+            if (contexts and any(c.strip() for c in contexts)) or (combined_answer and combined_answer.strip() and "no information" not in combined_answer.lower()):
                 sub_ragas_records.append({
-                    "question": sub.get("ragas_question") or sub.get("prompt", ""),
-                    "answer": sub.get("answer", ""),
-                    "contexts": sub.get("contexts", []),
+                    "question": ragas_question,
+                    "answer": combined_answer,
+                    "contexts": contexts,
                     "ground_truth": "",  # Not available at sub-requirement level
                     "requirement_id": pred.get("Requirement_ID", "unknown"),
-                    "sub_requirement_name": sub.get("reference", ""),
-                    "source": sub.get("source", "unknown"),
+                    "sub_requirement_name": sub_name,
+                    "source": source,
                     "case": case_name,
                 })
 
