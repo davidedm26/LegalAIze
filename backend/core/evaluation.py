@@ -32,7 +32,7 @@ Respond in JSON format:
 }}
 """
 
-    def _get_aggregate_prompt(self, sub_results: List[Dict[str, Any]]) -> str:
+    def _get_aggregate_prompt(self, sub_results: List[Dict[str, Any]], computed_score: float) -> str:
         simplified_results = []
         for res in sub_results:
             simplified_results.append({
@@ -48,13 +48,14 @@ You are a Lead AI Auditor consolidating findings for a main requirement based on
 SUB-REQUIREMENT FINDINGS:
 {json.dumps(simplified_results, indent=2, ensure_ascii=False)}
 
+COMPUTED OVERALL SCORE: {computed_score:.1f}
+(This score is the arithmetic mean of all sub-requirement scores and has already been calculated.)
+
 TASK:
 Aggregate these findings into a final compliance assessment for the main requirement.
 
 INSTRUCTIONS:
-1. Calculate an overall score reflecting the compliance level. If critical sub-requirements score low, the overall score should be proportionally low.
-
-2. Write 'auditor_notes' as an EXECUTIVE SUMMARY for management/stakeholders (NO technical legal references):
+1. Write 'auditor_notes' as an EXECUTIVE SUMMARY for management/stakeholders (NO technical legal references):
    - Write in paragraph form (NOT a list, NO bullet points, NO semicolons separating items)
    - Start with overall compliance status (e.g., "Partially compliant", "Non-compliant", "Fully compliant")
    - Describe FUNCTIONALLY what was found and what gaps exist
@@ -62,7 +63,7 @@ INSTRUCTIONS:
    - DO NOT mention specific article numbers, paragraph numbers, or section codes
    - Focus on impact and actionable insights
 
-3. Write 'rationale' as a TECHNICAL ANALYSIS for compliance experts (WITH legal references):
+2. Write 'rationale' as a TECHNICAL ANALYSIS for compliance experts (WITH legal references):
    - Reference specific sub-requirement codes and scores (e.g., "Article 15 Para 1 scored 2", "ISO 42001 section 6.1.1 scored 1")
    - Map findings to regulatory requirements precisely
    - Explain technical compliance implications
@@ -78,9 +79,8 @@ EXAMPLE FORMAT for auditor_notes (NO legal references):
 EXAMPLE FORMAT for rationale (WITH legal references):
 "The overall score reflects mixed compliance across five evaluated sub-requirements. Article 15 Para 1 (EU AI Act) received a score of 2, indicating the system's purpose is identified but lacks comprehensive robustness evidence. Article 15 Para 3 scored 0 as no accuracy metrics are declared, failing a mandatory EU AI Act requirement. ISO 42001 sections 6.1.1 and 8.1 both scored 1, showing minimal risk management and operational control evidence. Only section 6.1.2 achieved a score of 2, demonstrating some risk awareness without formal processes. These deficiencies in critical regulatory areas justify the low overall compliance score."
 
-Respond in JSON format:
+Respond in JSON format (DO NOT include 'score' - it has already been calculated):
 {{
-    "score": "Integer 0-5 or 'N/A'",
     "auditor_notes": "Executive summary paragraph describing compliance status, evidence found, and specific gaps.",
     "rationale": "Detailed analytical justification referencing specific sub-requirement findings and their implications."
 }}
@@ -108,14 +108,29 @@ Respond in JSON format:
     def aggregate_results(self, sub_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Aggregates multiple sub-requirement results into a final report.
+        Score is computed as the arithmetic mean of sub-requirement scores.
         """
-        agg_prompt = self._get_aggregate_prompt(sub_results)
+        # Calculate average score from sub-requirements
+        numeric_scores = []
+        for res in sub_results:
+            score = res.get("score")
+            try:
+                numeric_scores.append(float(score))
+            except (ValueError, TypeError):
+                pass  # Skip non-numeric scores
+        
+        if numeric_scores:
+            computed_score = sum(numeric_scores) / len(numeric_scores)
+        else:
+            computed_score = 0.0
+        
+        agg_prompt = self._get_aggregate_prompt(sub_results, computed_score)
         agg_response = self.llm.invoke(agg_prompt).content.strip()
         try:
             cleaned_agg = agg_response.replace("```json", "").replace("```", "").strip()
             agg_result = json.loads(cleaned_agg)
         except Exception:
-            agg_result = {"score": "N/A", "auditor_notes": "Parsing failed", "rationale": agg_response}
+            agg_result = {"auditor_notes": "Parsing failed", "rationale": agg_response}
 
         # Helper: ensure auditor_notes is a string
         notes_val = agg_result.get("auditor_notes", "")
@@ -129,7 +144,7 @@ Respond in JSON format:
             notes_str = str(notes_val)
 
         return {
-            "score": agg_result.get("score", "N/A"),
+            "score": round(computed_score, 1),  # Use computed average score
             "auditor_notes": notes_str,
             "rationale": agg_result.get("rationale", ""),
             "prompt": agg_prompt
