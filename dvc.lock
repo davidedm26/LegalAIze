@@ -111,11 +111,11 @@ stages:
       size: 121766
     - path: evaluate_rag.py
       hash: md5
-      md5: aab8ac59f7703d582c17319a961c532d
-      size: 19636
+      md5: 035fe842066106c9124ea4360a5286a8
+      size: 19638
     - path: evaluation/
       hash: md5
-      md5: 7383dcc794e2b7904b6f745a8c2a3e35.dir
+      md5: db348c0b33059f1aabad83d0b3647aa2.dir
       size: 65288
       nfiles: 13
     params:
@@ -163,9 +163,9 @@ stages:
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: bb97e17833d1c6885f9d1921cb4ff857
-      size: 2389
+      md5: eabd30214d5e8b41154619392aa002a6
+      size: 2387
     - path: metrics/ragas_records.json
       hash: md5
-      md5: a6493532ebd440aa0e3be04204cad774
-      size: 19264
+      md5: 5a3373d9ed586f8bd782876d87091690
+      size: 19295

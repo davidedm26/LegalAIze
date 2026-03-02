@@ -32,7 +32,7 @@ qdrant-client==1.16.2
 
 # Evaluation Metrics
 datasets==4.0.0
-ragas==0.3.2
+ragas==0.4.0
 
 
 attrs==23.2.0

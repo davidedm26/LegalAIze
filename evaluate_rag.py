@@ -80,7 +80,7 @@ def main() -> None:
     ingestion_params = params.get("ingestion", {})
 
     random_seed = int(eval_params.get("random_seed", 42))
-
+  
     llm_model = eval_params.get("llm_model")
     llm_temperature = float(eval_params.get("llm_temperature"))
     metrics_output = eval_params.get("metrics_output", "metrics/rag_eval.json")
