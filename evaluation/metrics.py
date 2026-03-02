@@ -1,7 +1,6 @@
 """Metrics computation for RAG evaluation."""
 
 from typing import List, Dict, Any, Optional
-import numpy as np
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 try:
     from datasets import Dataset

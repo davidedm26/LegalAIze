@@ -591,6 +591,13 @@ if st.session_state.audit_results is not None:
                         # ----------------------------
 
                         st.progress(req["progress"])
+                        
+                    with col_B:
+                        st.caption("AI FINDINGS")
+                        st.write(req["notes"])
+
+                        st.caption("Rationale")
+                        st.text(req.get("rationale", "No rationale provided."))
 elif analyze_btn and not doc_text:
     st.warning("Please upload a file or paste text.")
 
