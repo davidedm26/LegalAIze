@@ -103,7 +103,8 @@ def main() -> None:
 
     # Aggregate metrics across all cases
     all_results: List[Dict[str, Any]] = []
-    ragas_records: List[Dict[str, Any]] = []
+    sub_ragas_records: List[Dict[str, Any]] = []  # Sub-requirements (for faithfulness)
+    main_ragas_records: List[Dict[str, Any]] = []  # Main requirements (for relevancy/correctness)
 
     experiment_name = eval_params.get("mlflow_experiment", "rag_evaluation")
 
@@ -218,7 +219,7 @@ def main() -> None:
 
             # Use a temporary directory for any artifacts related to this case (like backend predictions)
             with tempfile.TemporaryDirectory(prefix=f"case_{case_slug}_") as tmpdir:
-                res, case_ragas_records = evaluate_single_case(
+                res, case_sub_ragas_records, case_main_ragas_records = evaluate_single_case(
                     case_name=name,
                     gt_path=report_path_for_eval,
                     doc_path=doc_path,
@@ -230,7 +231,9 @@ def main() -> None:
                 res["name"] = name # Add case name to results
                 all_results.append(res) # Append to all results
 
-                ragas_records.extend(case_ragas_records) # Collect groundedness samples for potential further analysis or separate logging
+                # Collect RAGAS records for logging
+                sub_ragas_records.extend(case_sub_ragas_records)  # Sub-requirements
+                main_ragas_records.extend(case_main_ragas_records)  # Main requirements
 
                 if run_ctx is not None:
                     # Log per-case metrics with a step index (for easier aggregation in MLflow UI charts)
@@ -375,12 +378,22 @@ def main() -> None:
             if os.path.exists(mapping_path):
                 mlflow.log_artifact(mapping_path, artifact_path="inputs")
 
-            # Log RAGAS records as artifact for potential further analysis
-            if ragas_records:
-                ragas_artifact_path = os.path.join(metrics_dir, "ragas_records.json")
-                with open(ragas_artifact_path, "w", encoding="utf-8") as f:
-                    json.dump(ragas_records, f, indent=2)
-                mlflow.log_artifact(ragas_artifact_path, artifact_path="ragas")
+            # Log RAGAS records as artifacts for potential further analysis
+            # Sub-requirements records (for faithfulness evaluation)
+            if sub_ragas_records:
+                sub_ragas_path = os.path.join(metrics_dir, "ragas_sub_requirements.json")
+                with open(sub_ragas_path, "w", encoding="utf-8") as f:
+                    json.dump(sub_ragas_records, f, indent=2, ensure_ascii=False)
+                mlflow.log_artifact(sub_ragas_path, artifact_path="ragas")
+                print(f"✓ Logged {len(sub_ragas_records)} sub-requirement records to MLflow")
+            
+            # Main requirements records (for relevancy/correctness evaluation)
+            if main_ragas_records:
+                main_ragas_path = os.path.join(metrics_dir, "ragas_main_requirements.json")
+                with open(main_ragas_path, "w", encoding="utf-8") as f:
+                    json.dump(main_ragas_records, f, indent=2, ensure_ascii=False)
+                mlflow.log_artifact(main_ragas_path, artifact_path="ragas")
+                print(f"✓ Logged {len(main_ragas_records)} main requirement records to MLflow")
 
         print("✓ RAG evaluation completed.")
 

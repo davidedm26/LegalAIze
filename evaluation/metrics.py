@@ -153,12 +153,12 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]], embedding_model=None) -
             faithfulness = None
             print("  ⚠️ No faithfulness column found!")
         
-        # Groundedness and relevancy are not computed for sub-requirements
-        # Correctness is computed separately on main requirements
+        # Groundedness is not computed
+        # Relevancy and Correctness are computed separately on main requirements
         return {
             "groundedness": None, 
             "faithfulness": faithfulness, 
-            "relevancy": None,  # Removed - problematic in legal context
+            "relevancy": None,  # Computed separately on main requirements
             "correctness": None  # Computed separately on main requirements
         }
     except Exception as e:
@@ -166,23 +166,23 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]], embedding_model=None) -
         return {"groundedness": None, "faithfulness": None, "relevancy": None, "correctness": None}
 
 
-def compute_correctness_on_main_requirements(
+def compute_main_requirement_metrics(
     main_requirement_samples: List[Dict[str, Any]], embedding_model=None
-) -> Optional[float]:
+) -> Dict[str, Optional[float]]:
     """
-    Compute AnswerCorrectness specifically for main requirements that have ground truth.
-    This is separate from sub-requirement metrics (faithfulness/relevancy).
+    Compute AnswerCorrectness and AnswerRelevancy for main requirements.
+    AnswerCorrectness requires ground truth, AnswerRelevancy works without it.
     
     Args:
-        main_requirement_samples: List of main requirement samples with ground_truth field
-        embedding_model: Optional (not used for correctness but kept for consistency)
+        main_requirement_samples: List of main requirement samples
+        embedding_model: Optional (not used but kept for consistency)
     
     Returns:
-        Average correctness score or None if unavailable
+        Dict with keys 'correctness' and 'relevancy', values are scores or None
     """
     if not main_requirement_samples:
-        print("  No main requirement samples with ground truth for correctness calculation.")
-        return None
+        print("  No main requirement samples for metric calculation.")
+        return {"correctness": None, "relevancy": None}
     
     # Filter samples that have non-empty ground truth
     samples_with_gt = [
@@ -190,13 +190,9 @@ def compute_correctness_on_main_requirements(
         if s.get("ground_truth") and str(s.get("ground_truth")).strip()
     ]
     
-    if not samples_with_gt:
-        print(f"  No samples with ground truth found (filtered from {len(main_requirement_samples)} samples).")
-        return None
-    
-    if not RAGAS_CORRECTNESS_AVAILABLE:
-        print("⚠ AnswerCorrectness metric unavailable (check ragas installation).")
-        return None
+    if not RAGAS_CORRECTNESS_AVAILABLE or not RAGAS_RELEVANCY_AVAILABLE:
+        print("⚠ Required RAGAS metrics unavailable (check ragas installation).")
+        return {"correctness": None, "relevancy": None}
     
     import yaml
     import os
@@ -210,40 +206,78 @@ def compute_correctness_on_main_requirements(
         
         if llm_model is None:
             print("⚠ LLM model name not found in params.yaml under evaluation.llm_model.")
-            return None
+            return {"correctness": None, "relevancy": None}
         
         llm = ChatOpenAI(model=llm_model, temperature=llm_temperature, request_timeout=180)
-        correctness_metric = AnswerCorrectness(llm=llm)
+        embeddings = OpenAIEmbeddings()
         
-        ragas_dataset = Dataset.from_list([
+        # Initialize metrics for main requirements
+        correctness_metric = AnswerCorrectness(llm=llm)
+        relevancy_metric = AnswerRelevancy(llm=llm, embeddings=embeddings)
+        
+        # Compute on all samples (relevancy doesn't need GT)
+        all_samples_dataset = Dataset.from_list([
             {
                 "question": sample['question'],
                 "answer": sample["answer"],
                 "contexts": sample["contexts"],
                 "ground_truth": sample.get("ground_truth", ""),
             }
-            for sample in samples_with_gt
+            for sample in main_requirement_samples
         ])
         
-        print(f"\n🔍 Computing AnswerCorrectness on {len(samples_with_gt)} main requirements with ground truth...")
-        ragas_result = ragas_evaluate(
-            dataset=ragas_dataset,
-            metrics=[correctness_metric],
+        print(f"\n🔍 Computing Relevancy on {len(main_requirement_samples)} main requirements...")
+        relevancy_result = ragas_evaluate(
+            dataset=all_samples_dataset,
+            metrics=[relevancy_metric],
             llm=llm,
         )
-        df = ragas_result.to_pandas()
+        relevancy_df = relevancy_result.to_pandas()
         
-        # Extract correctness score
-        if "answer_correctness" in df.columns:
-            correctness = float(df["answer_correctness"].mean())
-            print(f"  AnswerCorrectness mean: {correctness:.4f}")
-            return correctness
+        # Extract relevancy score with detailed debugging
+        if "answer_relevancy" in relevancy_df.columns:
+            relevancy_values = relevancy_df["answer_relevancy"].tolist()
+            relevancy = float(relevancy_df["answer_relevancy"].mean())
+            print(f"  AnswerRelevancy values: {relevancy_values}")
+            print(f"  AnswerRelevancy mean: {relevancy:.4f}")
+            print(f"  Non-zero count: {sum(1 for v in relevancy_values if v > 0.001)}/{len(relevancy_values)}")
         else:
-            print("  ⚠️ No answer_correctness column found in results!")
-            return None
+            print("  ⚠️ No answer_relevancy column found!")
+            relevancy = None
+        
+        # Compute correctness only on samples with ground truth
+        correctness = None
+        if samples_with_gt:
+            gt_dataset = Dataset.from_list([
+                {
+                    "question": sample['question'],
+                    "answer": sample["answer"],
+                    "contexts": sample["contexts"],
+                    "ground_truth": sample.get("ground_truth", ""),
+                }
+                for sample in samples_with_gt
+            ])
+            
+            print(f"🔍 Computing Correctness on {len(samples_with_gt)} main requirements with ground truth...")
+            correctness_result = ragas_evaluate(
+                dataset=gt_dataset,
+                metrics=[correctness_metric],
+                llm=llm,
+            )
+            correctness_df = correctness_result.to_pandas()
+            
+            if "answer_correctness" in correctness_df.columns:
+                correctness = float(correctness_df["answer_correctness"].mean())
+                print(f"  AnswerCorrectness mean: {correctness:.4f}")
+            else:
+                print("  ⚠️ No answer_correctness column found!")
+        else:
+            print(f"  No samples with ground truth (filtered from {len(main_requirement_samples)} samples) - skipping correctness.")
+        
+        return {"correctness": correctness, "relevancy": relevancy}
             
     except Exception as e:
-        print(f"⚠ Failed to compute AnswerCorrectness: {e}")
+        print(f"⚠ Failed to compute main requirement metrics: {e}")
         import traceback
         traceback.print_exc()
-        return None
+        return {"correctness": None, "relevancy": None}

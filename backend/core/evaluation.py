@@ -49,18 +49,40 @@ SUB-REQUIREMENT FINDINGS:
 {json.dumps(simplified_results, indent=2, ensure_ascii=False)}
 
 TASK:
-Aggregate these findings into a final assessment for the main requirement.
+Aggregate these findings into a final compliance assessment for the main requirement.
 
 INSTRUCTIONS:
-1. The overall score should reflect the weakest links. If critical sub-requirements are missing, the score should be low.
-2. The 'auditor_notes' must be a structured summary listing the status of key sub-requirements (e.g., "Article 10 (EU_AI_ACT): Covered; B.3.2 (ISO_42001): Missing").
-3. The 'rationale' should provide a high-level justification.
+1. Calculate an overall score reflecting the compliance level. If critical sub-requirements score low, the overall score should be proportionally low.
+
+2. Write 'auditor_notes' as an EXECUTIVE SUMMARY for management/stakeholders (NO technical legal references):
+   - Write in paragraph form (NOT a list, NO bullet points, NO semicolons separating items)
+   - Start with overall compliance status (e.g., "Partially compliant", "Non-compliant", "Fully compliant")
+   - Describe FUNCTIONALLY what was found and what gaps exist
+   - Use business-friendly language: "accuracy measurements", "risk management processes", "oversight mechanisms"
+   - DO NOT mention specific article numbers, paragraph numbers, or section codes
+   - Focus on impact and actionable insights
+
+3. Write 'rationale' as a TECHNICAL ANALYSIS for compliance experts (WITH legal references):
+   - Reference specific sub-requirement codes and scores (e.g., "Article 15 Para 1 scored 2", "ISO 42001 section 6.1.1 scored 1")
+   - Map findings to regulatory requirements precisely
+   - Explain technical compliance implications
+   - Be definitive: instead of "X is missing", say "The documentation does not provide X"
+
+TONE: 
+- auditor_notes: Executive, accessible, action-oriented
+- rationale: Technical, precise, regulation-focused
+
+EXAMPLE FORMAT for auditor_notes (NO legal references):
+"The system demonstrates partial compliance with robustness and safety requirements. Documentation shows awareness of the AI's high-risk classification and includes some automated decision-making oversight through scoring thresholds. However, critical gaps significantly impact compliance: accuracy metrics and performance measurements are not declared in system documentation, formal risk assessment and management frameworks are not documented, and comprehensive operational control processes are absent from the reviewed materials."
+
+EXAMPLE FORMAT for rationale (WITH legal references):
+"The overall score reflects mixed compliance across five evaluated sub-requirements. Article 15 Para 1 (EU AI Act) received a score of 2, indicating the system's purpose is identified but lacks comprehensive robustness evidence. Article 15 Para 3 scored 0 as no accuracy metrics are declared, failing a mandatory EU AI Act requirement. ISO 42001 sections 6.1.1 and 8.1 both scored 1, showing minimal risk management and operational control evidence. Only section 6.1.2 achieved a score of 2, demonstrating some risk awareness without formal processes. These deficiencies in critical regulatory areas justify the low overall compliance score."
 
 Respond in JSON format:
 {{
     "score": "Integer 0-5 or 'N/A'",
-    "auditor_notes": "Structured summary of coverage across sub-requirements.",
-    "rationale": "High-level justification for the overall score."
+    "auditor_notes": "Executive summary paragraph describing compliance status, evidence found, and specific gaps.",
+    "rationale": "Detailed analytical justification referencing specific sub-requirement findings and their implications."
 }}
 """
 

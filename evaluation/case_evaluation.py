@@ -10,7 +10,7 @@ from evaluation.metrics import (
     compute_mae,
     compute_note_similarity,
     compute_ragas_metrics,
-    compute_correctness_on_main_requirements,
+    compute_main_requirement_metrics,
 )
 
 
@@ -230,22 +230,25 @@ def evaluate_single_case(
             if note_similarities
             else 0.0
         )
-        # Compute faithfulness and relevancy on SUB-requirements (no ground truth)
-        ragas_metrics = compute_ragas_metrics(sub_ragas_records, embedding_model=embedding_model)
-        case_groundedness_score = ragas_metrics.get("groundedness")
-        case_faithfulness_score = ragas_metrics.get("faithfulness")
-        case_relevancy_score = ragas_metrics.get("relevancy")
+        # Compute faithfulness on SUB-requirements (without ground truth)
+        sub_metrics = compute_ragas_metrics(sub_ragas_records, embedding_model=embedding_model)
+        case_groundedness_score = sub_metrics.get("groundedness")
+        case_faithfulness_score = sub_metrics.get("faithfulness")
         
-        # Compute AnswerCorrectness on MAIN requirements (with ground truth)
-        case_correctness_score = compute_correctness_on_main_requirements(
+        # Compute AnswerCorrectness and AnswerRelevancy on MAIN requirements
+        main_metrics = compute_main_requirement_metrics(
             ragas_records, embedding_model=embedding_model
         )
+        case_correctness_score = main_metrics.get("correctness")
+        case_relevancy_score = main_metrics.get("relevancy")
 
-        # Check for critical failures (faithfulness should work, correctness requires GT)
+        # Check for critical failures
         if case_faithfulness_score is None:
             print("⚠ Faithfulness score is None, RAGAS evaluation may have failed.")
         if case_correctness_score is None:
             print("⚠ AnswerCorrectness is None - check if main requirements have ground truth auditor notes.")
+        if case_relevancy_score is None:
+            print("⚠ AnswerRelevancy is None - RAGAS evaluation may have failed.")
 
         return (
             {
@@ -259,18 +262,24 @@ def evaluate_single_case(
                 "faithfulness_score": case_faithfulness_score,
                 "faithfulness_sample_count": len(sub_ragas_records),
                 "relevancy_score": case_relevancy_score,
-                "relevancy_sample_count": len(sub_ragas_records),
+                "relevancy_sample_count": len(ragas_records),  # Main requirements
                 "correctness_score": case_correctness_score,
-                "correctness_sample_count": len(ragas_records),  # Main requirements with GT
+                "correctness_sample_count": len(ragas_records),  # Main requirements
             },
             sub_ragas_records,
+            ragas_records,  # Return main requirement records too
         )
     else:
         # No Ground Truth available, we can only compute RAGAS metrics that do not require GT
-        ragas_metrics = compute_ragas_metrics(sub_ragas_records, embedding_model=embedding_model)
-        case_groundedness_score = ragas_metrics.get("groundedness")
-        case_faithfulness_score = ragas_metrics.get("faithfulness")
-        case_relevancy_score = ragas_metrics.get("relevancy")
+        sub_metrics = compute_ragas_metrics(sub_ragas_records, embedding_model=embedding_model)
+        case_groundedness_score = sub_metrics.get("groundedness")
+        case_faithfulness_score = sub_metrics.get("faithfulness")
+        
+        # Compute AnswerRelevancy on MAIN requirements (doesn't require GT)
+        main_metrics = compute_main_requirement_metrics(
+            ragas_records, embedding_model=embedding_model
+        )
+        case_relevancy_score = main_metrics.get("relevancy")
 
         return (
             {
@@ -284,9 +293,10 @@ def evaluate_single_case(
                 "faithfulness_score": case_faithfulness_score,
                 "faithfulness_sample_count": len(sub_ragas_records),
                 "relevancy_score": case_relevancy_score,
-                "relevancy_sample_count": len(sub_ragas_records),
+                "relevancy_sample_count": len(ragas_records),
                 "correctness_score": None,
                 "correctness_sample_count": 0,
             },
             sub_ragas_records,
+            ragas_records,  # Return main requirement records too
         )
