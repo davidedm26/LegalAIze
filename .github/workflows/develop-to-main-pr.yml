@@ -21,8 +21,8 @@ env:
   THRESHOLD_GROUNDEDNESS: "0.5"      # adjust to desired min groundedness
   THRESHOLD_FAITHFULNESS: "0.5"      # adjust to desired min faithfulness
   THRESHOLD_NOTE_SIMILARITY: "0.35"  # adjust to desired min note similarity
-  THRESHOLD_ANSWER_RELEVANCY: "0.5"  # adjust to desired min answer relevancy
-  THRESHOLD_CORRECTNESS: "0.5"       # adjust to desired min correctness
+  THRESHOLD_RAGAS_ANSWER_RELEVANCY: "0.5"  # adjust to desired min answer relevancy
+  THRESHOLD_RAGAS_CORRECTNESS: "0.5"       # adjust to desired min correctness
 
 jobs:
   release-checks:
@@ -94,8 +94,8 @@ jobs:
           THRESHOLD_GROUNDEDNESS: ${{ env.THRESHOLD_GROUNDEDNESS }}
           THRESHOLD_FAITHFULNESS: ${{ env.THRESHOLD_FAITHFULNESS }}
           THRESHOLD_NOTE_SIMILARITY: ${{ env.THRESHOLD_NOTE_SIMILARITY }}
-          THRESHOLD_ANSWER_RELEVANCY: ${{ env.THRESHOLD_ANSWER_RELEVANCY }}
-          THRESHOLD_CORRECTNESS: ${{ env.THRESHOLD_CORRECTNESS }}
+          THRESHOLD_RAGAS_ANSWER_RELEVANCY: ${{ env.THRESHOLD_RAGAS_ANSWER_RELEVANCY }}
+          THRESHOLD_RAGAS_CORRECTNESS: ${{ env.THRESHOLD_RAGAS_CORRECTNESS }}
         run: |
           python .github/scripts/check_and_issue.py "develop-to-main-pr"
 

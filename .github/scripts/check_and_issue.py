@@ -25,8 +25,8 @@ default_thresholds = {
     "mean_groundedness_score": ("min", float(os.getenv("THRESHOLD_GROUNDEDNESS", "0.5"))),
     "mean_faithfulness_score": ("min", float(os.getenv("THRESHOLD_FAITHFULNESS", "0.5"))),
     "mean_note_similarity": ("min", float(os.getenv("THRESHOLD_NOTE_SIMILARITY", "0.35"))),
-    "ragas_correctness": ("min", 0.5),
-    "ragas_answer_relevancy": ("min", 0.5)
+    "ragas_correctness": ("min", float(os.getenv("THRESHOLD_RAGAS_CORRECTNESS", "0.5"))),
+    "ragas_answer_relevancy": ("min", float(os.getenv("THRESHOLD_RAGAS_ANSWER_RELEVANCY", "0.5")))
     # You can add more custom thresholds here
 }
 
