@@ -53,9 +53,9 @@ def evaluate_single_case(
             # The rationale provides detailed, grounded analysis
             combined_answer = sub.get('Rationale', '')
 
-            # The prompt/question logic needs to be reconstructed or we rely on contexts
-            # Since we didn't save the explicit ragas_question in SubRequirementReport,
-            # we will re-generate it here based on the available data.
+            # The prompt/question logic needs to be reconstructed or rely on contexts
+            # Since the explicit ragas_question is not saved in SubRequirementReport,
+            # re-generate it here based on the available data.
             req_name = pred.get("Requirement_Name", "Unknown")
             sub_name = sub.get("Reference", "")
             source = sub.get("Source", "")
@@ -66,7 +66,7 @@ def evaluate_single_case(
 
             contexts = sub.get("Contexts", [])
 
-            # Only add if there is at least some context or a non-trivial answer
+            # Add only if there is at least some context or a non-trivial answer
             if (contexts and any(c.strip() for c in contexts)) or (combined_answer and combined_answer.strip() and "no information" not in combined_answer.lower()):
                 sub_ragas_records.append({
                     "question": ragas_question,
@@ -133,7 +133,8 @@ def evaluate_single_case(
             gt_score: Optional[float] = None
             pred_score: Optional[float] = None
 
-            # If Score is 'N/A' or missing, we treat it as None and exclude from MAE calculation. Log warnings for invalid score formats.
+            # If Score is 'N/A' or missing, treat it as None and exclude from MAE calculation.
+            # Log warnings for invalid score formats.
             try:
                 if gt_row.get("Score") != 'N/A':
                     gt_score = float(gt_row.get("Score", "0"))
@@ -251,7 +252,7 @@ def evaluate_single_case(
             ragas_records,  # Return main requirement records too
         )
     else:
-        # No Ground Truth available, we can only compute RAGAS metrics that do not require GT
+        # No Ground Truth available, compute only RAGAS metrics that do not require GT
         sub_metrics = compute_ragas_metrics(sub_ragas_records, embedding_model=embedding_model)
         case_faithfulness_score = sub_metrics.get("faithfulness")
         

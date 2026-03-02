@@ -160,7 +160,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     
-    st.info("💡 **Note:** This is an AI-based decision support tool and does not replace professional legal advice.")
+    st.info("💡 **Disclaimer:** This tool provides decision support based on automated analysis and does not replace professional legal advice.")
 
 # ==============================================================================
 # HEADER (LOGO + TITLE)
@@ -204,7 +204,7 @@ with col_mid:
     st.markdown("""
     <div class="lens-description">
         <div class="lens-cta">Click to Start Audit</div>
-        Our AI engine is ready to analyze your technical documentation<br>
+        The analysis engine is ready to process your technical documentation<br>
         against <b>EU AI Act</b> & <b>ISO 42001</b> standards.
     </div>
     """, unsafe_allow_html=True)

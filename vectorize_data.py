@@ -44,7 +44,7 @@ def main():
         print(f"Loaded {len(requirements)} requirements from {chunks_path}.")
 
     # Decide mode: local qdrant process (path) or remote service (host:port)
-    # If the QDRANT_HOST environment variable is set, we assume remote service mode; otherwise, we use local path-based storage. This allows flexibility for different deployment scenarios (local development vs production).
+    # Determine the Qdrant connection mode: remote service (QDRANT_HOST set) or local path-based storage.
 
     qdrant_host = os.getenv("QDRANT_HOST") # Use localhost to connect to qdrant container when running this script in local environment.
     qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
@@ -52,7 +52,7 @@ def main():
     vector_index_path = vect_params.get('vector_index_path')
     collection_name = vect_params.get('collection_name')
 
-    # Helper function to wait for Qdrant service to be ready (only relevant for remote service mode)
+    # Wait for Qdrant service to be ready (only relevant for remote service mode)
     def wait_for_qdrant(host: str, port: int, timeout: int = 60):
         url = f"http://{host}:{port}/healthz"
         deadline = time.time() + timeout
@@ -66,7 +66,7 @@ def main():
             time.sleep(1)
         return False
 
-    if qdrant_host: # If QDRANT_HOST is set, we're in remote service mode
+    if qdrant_host: # Remote service mode
         print(f"Using remote Qdrant service at {qdrant_host}:{qdrant_port}")
         if not wait_for_qdrant(qdrant_host, qdrant_port, timeout=60):
             print("⚠ Qdrant service not ready (health check failed). Aborting.")
@@ -175,7 +175,7 @@ def main():
             json.dump({"status": "indexed", "count": len(requirements)}, f)
         
     else:
-        print("Note: no local vector_index_path configured; skipping snapshot creation for remote Qdrant.")
+        print("Notice: no local vector_index_path configured; skipping snapshot creation for remote Qdrant.")
 
     print("✓ Vectorization completed.")
 
