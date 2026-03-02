@@ -12,21 +12,15 @@ except ImportError:
 
 try:
     from ragas import evaluate as ragas_evaluate
-    from ragas.metrics import Faithfulness, ResponseGroundedness, AnswerRelevancy, AnswerCorrectness
+    from ragas.metrics import Faithfulness, AnswerRelevancy, AnswerCorrectness
 except ImportError:
     ragas_evaluate = None
-    ResponseGroundedness = None
     Faithfulness = None
     AnswerRelevancy = None
     AnswerCorrectness = None
 
 
 
-RAGAS_GROUNDEDNESS_AVAILABLE = (
-    Dataset is not None
-    and ragas_evaluate is not None
-    and ResponseGroundedness is not None
-)
 RAGAS_FAITHFULNESS_AVAILABLE = (
     Dataset is not None
     and ragas_evaluate is not None
@@ -52,33 +46,7 @@ def compute_mae(gt_scores: List[float], pred_scores: List[float]) -> float:
     return sum(diffs) / len(diffs)
 
 
-def compute_note_similarity(gt_note: str, pred_note: str, embedding_model) -> float:
-    """
-    Compute cosine similarity between ground-truth and predicted notes using embeddings.
-    Args:
-        gt_note (str): Ground-truth note text.
-        pred_note (str): Predicted note text.
-        embedding_model: SentenceTransformer or compatible model with .encode().
-    Returns:
-        float: Cosine similarity between the two notes in [-1, 1].
-    """
-    if not gt_note or not pred_note:
-        return 0.0
-    if embedding_model is None:
-        raise ValueError("embedding_model must be provided to compute_note_similarity.")
-    
-    embeddings = embedding_model.encode(
-        [gt_note, pred_note],
-        convert_to_numpy=True,
-    )
-    gt_vec, pred_vec = embeddings
-    gt_norm = np.linalg.norm(gt_vec)
-    pred_norm = np.linalg.norm(pred_vec)
-    if not gt_norm or not pred_norm:
-        return 0.0
-    similarity = float(np.dot(gt_vec, pred_vec) / (gt_norm * pred_norm)) # Cosine similarity (Dot product divided by norms)
 
-    return max(min(similarity, 1.0), -1.0) # Ensure similarity is in [-1, 1] range
 
 
 
@@ -86,17 +54,17 @@ def compute_note_similarity(gt_note: str, pred_note: str, embedding_model) -> fl
 
 def compute_ragas_metrics(samples: List[Dict[str, Any]], embedding_model=None) -> Dict[str, Optional[float]]:
     """
-    Compute groundedness, faithfulness, relevancy, and correctness scores for a list of samples using a single Ragas evaluation call.
+    Compute faithfulness scores for a list of samples using a single Ragas evaluation call.
     Args:
         samples: List of evaluation samples
         embedding_model: Optional SentenceTransformer model instance to reuse (avoids reloading)
-    Returns a dict with keys 'groundedness', 'faithfulness', 'relevancy', and 'correctness'.
+    Returns a dict with key 'faithfulness'.
     """
     if not samples:
-        return {"groundedness": None, "faithfulness": None, "relevancy": None, "correctness": None}
-    if not (RAGAS_GROUNDEDNESS_AVAILABLE and RAGAS_FAITHFULNESS_AVAILABLE and RAGAS_RELEVANCY_AVAILABLE and RAGAS_CORRECTNESS_AVAILABLE):
-        print("⚠ RAGAS metrics unavailable (check ragas/datasets installation).")
-        return {"groundedness": None, "faithfulness": None, "relevancy": None, "correctness": None}
+        return {"faithfulness": None}
+    if not RAGAS_FAITHFULNESS_AVAILABLE:
+        print("⚠ RAGAS faithfulness metric unavailable (check ragas/datasets installation).")
+        return {"faithfulness": None}
 
     import yaml
     import os
@@ -112,7 +80,7 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]], embedding_model=None) -
         
         if llm_model is None:
             print("⚠ LLM model name not found in params.yaml under evaluation.llm_model.")
-            return {"groundedness": None, "faithfulness": None, "relevancy": None, "correctness": None}
+            return {"faithfulness": None}
         
         # Configure LLM for RAGAS
         llm = ChatOpenAI(model=llm_model, temperature=llm_temperature, request_timeout=180)
@@ -153,17 +121,13 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]], embedding_model=None) -
             faithfulness = None
             print("  ⚠️ No faithfulness column found!")
         
-        # Groundedness is not computed
         # Relevancy and Correctness are computed separately on main requirements
         return {
-            "groundedness": None, 
-            "faithfulness": faithfulness, 
-            "relevancy": None,  # Computed separately on main requirements
-            "correctness": None  # Computed separately on main requirements
+            "faithfulness": faithfulness
         }
     except Exception as e:
         print(f"⚠ Failed to compute RAGAS metrics: {e}")
-        return {"groundedness": None, "faithfulness": None, "relevancy": None, "correctness": None}
+        return {"faithfulness": None}
 
 
 def compute_main_requirement_metrics(

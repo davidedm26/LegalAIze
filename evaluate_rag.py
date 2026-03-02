@@ -239,10 +239,6 @@ def main() -> None:
                     # Log per-case metrics with a step index (for easier aggregation in MLflow UI charts)
                     if res.get("mae_score") is not None:
                         mlflow.log_metric("mae_score_list", res["mae_score"], step=i)
-                    if res.get("mean_note_similarity") is not None:
-                        mlflow.log_metric("note_similarity_list", res["mean_note_similarity"], step=i)
-                    if res.get("groundedness_score") is not None:
-                        mlflow.log_metric("groundedness_list", res["groundedness_score"], step=i)
                     if res.get("faithfulness_score") is not None:
                         mlflow.log_metric("faithfulness_list", res["faithfulness_score"], step=i)
                     if res.get("relevancy_score") is not None:
@@ -265,8 +261,6 @@ def main() -> None:
 
 
             total_score_pairs = sum(r["num_pairs"] for r in all_results)
-            total_note_pairs = sum(r.get("note_similarity_count", 0) for r in all_results)
-            total_groundedness_samples = sum(r.get("groundedness_sample_count", 0) for r in all_results)
             total_faithfulness_samples = sum(r.get("faithfulness_sample_count", 0) for r in all_results)
             total_relevancy_samples = sum(r.get("relevancy_sample_count", 0) for r in all_results)
             total_correctness_samples = sum(r.get("correctness_sample_count", 0) for r in all_results)
@@ -277,21 +271,6 @@ def main() -> None:
                 if total_score_pairs > 0
                 else 0.0
             )
-
-            # Weighted note similarity by number of note pairs
-            weighted_note_similarity = (
-                sum((r.get("mean_note_similarity") or 0.0) * (r.get("note_similarity_count") or 0) for r in all_results) / total_note_pairs
-                if total_note_pairs > 0
-                else 0.0
-            )
-
-            # Weighted groundedness by sample count
-            weighted_groundedness = None
-            groundedness_results = [r for r in all_results if r.get("groundedness_score") is not None]
-            if groundedness_results and total_groundedness_samples > 0:
-                weighted_groundedness = (
-                    sum((r.get("groundedness_score") or 0) * (r.get("groundedness_sample_count") or 0) for r in groundedness_results) / total_groundedness_samples
-                )
 
             # Weighted faithfulness by sample count
             weighted_faithfulness = None
@@ -319,14 +298,10 @@ def main() -> None:
 
         else: # Fallback values if no results were processed (e.g., all cases were skipped due to missing files)
             total_score_pairs = 0
-            total_note_pairs = 0
-            total_groundedness_samples = 0
             total_faithfulness_samples = 0
             total_relevancy_samples = 0
             total_correctness_samples = 0
             weighted_mae = 0.0
-            weighted_note_similarity = 0.0
-            weighted_groundedness = None
             weighted_faithfulness = None
             weighted_relevancy   = None
             weighted_correctness = None
@@ -335,13 +310,9 @@ def main() -> None:
             "total_cases": len(all_results),
             "total_score_pairs": total_score_pairs,
             "weighted_mae_score": weighted_mae,
-            "total_note_pairs": total_note_pairs,
-            "mean_note_similarity": weighted_note_similarity,
-            "total_groundedness_samples": total_groundedness_samples,
             "total_faithfulness_samples": total_faithfulness_samples,
             "total_relevancy_samples": total_relevancy_samples,
             "total_correctness_samples": total_correctness_samples,
-            "mean_groundedness_score": weighted_groundedness,
             "mean_faithfulness_score": weighted_faithfulness,
             "mean_relevancy_score": weighted_relevancy,
             "mean_correctness_score": weighted_correctness,
@@ -356,13 +327,7 @@ def main() -> None:
             mlflow.log_metric("mae_score_pairs", total_score_pairs)
             if weighted_mae is not None:
                 mlflow.log_metric("mae_weighted_score", weighted_mae)
-            mlflow.log_metric("note_similarity_pairs", total_note_pairs)
-            if weighted_note_similarity is not None:
-                mlflow.log_metric("note_similarity_mean", weighted_note_similarity)
 
-            if weighted_groundedness is not None:
-                mlflow.log_metric("groundedness_score", weighted_groundedness)
-                mlflow.log_metric("groundedness_samples", total_groundedness_samples)
             if weighted_faithfulness is not None:
                 mlflow.log_metric("faithfulness_score", weighted_faithfulness)
                 mlflow.log_metric("faithfulness_samples", total_faithfulness_samples)

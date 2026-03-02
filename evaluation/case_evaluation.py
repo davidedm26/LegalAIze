@@ -8,7 +8,6 @@ import numpy as np
 from evaluation.data_loading import load_ground_truth_csv, load_text
 from evaluation.metrics import (
     compute_mae,
-    compute_note_similarity,
     compute_ragas_metrics,
     compute_main_requirement_metrics,
 )
@@ -117,7 +116,6 @@ def evaluate_single_case(
     # Initialize accumulators for metrics
     gt_scores: List[float] = []
     pred_scores: List[float] = []
-    note_similarities: List[float] = []
     ragas_records: List[Dict[str, Any]] = []
 
     if  ground_truth:
@@ -128,14 +126,14 @@ def evaluate_single_case(
                 print(f"⚠ Skipping prediction with missing or unmatched Requirement_ID: {requirement_id}")
                 continue
 
-            document_context = pred.get("Context") or []  # Get the context from the prediction, which should be the same as the one used for RAG evaluation. Used for groundedness evaluation in RAGAS, to ensure consistency between the information available at inference time and at evaluation time.
+            document_context = pred.get("Context") or []  # Get the context from the prediction for RAGAS evaluation
 
             gt_row = ground_truth[requirement_id]
 
             gt_score: Optional[float] = None
             pred_score: Optional[float] = None
 
-            # If Score is 'N/A' or missing, we treat it as None and exclude from MAE calculation, but still include in note similarity and groundedness if notes are available. Log warnings for invalid score formats.
+            # If Score is 'N/A' or missing, we treat it as None and exclude from MAE calculation. Log warnings for invalid score formats.
             try:
                 if gt_row.get("Score") != 'N/A':
                     gt_score = float(gt_row.get("Score", "0"))
@@ -169,22 +167,15 @@ def evaluate_single_case(
             #rationale = pred.get("Rationale") or pred.get("rationale")
             #pred_note = auditor_notes + ("\nRationale: " + rationale if rationale else "")
             pred_note = auditor_notes
-            if gt_note and pred_note:
-                try:
-                    similarity = compute_note_similarity(gt_note, pred_note, embedding_model)
-                    note_similarities.append(similarity)
-                except Exception as exc:
-                    print(f"⚠ Failed to compute note similarity for {requirement_id}: {exc}")
 
-            # Build question text for RAGAS groundedness evaluation
+            # Build question text for RAGAS evaluation
             identifier = requirement_id or "Unknown requirement"
             requirement_name = pred.get("Requirement_Name") or gt_row.get("Requirement_Name")
             title = requirement_name 
             # Only use title and id, no metadata
             question_text = f"Is the provided document compliant with the requirement '{title}', according with the provided regulatory chunks from UE AI ACT and ISO standard 42001:2023?"
 
-            # Context is made up by the whole chunks extracted from the Document under Test for the particular requirement. This is the same context that the RAG engine used to produce the prediction, so it allows us to evaluate groundedness in a way that is consistent with the actual information available to the model at inference time.
-            # We can reuse the already built context, passing it as a parameter to this function.
+            # Context is made up by the whole chunks extracted from the Document under Test for the particular requirement.
 
             ragas_records.append(
                 {
@@ -225,14 +216,8 @@ def evaluate_single_case(
     # Compute Metrics 
     if ground_truth:
         mae = compute_mae(gt_scores, pred_scores)
-        mean_note_similarity = (
-            sum(note_similarities) / len(note_similarities)
-            if note_similarities
-            else 0.0
-        )
-        # Compute faithfulness on SUB-requirements (without ground truth)
+        # Compute faithfulness on SUB-requirements
         sub_metrics = compute_ragas_metrics(sub_ragas_records, embedding_model=embedding_model)
-        case_groundedness_score = sub_metrics.get("groundedness")
         case_faithfulness_score = sub_metrics.get("faithfulness")
         
         # Compute AnswerCorrectness and AnswerRelevancy on MAIN requirements
@@ -255,10 +240,6 @@ def evaluate_single_case(
                 "num_pairs": len(gt_scores),
                 "mae_score": mae,
                 "artifacts": artifacts,
-                "note_similarity_count": len(note_similarities),
-                "mean_note_similarity": mean_note_similarity,
-                "groundedness_score": case_groundedness_score,
-                "groundedness_sample_count": len(sub_ragas_records),
                 "faithfulness_score": case_faithfulness_score,
                 "faithfulness_sample_count": len(sub_ragas_records),
                 "relevancy_score": case_relevancy_score,
@@ -272,7 +253,6 @@ def evaluate_single_case(
     else:
         # No Ground Truth available, we can only compute RAGAS metrics that do not require GT
         sub_metrics = compute_ragas_metrics(sub_ragas_records, embedding_model=embedding_model)
-        case_groundedness_score = sub_metrics.get("groundedness")
         case_faithfulness_score = sub_metrics.get("faithfulness")
         
         # Compute AnswerRelevancy on MAIN requirements (doesn't require GT)
@@ -286,10 +266,6 @@ def evaluate_single_case(
                 "num_pairs": 0,
                 "mae_score": None,
                 "artifacts": artifacts,
-                "note_similarity_count": 0,
-                "mean_note_similarity": None,
-                "groundedness_score": case_groundedness_score,
-                "groundedness_sample_count": len(sub_ragas_records),
                 "faithfulness_score": case_faithfulness_score,
                 "faithfulness_sample_count": len(sub_ragas_records),
                 "relevancy_score": case_relevancy_score,
