@@ -215,6 +215,14 @@ def compute_main_requirement_metrics(
         correctness_metric = AnswerCorrectness(llm=llm)
         relevancy_metric = AnswerRelevancy(llm=llm, embeddings=embeddings)
         
+        # Customize AnswerRelevancy for compliance audit responses
+        try:
+            relevancy_metric.question_generation.instruction = """Given a question and answer, create one or more statements from the answer that are relevant to answering the question.
+For compliance audit responses, statements identifying gaps, deficiencies, or non-compliance ARE RELEVANT if they directly address compliance status.
+Phrases like 'lacks X', 'insufficient Y', 'gaps in Z', 'does not provide', 'absence of' are valid audit findings."""
+        except AttributeError:
+            pass  # Fallback if prompt customization not available
+        
         # Compute on all samples (relevancy doesn't need GT)
         all_samples_dataset = Dataset.from_list([
             {

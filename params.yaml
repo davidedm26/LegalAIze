@@ -30,10 +30,10 @@ evaluation:
   ground_truth:
     - name: "Evaluation1"
       document_path: "data/ground_truth/raw_data/Evaluation1/documentation.txt"
-      report_path: "data/ground_truth/raw_data/Evaluation1/report.CSV"
+      report_path: "data/ground_truth/raw_data/Evaluation1/report_2.CSV"
     - name: "Evaluation2"
       document_path: "data/ground_truth/raw_data/Evaluation2/documentation.txt"
-      report_path: "data/ground_truth/raw_data/Evaluation2/report.CSV"
+      report_path: "data/ground_truth/raw_data/Evaluation2/report_2.CSV"
     - name: "Evaluation3"
       document_path: "data/ground_truth/raw_data/Evaluation3/documentation.txt"
       report_path: "data/ground_truth/raw_data/Evaluation3/report.CSV"
