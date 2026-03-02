@@ -1,10 +1,33 @@
-"""  
-This module contains functions to parse the AIA document and extract relevant information."""
+"""
+AI Act HTML Parser
 
+This module extracts structured sections from the EU AI Act HTML document, converting
+the raw legislative text into a machine-readable JSON format.
+
+Extraction Capabilities:
+- **Recitals**: Preamble paragraphs explaining legislative intent (e.g., Recital 1-180)
+- **Articles**: Legal provisions organized by article number with optional titles
+- **Annexes**: Supplementary requirements and lists (e.g., Annex I-XI)
+
+HTML Structure Parsing:
+- Uses BeautifulSoup to parse HTML tags and classes
+- Identifies sections by CSS classes and 'id' attributes
+- Extracts hierarchical content (titles, paragraphs, tables)
+- Cleans and normalizes text (removes excessive whitespace, deduplications)
+
+Output Format:
+Each extracted section is a dictionary containing:
+{
+  "name": "art_15",                    # Section identifier
+  "type": "article",                   # Section type: recital|article|annex
+  "title": "Accuracy, robustness...",  # Optional: Section title if present
+  "content": "High-risk AI systems..."  # Main text content
+}
+
+"""
 
 import json
 from pathlib import Path
-
 from typing import Dict, Any, List, Optional
 
 

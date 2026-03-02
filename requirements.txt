@@ -1,40 +1,43 @@
-# Needed for .github/scripts/check_and_issue.py
+# ==============================================================================
+# LegalAIze - AI Compliance Auditing System Dependencies
+# ==============================================================================
+
+# GitHub Integration (for CI/CD automation)
 PyGithub
-# For HTML parsing (specific, stable version)
+
+# HTML Parsing (for legal document ingestion from AI Act HTML)
 beautifulsoup4==4.12.3
 
-# Core ML
+# Core Machine Learning & Data Processing
 scikit-learn==1.3.2
 pandas==2.1.4
 numpy==1.26.2
 
-# MLflow & Tracking
+# Experiment Tracking & Model Registry
 mlflow==3.9.0
 
-
-# DVC
+# Data Version Control (DVC for tracking datasets and model artifacts)
 dvc==3.66.1
 
-
-# Utils
+# Configuration & Data Validation
 python-dotenv==1.0.0
 pydantic==2.12.5
 
-# RAG and LLM
-pymupdf==1.23.8
-langchain-text-splitters==0.3.11
-langchain==0.3.27
-langchain-community==0.3.31
-langchain-openai==0.3.32
-openai==1.99.9
-sentence-transformers==5.2.2
-qdrant-client==1.16.2
+# RAG Pipeline Components
+pymupdf==1.23.8                    # PDF parsing for ISO 42001 standard
+langchain-text-splitters==0.3.11   # Document chunking strategies
+langchain==0.3.27                  # LLM orchestration framework
+langchain-community==0.3.31        # Community integrations
+langchain-openai==0.3.32           # OpenAI LLM integration
+openai==1.99.9                     # OpenAI API client
+sentence-transformers==5.2.2       # Embedding models for semantic search
+qdrant-client==1.16.2              # Vector database for regulatory chunks
 
-# Evaluation Metrics
-datasets==4.0.0
-ragas==0.4.0
+# RAG Evaluation Framework
+datasets==4.0.0                    # Dataset handling for RAGAS
+ragas==0.4.0                       # Faithfulness, Relevancy, and Correctness metrics
 
-
+# Supporting Dependencies
 attrs==23.2.0
 dill==0.3.8
 packaging==25.0
@@ -47,6 +50,5 @@ transformers==4.41.2
 langchain-core==0.3.83
 torch==2.9.1
 
-
-# GitHub Integration
+# File Pattern Matching
 pathspec==0.11.1

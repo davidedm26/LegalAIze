@@ -1,12 +1,19 @@
 """
-Script to generate audit JSON files for the first 4 evaluation cases.
+Script to generate audit JSON files for evaluation cases.
 Saves them in data/debug/ for inspection and debugging.
+
+Usage:
+    python generate_debug_audits.py                    # Process first 5 cases (default)
+    python generate_debug_audits.py --case 0           # Process case at index 0
+    python generate_debug_audits.py --case Evaluation1 # Process case by name
+    python generate_debug_audits.py --case all         # Process all cases
 """
 
 import os
 import json
 import yaml
-from typing import Dict, Any
+import argparse
+from typing import Dict, Any, List
 
 # Import backend modules
 from backend import rag_engine
@@ -19,8 +26,76 @@ def load_params() -> Dict[str, Any]:
         return yaml.safe_load(f)
 
 
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Generate audit JSON files for evaluation cases",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python generate_debug_audits.py                    # Process first 5 cases (default)
+  python generate_debug_audits.py --case 0           # Process case at index 0
+  python generate_debug_audits.py --case Evaluation1 # Process case by name
+  python generate_debug_audits.py --case all         # Process all cases
+        """
+    )
+    parser.add_argument(
+        "--case",
+        type=str,
+        default=None,
+        help="Case to process: index (0-based), name, or 'all' for all cases. Default: first 5 cases"
+    )
+    return parser.parse_args()
+
+
+def select_cases(evaluation_cases: List[Dict[str, Any]], case_arg: str = None) -> List[Dict[str, Any]]:
+    """
+    Select evaluation cases based on command line argument.
+    
+    Args:
+        evaluation_cases: Full list of evaluation cases from params.yaml
+        case_arg: Command line argument: index, name, 'all', or None for first 5
+        
+    Returns:
+        List of selected cases to process
+    """
+    if case_arg is None:
+        # Default: first 5 cases (Evaluation1-5)
+        return evaluation_cases[:5]
+    
+    if case_arg.lower() == "all":
+        # Process all cases
+        return evaluation_cases
+    
+    # Try to parse as index
+    try:
+        index = int(case_arg)
+        if 0 <= index < len(evaluation_cases):
+            return [evaluation_cases[index]]
+        else:
+            print(f"❌ Error: Index {index} out of range (0-{len(evaluation_cases)-1})")
+            return []
+    except ValueError:
+        pass
+    
+    # Try to match by name
+    for case in evaluation_cases:
+        if case.get("name") == case_arg:
+            return [case]
+    
+    # Case not found
+    print(f"❌ Error: Case '{case_arg}' not found")
+    print(f"\nAvailable cases:")
+    for idx, case in enumerate(evaluation_cases):
+        print(f"  [{idx}] {case.get('name')}")
+    return []
+
+
 def main():
-    """Generate audit reports for first 4 evaluation cases."""
+    """Generate audit reports for selected evaluation cases."""
+    
+    # Parse arguments
+    args = parse_args()
     
     print("=" * 80)
     print("Generating Debug Audit Reports")
@@ -30,10 +105,16 @@ def main():
     params = load_params()
     evaluation_cases = params.get("evaluation", {}).get("ground_truth", [])
     
-    # Get first 4 cases
-    cases_to_process = evaluation_cases[:4]
+    print(f"\nTotal available cases: {len(evaluation_cases)}")
     
-    print(f"\nProcessing {len(cases_to_process)} cases:")
+    # Select cases to process
+    cases_to_process = select_cases(evaluation_cases, args.case)
+    
+    if not cases_to_process:
+        print("\n❌ No cases selected. Exiting.")
+        return
+    
+    print(f"\nProcessing {len(cases_to_process)} case(s):")
     for case in cases_to_process:
         print(f"  - {case.get('name')}")
     

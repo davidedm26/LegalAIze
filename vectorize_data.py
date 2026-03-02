@@ -20,7 +20,6 @@ def load_params():
     with open("params.yaml", "r") as f:
         return yaml.safe_load(f)
 
-    
 
 def main():
     params = load_params() # Load parameters from params.yaml
@@ -88,6 +87,7 @@ def main():
     if model is None:
         print(f"⚠ Failed to load embedding model '{vect_params['model_name']}'. Check model name and availability.")
         return
+    
     # Ensure collection exists 
     vector_size = model.get_sentence_embedding_dimension() # Get vector size from model
     client.recreate_collection( 
@@ -95,6 +95,7 @@ def main():
         vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
     )
 
+    
     print(f"Generating embeddings for {len(requirements)} requirements...")
 
     flat_chunks = []
@@ -141,12 +142,13 @@ def main():
     for c in flat_chunks:
         content = c.get("content", "")
         if not content:
-            # If no content, try control + implementation_guidance
+            # If no content, try control + implementation_guidance (for ISO chunks)
             control = c.get("control", "")
             guidance = c.get("implementation_guidance", "")
             content = f"{control}\n{guidance}".strip()
         texts.append(content)
 
+    # Generate embeddings in batches to avoid memory issues with large datasets
     embeddings = model.encode(texts, convert_to_numpy=True, show_progress_bar=True)
 
     batch_size = vect_params.get('batch_size', 128)
@@ -164,11 +166,12 @@ def main():
             "implementation_guidance": chunk.get('implementation_guidance'),
         }))
 
+    # Upsert points in batches
     for i in range(0, len(points), batch_size):
         batch_points = points[i:i+batch_size]
         client.upsert(collection_name=collection_name, points=batch_points)
 
-    # Save indexing status locally if vector_index_path present
+    # Save indexing status locally if vector_index_path present (local file-based storage)
     if vector_index_path:
         status_path = os.path.join(vector_index_path, "status.json")
         with open(status_path, "w", encoding="utf-8") as f:

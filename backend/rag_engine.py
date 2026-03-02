@@ -88,7 +88,7 @@ llm: Optional[ChatOpenAI] = None
 embedding_model: Optional[SentenceTransformer] = None
 requirement_chunks: Dict[str, Any] = {}
 
-# New engines
+# Main RAG components: RetrievalEngine and EvaluationEngine, instantiated globally for reuse across requests
 retrieval_engine: Optional[RetrievalEngine] = None
 evaluation_engine: Optional[EvaluationEngine] = None
 
@@ -170,11 +170,13 @@ def init_rag(force: bool = False) -> None:
         print(f"✓ Embedding model initialized: {embedding_model_name}")
 
         # Initialize engines
+
+        # Instantiate RetrievalEngine 
+        retrieval_engine = RetrievalEngine(doc_client=None, embedding_model=embedding_model)
+
+        # Instantiate Evaluation Engine with the global LLM 
         evaluation_engine = EvaluationEngine(llm)
 
-        # Instantiate RetrievalEngine globally with the embedding model.
-        # The doc_client will be provided per-request during evaluation.
-        retrieval_engine = RetrievalEngine(doc_client=None, embedding_model=embedding_model)
 
         _initialized = True
     except Exception as exc:
@@ -194,7 +196,7 @@ def rag_ready() -> bool:
 
 def _get_requirement_chunks_from_qdrant(requirement_name: str, regulatory_client: QdrantClient, regulatory_collection: str) -> list:
     """
-    Retrieve all regulatory chunks (already embedded) for a given requirement from Qdrant.
+    Retrieve all regulatory chunks (already embedded) for a given requirement from Qdrant. The retrival is deterministic and based on the requirement name.
     Args:
         requirement_name: The name of the requirement.
         regulatory_client: QdrantClient instance for the regulatory chunks DB.
@@ -258,32 +260,14 @@ def evaluate_requirement(
     # Instantiate RetrievalEngine for this document context using the global embedding_model
     retriever = RetrievalEngine(doc_client=_doc_client, embedding_model=embedding_model)
     
-    pre_rerank_top_k = int(rag_params.get("pre_rerank_top_k", 10))
+    document_chunks_top_k = int(rag_params.get("document_chunks_top_k", 10))
     
-    top_doc_chunks_by_group = retriever.query_for_requirement(
+    # Use the requirement chunks embeddings as queries to retrieve the most relevant document chunks for this requirement. The retrieval is done per group (e.g., per regulatory reference) to maintain traceability and relevance of the retrieved context.
+    top_doc_chunks_per_subreq = retriever.query_for_requirement(
         collection_name=_temp_collection,
         req_chunks_embeddings=req_chunks_embeddings,
-        top_k=pre_rerank_top_k
+        top_k=document_chunks_top_k
     )
-
-    # Optimization: deduplication of retrieved chunks across groups
-    unique_chunks = {}  # chunk_id -> {"content": str, "refs": set}
-    for group, chunks in top_doc_chunks_by_group.items():
-        for c in chunks:
-            cid = c['chunk_id']
-            if cid not in unique_chunks:
-                unique_chunks[cid] = {
-                    "content": c['content'],
-                    "refs": {group}
-                }
-            else:
-                unique_chunks[cid]["refs"].add(group)
-
-    # Build context (optional, for debug or legacy reasons)
-    doc_context_list = []
-    for cid, data in unique_chunks.items():
-        doc_context_list.append(data['content'])
-
 
     # 3. Evaluate Sub-requirements using EvaluationEngine
     sub_results = []
@@ -299,6 +283,7 @@ def evaluate_requirement(
         control = reg_chunk.get("control", "")
         guidance = reg_chunk.get("implementation_guidance", "")
         regulatory_parts = []
+        # Build regulatory context
         if content:
             regulatory_parts.append(content)
         if control:
@@ -307,8 +292,8 @@ def evaluate_requirement(
             regulatory_parts.append(f"[IMPLEMENTATION_GUIDANCE] {guidance}")
         content = "\n".join(regulatory_parts).strip()
 
-        # Find document chunks associated with this reference using top_doc_chunks_by_group
-        # Build group_key based on source
+        # Find document chunks associated with this reference using top_doc_chunks_per_subreq
+        # Build group_key based on source for search in top_doc_chunks_per_subreq. 
         group_key = None
         if reg_chunk.get('source') == 'EU_AI_ACT':
             group_key = f"AI_ACT::{reference}"
@@ -317,20 +302,15 @@ def evaluate_requirement(
         else:
             group_key = reference
         
-        doc_chunks_for_group = top_doc_chunks_by_group.get(group_key, [])
+        # Retrieve the relevant document chunks for this sub-requirement (reference) 
+        doc_chunks_for_group = top_doc_chunks_per_subreq.get(group_key, [])
         relevant_chunks = []
         if doc_chunks_for_group:
             for chunk in doc_chunks_for_group:
                 relevant_chunks.append(chunk['content'])
         else:
-            # Fallback: include all document chunks
-            for cid, data in unique_chunks.items():
-                relevant_chunks.append(data["content"])
+            print(f"⚠ No relevant document chunks found for reference '{reference}' (group key: '{group_key}'). This may affect the evaluation of this sub-requirement.")
 
-        sub_req_data = {
-            "name": reference,
-            "regulatory_content": content
-        }
 
         # Use EvaluationEngine to evaluate
         result = evaluator.evaluate_sub_requirement(
@@ -341,7 +321,7 @@ def evaluate_requirement(
             associated_chunks=relevant_chunks
         )
 
-        # Compose context for RAGAS (legacy / tracking)
+        # Compose context for RAGAS 
         ragas_contexts = []
         if content:
             reg_name = reference
@@ -353,9 +333,8 @@ def evaluate_requirement(
             for chunk in doc_chunks_for_group:
                 ragas_contexts.append(f"[DOCUMENT] {chunk['content']}")
         else:
-            # Fallback: include all document chunks
-            for cid, data in unique_chunks.items():
-                ragas_contexts.append(f"[DOCUMENT] {data['content']}")
+            ragas_contexts.append("[DOCUMENT] No relevant document chunks found for this reference.")
+
 
         # Reconstruct the result dict expected by aggregate_results
         # Combine rationale and notes for RAGAS evaluation to improve groundedness
@@ -451,7 +430,6 @@ def audit_document(
         regulatory_client = QdrantClient(path=index_path)
 
     # For each requirement in requirement_chunks, call evaluate_requirement to get its report.
-
     req_iter = requirement_chunks
     if requirement_limit is not None:
         req_iter = req_iter[:requirement_limit]

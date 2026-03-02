@@ -46,12 +46,7 @@ def compute_mae(gt_scores: List[float], pred_scores: List[float]) -> float:
 
 
 
-
-
-
-
-
-def compute_ragas_metrics(samples: List[Dict[str, Any]], embedding_model=None) -> Dict[str, Optional[float]]:
+def compute_subrequirements_ragas_metrics(samples: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
     """
     Compute faithfulness scores for a list of samples using a single Ragas evaluation call.
     Args:
@@ -75,7 +70,6 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]], embedding_model=None) -
         # Extract the LLM model name from the params
         llm_model = params.get("evaluation", {}).get("llm_model", None)
         llm_temperature = params.get("evaluation", {}).get("llm_temperature", 0.0)
-        embedding_model_name = params.get("vectorization", {}).get("model_name", "all-MiniLM-L6-v2")
         
         if llm_model is None:
             print("⚠ LLM model name not found in params.yaml under evaluation.llm_model.")

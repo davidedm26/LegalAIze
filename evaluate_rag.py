@@ -2,6 +2,7 @@
 RAG Evaluation Script
 This script evaluates the RAG system using the local RAG engine defined in backend.rag_engine. It loads evaluation cases defined in params.yaml, runs them through the RAG engine, computes metrics and logs results to MLflow (if configured).    
 """
+
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -73,6 +74,7 @@ setup_mlflow()
 
 def main() -> None:
 
+    # Load parameters from params.yaml
     params = load_params()
     eval_params = params.get("evaluation", {})
     precompute_params = params.get("precompute", {})
@@ -88,9 +90,7 @@ def main() -> None:
     case_selector = normalize_case_selector(eval_params.get("case_selector"))
     requirement_limit = eval_params.get("requirement_limit", None)
 
-
-
-
+    # Initialize embedding model for evaluation
     embedding_model = SentenceTransformer(vect_params.get("model_name", "all-MiniLM-L6-v2"))
 
     # Set seed for reproducibility where possible
@@ -111,17 +111,18 @@ def main() -> None:
     if mlflow is not None:
         mlflow.set_experiment(experiment_name)
 
+    # Start MLflow run context (if MLflow is configured properly, otherwise this will be None and logging calls will be skipped)
     run_ctx = (
         mlflow.start_run(run_name="rag_eval")
         if mlflow is not None
         else None
     )
 
-
     
     if rag_engine is None:
         raise RuntimeError("backend.rag_engine is not available. Run evaluate_rag from the repository root.")
 
+    # Initialize RAG engine components (like retriever, LLM, etc.) before running evaluations. This ensures that the RAG system is ready to process the evaluation cases. The initialization logic is defined in backend.rag_engine.init_rag(), which is also called on startup in the FastAPI app lifespan event.
     rag_engine.init_rag()
     print("✓ Using local RAG engine (backend.rag_engine)")
 
@@ -164,7 +165,6 @@ def main() -> None:
             mlflow.log_param("chunk_overlap", rag_engine.rag_params.get("document_chunk_overlap"))
 
             # Log prompt templates to MLflow after run initialization
-
             try:
                 # Use the EvaluationEngine from rag_engine to access prompt templates
                 if rag_engine.evaluation_engine:
@@ -175,21 +175,22 @@ def main() -> None:
 
                     # Access methods to log prompt templates
                     sub_prompt_template = rag_engine.evaluation_engine._get_sub_prompt("EXAMPLE_MAIN_REQ", example_reference, "EXAMPLE_SOURCE", example_content, example_chunks)
-                    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix="_sub_prompt_template.txt", encoding="utf-8") as tf:
-                        tf.write(sub_prompt_template)
-                        tf.flush()
-                        mlflow.log_artifact(tf.name, artifact_path="prompt_templates")
+                    sub_prompt_file = os.path.join(tempfile.gettempdir(), "sub_prompt_template.txt")
+                    with open(sub_prompt_file, "w", encoding="utf-8") as f:
+                        f.write(sub_prompt_template)
+                    mlflow.log_artifact(sub_prompt_file, artifact_path="prompt_templates")
 
                     agg_prompt_template = rag_engine.evaluation_engine._get_aggregate_prompt([
                         {"reference": example_reference, "score": 5, "answer": "Good"}
                     ], computed_score=3.5)
-                    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix="_aggregate_prompt_template.txt", encoding="utf-8") as tf:
-                        tf.write(agg_prompt_template)
-                        tf.flush()
-                        mlflow.log_artifact(tf.name, artifact_path="prompt_templates")
+                    agg_prompt_file = os.path.join(tempfile.gettempdir(), "aggregate_prompt_template.txt")
+                    with open(agg_prompt_file, "w", encoding="utf-8") as f:
+                        f.write(agg_prompt_template)
+                    mlflow.log_artifact(agg_prompt_file, artifact_path="prompt_templates")
             except Exception as e:
                 print(f"⚠ Failed to log prompt templates to MLflow: {e}")
 
+        # Select evaluation cases based on case_selector
         filtered_cases = select_cases(gt_cases, case_selector) # Select cases based on case_selector (params)
 
         
@@ -257,8 +258,6 @@ def main() -> None:
 
         # Compute aggregated metrics across all results and log them to MLflow and/or save to a JSON file for DVC tracking.
         if all_results:
-
-
             total_score_pairs = sum(r["num_pairs"] for r in all_results)
             total_faithfulness_samples = sum(r.get("faithfulness_sample_count", 0) for r in all_results)
             total_relevancy_samples = sum(r.get("relevancy_sample_count", 0) for r in all_results)
@@ -362,6 +361,13 @@ def main() -> None:
         print("✓ RAG evaluation completed.")
 
     finally:
+        # Clean up resources to avoid shutdown warnings
+        if rag_engine and hasattr(rag_engine, 'vector_db') and rag_engine.vector_db:
+            try:
+                rag_engine.vector_db.close()
+            except Exception:
+                pass  # Ignore errors during cleanup
+        
         if run_ctx is not None:
             mlflow.end_run()
 

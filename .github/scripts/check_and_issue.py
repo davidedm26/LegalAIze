@@ -12,9 +12,7 @@ with open("metrics/rag_eval.json", "r", encoding="utf-8") as f:
 # List of actually used metrics in rag_eval.json
 metric_keys = [
     "weighted_mae_score",
-    "mean_groundedness_score",
     "mean_faithfulness_score",
-    "mean_note_similarity",
     "ragas_correctness",
     "ragas_answer_relevancy"
 ]
@@ -22,9 +20,7 @@ metric_keys = [
 # Default thresholds (add more if needed)
 default_thresholds = {
     "weighted_mae_score": ("max", float(os.getenv("THRESHOLD_MAE", "1.0"))),
-    "mean_groundedness_score": ("min", float(os.getenv("THRESHOLD_GROUNDEDNESS", "0.5"))),
     "mean_faithfulness_score": ("min", float(os.getenv("THRESHOLD_FAITHFULNESS", "0.5"))),
-    "mean_note_similarity": ("min", float(os.getenv("THRESHOLD_NOTE_SIMILARITY", "0.35"))),
     "ragas_correctness": ("min", 0.5),
     "ragas_answer_relevancy": ("min", 0.5)
     # You can add more custom thresholds here

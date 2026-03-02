@@ -13,7 +13,8 @@ services:
     # The seeder will perform its own HTTP health polling before starting.
     
 
-  qdrant_seeder:
+  qdrant_seeder: # Separate service to seed Qdrant after it is healthy
+  # Allows to run the data ingestion and vectorization stages independently of the backend, and ensures seeding only happens after Qdrant is ready.
     build: ./qdrant_init
     container_name: ml-qdrant-seeder
     volumes:
@@ -34,7 +35,6 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      #- ./backend:/app
       - ./params.yaml:/app/params.yaml:ro
       - ./data/mapping.json:/app/data/mapping.json:ro
       - ./data/processed/chunks.json:/app/data/processed/chunks.json:ro
@@ -72,4 +72,4 @@ services:
 
 networks:
   default:
-    name: ml-network
+    name: legalaize-network

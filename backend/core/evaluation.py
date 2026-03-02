@@ -1,7 +1,10 @@
+"""
+This module defines the EvaluationEngine class, which is responsible for evaluating compliance of documents against regulatory requirements using a language model (LLM). It provides methods to evaluate individual sub-requirements and aggregate results into a final compliance assessment. The engine generates detailed prompts for the LLM to ensure structured and comprehensive responses, including both technical rationales and executive summaries for stakeholders.
+"""
+
 import json
 from typing import Dict, Any, List
 from langchain_openai import ChatOpenAI
-from pydantic import BaseModel
 
 class EvaluationEngine:
     def __init__(self, llm: ChatOpenAI):
