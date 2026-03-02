@@ -1,8 +1,8 @@
 name: Daily Evaluation & Alert
-
+# TEMPORARILY DISABLED SCHEDULE TO AVOID EXCESSIVE API USAGE DURING DEVELOPMENT
 on:
-  schedule:
-    - cron: '30 11 * * *'  
+  #schedule:
+    #- cron: '30 11 * * *'  
   workflow_dispatch:
 
 permissions:

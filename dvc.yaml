@@ -36,3 +36,5 @@ stages:
       - rag
     outs:
       - metrics/rag_eval.json
+      - metrics/ragas_sub_requirements.json
+      - metrics/ragas_main_requirements.json

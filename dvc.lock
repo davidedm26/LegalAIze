@@ -15,7 +15,7 @@ stages:
       nfiles: 4
     - path: ingestion/
       hash: md5
-      md5: d0f9f210b9bbfc8d4073c63f1840ac33.dir
+      md5: 42e0b300499a62bc6a968eef020ae108.dir
       size: 42672
       nfiles: 5
     params:
@@ -98,25 +98,25 @@ stages:
     deps:
     - path: backend/rag_engine.py
       hash: md5
-      md5: 3da7169654b878e85e7e933617012b3c
-      size: 26013
+      md5: 2b974013413dc0e9d2631911e19e401f
+      size: 23979
     - path: data/ground_truth
       hash: md5
-      md5: c1562a57843be1eb01429eec95014c3b.dir
-      size: 7448160
-      nfiles: 13
+      md5: 81ce162dacdac7ae45f824a0e0658991.dir
+      size: 7510706
+      nfiles: 18
     - path: data/processed/requirement_chunks.json
       hash: md5
       md5: 16b6d0d3c497bcc8e45c091ea69260af
       size: 121766
     - path: evaluate_rag.py
       hash: md5
-      md5: e49e6d596cc5ed58544c3718b2488d44
-      size: 18024
+      md5: 2851df8f052246e69e4b641a370edd6b
+      size: 20644
     - path: evaluation/
       hash: md5
-      md5: e7f0745952a56339d84b755753a1a377.dir
-      size: 55642
+      md5: 9938ea6c11593c695b1e723d9bbc5c17.dir
+      size: 73802
       nfiles: 13
     params:
       params.yaml:
@@ -124,16 +124,18 @@ stages:
           llm_model: gpt-4o-mini
           llm_temperature: 0.0
           mlflow_experiment: rag_evaluation
-          case_selector: []
+          case_selector:
+          - 2
+          requirement_limit: 2
           ground_truth:
           - name: Evaluation1
             document_path: 
               data/ground_truth/raw_data/Evaluation1/documentation.txt
-            report_path: data/ground_truth/raw_data/Evaluation1/report.CSV
+            report_path: data/ground_truth/raw_data/Evaluation1/report_2.CSV
           - name: Evaluation2
             document_path: 
               data/ground_truth/raw_data/Evaluation2/documentation.txt
-            report_path: data/ground_truth/raw_data/Evaluation2/report.CSV
+            report_path: data/ground_truth/raw_data/Evaluation2/report_2.CSV
           - name: Evaluation3
             document_path: 
               data/ground_truth/raw_data/Evaluation3/documentation.txt
@@ -149,14 +151,25 @@ stages:
             document_path: data/ground_truth/raw_data/Gullon/documentation.pdf
           - name: Prysmian
             document_path: data/ground_truth/raw_data/Prysmian/documentation.pdf
+          - name: Evaluation8
+            document_path: 
+              data/ground_truth/raw_data/Evaluation8/documentation.txt
         rag:
-          document_chunk_size: 1100
-          document_chunk_overlap: 110
-          pre_rerank_top_k: 1
+          document_chunk_size: 300
+          document_chunk_overlap: 50
+          pre_rerank_top_k: 3
           llm_model: gpt-4o-mini
           llm_temperature: 0.0
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: d6e5319e90d3b6c4bfbbdeb515490e37
-      size: 21310
+      md5: 2f79f8d528e2df2480e5de2206189462
+      size: 2443
+    - path: metrics/ragas_main_requirements.json
+      hash: md5
+      md5: ffd329c918ce28585736ad502194cf27
+      size: 3070
+    - path: metrics/ragas_sub_requirements.json
+      hash: md5
+      md5: 9129a9d190f22012c11df684245dda66
+      size: 19488

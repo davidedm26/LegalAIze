@@ -72,6 +72,7 @@ def setup_mlflow():
 setup_mlflow()
 
 def main() -> None:
+
     params = load_params()
     eval_params = params.get("evaluation", {})
     precompute_params = params.get("precompute", {})
@@ -79,12 +80,13 @@ def main() -> None:
     ingestion_params = params.get("ingestion", {})
 
     random_seed = int(eval_params.get("random_seed", 42))
-
+  
     llm_model = eval_params.get("llm_model")
     llm_temperature = float(eval_params.get("llm_temperature"))
     metrics_output = eval_params.get("metrics_output", "metrics/rag_eval.json")
     gt_cases = eval_params.get("ground_truth", [])
     case_selector = normalize_case_selector(eval_params.get("case_selector"))
+    requirement_limit = eval_params.get("requirement_limit", None)
 
 
 
@@ -101,7 +103,8 @@ def main() -> None:
 
     # Aggregate metrics across all cases
     all_results: List[Dict[str, Any]] = []
-    ragas_records: List[Dict[str, Any]] = []
+    sub_ragas_records: List[Dict[str, Any]] = []  # Sub-requirements (for faithfulness)
+    main_ragas_records: List[Dict[str, Any]] = []  # Main requirements (for relevancy/correctness)
 
     experiment_name = eval_params.get("mlflow_experiment", "rag_evaluation")
 
@@ -114,13 +117,7 @@ def main() -> None:
         else None
     )
 
-    prompt_template_path = None
 
-    # Save prompt template locally for next steps (artifact logging) if available in rag_engine.
-    if run_ctx is not None and rag_engine is not None:
-        with tempfile.NamedTemporaryFile("w", suffix="_prompt_template.txt", delete=False, encoding="utf-8") as f:
-            f.write(getattr(rag_engine, "PROMPT_TEMPLATE", "").strip())
-            prompt_template_path = f.name
     
     if rag_engine is None:
         raise RuntimeError("backend.rag_engine is not available. Run evaluate_rag from the repository root.")
@@ -161,13 +158,42 @@ def main() -> None:
             mlflow.log_param("llm_temperature", llm_temperature)
             mlflow.log_param("embedding_model",vect_params.get("model_name", ""))
             mlflow.log_param("precompute_top_k", precompute_params.get("top_k", 3))
-            mlflow.log_param("chunk_size", ingestion_params.get("chunk_size"))
-            mlflow.log_param("chunk_overlap", ingestion_params.get("chunk_overlap"))
-            if prompt_template_path and os.path.exists(prompt_template_path):
-                mlflow.log_artifact(prompt_template_path, artifact_path="inputs")
+            mlflow.log_param("requirement_limit", requirement_limit if requirement_limit is not None else "all")
+            # Log the actual chunk_size and chunk_overlap used by the backend
+            mlflow.log_param("chunk_size", rag_engine.rag_params.get("document_chunk_size"))
+            mlflow.log_param("chunk_overlap", rag_engine.rag_params.get("document_chunk_overlap"))
+
+            # Log prompt templates to MLflow after run initialization
+
+            try:
+                # Use the EvaluationEngine from rag_engine to access prompt templates
+                if rag_engine.evaluation_engine:
+                    # Example values for template logging
+                    example_reference = "EXAMPLE_REFERENCE"
+                    example_content = "EXAMPLE_CONTENT"
+                    example_chunks = ["EXAMPLE_CHUNK_1", "EXAMPLE_CHUNK_2"]
+
+                    # Access private methods or use a public method to get template if available
+                    # Since methods are semi-private (_get_sub_prompt), we access them for logging purposes
+                    sub_prompt_template = rag_engine.evaluation_engine._get_sub_prompt("EXAMPLE_MAIN_REQ", example_reference, "EXAMPLE_SOURCE", example_content, example_chunks)
+                    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix="_sub_prompt_template.txt", encoding="utf-8") as tf:
+                        tf.write(sub_prompt_template)
+                        tf.flush()
+                        mlflow.log_artifact(tf.name, artifact_path="prompt_templates")
+
+                    agg_prompt_template = rag_engine.evaluation_engine._get_aggregate_prompt([
+                        {"reference": example_reference, "score": 5, "answer": "Good"}
+                    ])
+                    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix="_aggregate_prompt_template.txt", encoding="utf-8") as tf:
+                        tf.write(agg_prompt_template)
+                        tf.flush()
+                        mlflow.log_artifact(tf.name, artifact_path="prompt_templates")
+            except Exception as e:
+                print(f"⚠ Failed to log prompt templates to MLflow: {e}")
 
         filtered_cases = select_cases(gt_cases, case_selector) # Select cases based on case_selector (params)
 
+        
         # Loop through evaluation cases
         for i, case in enumerate(filtered_cases):
             ground_truth_present = True
@@ -193,18 +219,21 @@ def main() -> None:
 
             # Use a temporary directory for any artifacts related to this case (like backend predictions)
             with tempfile.TemporaryDirectory(prefix=f"case_{case_slug}_") as tmpdir:
-                res, case_ragas_records = evaluate_single_case(
+                res, case_sub_ragas_records, case_main_ragas_records = evaluate_single_case(
                     case_name=name,
                     gt_path=report_path_for_eval,
                     doc_path=doc_path,
                     case_artifact_dir=tmpdir,
                     embedding_model=embedding_model,
                     ground_truth=ground_truth_present,
+                    requirement_limit=requirement_limit,
                 ) # Evaluate this evaluation case
                 res["name"] = name # Add case name to results
                 all_results.append(res) # Append to all results
 
-                ragas_records.extend(case_ragas_records) # Collect groundedness samples for potential further analysis or separate logging
+                # Collect RAGAS records for logging
+                sub_ragas_records.extend(case_sub_ragas_records)  # Sub-requirements
+                main_ragas_records.extend(case_main_ragas_records)  # Main requirements
 
                 if run_ctx is not None:
                     # Log per-case metrics with a step index (for easier aggregation in MLflow UI charts)
@@ -349,12 +378,22 @@ def main() -> None:
             if os.path.exists(mapping_path):
                 mlflow.log_artifact(mapping_path, artifact_path="inputs")
 
-            # Log RAGAS records as artifact for potential further analysis
-            if ragas_records:
-                ragas_artifact_path = os.path.join(metrics_dir, "ragas_records.json")
-                with open(ragas_artifact_path, "w", encoding="utf-8") as f:
-                    json.dump(ragas_records, f, indent=2)
-                mlflow.log_artifact(ragas_artifact_path, artifact_path="ragas")
+            # Log RAGAS records as artifacts for potential further analysis
+            # Sub-requirements records (for faithfulness evaluation)
+            if sub_ragas_records:
+                sub_ragas_path = os.path.join(metrics_dir, "ragas_sub_requirements.json")
+                with open(sub_ragas_path, "w", encoding="utf-8") as f:
+                    json.dump(sub_ragas_records, f, indent=2, ensure_ascii=False)
+                mlflow.log_artifact(sub_ragas_path, artifact_path="ragas")
+                print(f"✓ Logged {len(sub_ragas_records)} sub-requirement records to MLflow")
+            
+            # Main requirements records (for relevancy/correctness evaluation)
+            if main_ragas_records:
+                main_ragas_path = os.path.join(metrics_dir, "ragas_main_requirements.json")
+                with open(main_ragas_path, "w", encoding="utf-8") as f:
+                    json.dump(main_ragas_records, f, indent=2, ensure_ascii=False)
+                mlflow.log_artifact(main_ragas_path, artifact_path="ragas")
+                print(f"✓ Logged {len(main_ragas_records)} main requirement records to MLflow")
 
         print("✓ RAG evaluation completed.")
 
