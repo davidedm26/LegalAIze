@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read 
+  issues: write
 
 env:
   PYTHON_VERSION: '3.11'

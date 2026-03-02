@@ -1,3 +1,5 @@
+# Needed for .github/scripts/check_and_issue.py
+PyGithub
 # For HTML parsing (specific, stable version)
 beautifulsoup4==4.12.3
 
