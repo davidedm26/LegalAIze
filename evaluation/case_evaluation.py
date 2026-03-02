@@ -10,6 +10,7 @@ from evaluation.metrics import (
     compute_mae,
     compute_note_similarity,
     compute_ragas_metrics,
+    compute_correctness_on_main_requirements,
 )
 
 
@@ -229,20 +230,22 @@ def evaluate_single_case(
             if note_similarities
             else 0.0
         )
+        # Compute faithfulness and relevancy on SUB-requirements (no ground truth)
         ragas_metrics = compute_ragas_metrics(sub_ragas_records, embedding_model=embedding_model)
         case_groundedness_score = ragas_metrics.get("groundedness")
         case_faithfulness_score = ragas_metrics.get("faithfulness")
         case_relevancy_score = ragas_metrics.get("relevancy")
-        case_correctness_score = ragas_metrics.get("correctness")
+        
+        # Compute AnswerCorrectness on MAIN requirements (with ground truth)
+        case_correctness_score = compute_correctness_on_main_requirements(
+            ragas_records, embedding_model=embedding_model
+        )
 
-        if case_groundedness_score is None:
-            print("⚠ Groundedness score is None, RAGAS evaluation may have failed or is unavailable.")
+        # Check for critical failures (faithfulness should work, correctness requires GT)
         if case_faithfulness_score is None:
-            print("⚠ Faithfulness score is None, RAGAS evaluation may have failed or is unavailable.")
-        if case_relevancy_score is None:
-            print("⚠ Relevancy score is None, RAGAS evaluation may have failed or is unavailable.")
+            print("⚠ Faithfulness score is None, RAGAS evaluation may have failed.")
         if case_correctness_score is None:
-            print("⚠ Correctness score is None, RAGAS evaluation may have failed or is unavailable.")
+            print("⚠ AnswerCorrectness is None - check if main requirements have ground truth auditor notes.")
 
         return (
             {
@@ -258,7 +261,7 @@ def evaluate_single_case(
                 "relevancy_score": case_relevancy_score,
                 "relevancy_sample_count": len(sub_ragas_records),
                 "correctness_score": case_correctness_score,
-                "correctness_sample_count": len(sub_ragas_records),
+                "correctness_sample_count": len(ragas_records),  # Main requirements with GT
             },
             sub_ragas_records,
         )

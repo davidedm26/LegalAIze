@@ -114,91 +114,136 @@ def compute_ragas_metrics(samples: List[Dict[str, Any]], embedding_model=None) -
             print("⚠ LLM model name not found in params.yaml under evaluation.llm_model.")
             return {"groundedness": None, "faithfulness": None, "relevancy": None, "correctness": None}
         
-        # Configure LLM and Embeddings for RAGAS
-        # Use OpenAI embeddings for native compatibility with RAGAS
+        # Configure LLM for RAGAS
         llm = ChatOpenAI(model=llm_model, temperature=llm_temperature, request_timeout=180)
-        embeddings = OpenAIEmbeddings()
         
-        # Initialize metrics with OpenAI embeddings
+        # Initialize only Faithfulness metric for sub-requirements
+        # Answer Relevancy is problematic in legal context where saying "no evidence found" is valid
         faithfulness_metric = Faithfulness(llm=llm)
-        relevancy_metric = AnswerRelevancy(llm=llm, embeddings=embeddings)
 
         ragas_dataset = Dataset.from_list([
             {
-                "question": sample['question'],  # Use the question directly without redundant prefix
+                "question": sample['question'],
                 "answer": sample["answer"],
                 "contexts": sample["contexts"],
                 "ground_truth": sample.get("ground_truth", ""),
             }
             for sample in samples
         ])
+        
+        print(f"\n🔍 Computing Faithfulness on {len(samples)} sub-requirements...")
         ragas_result = ragas_evaluate(
             dataset=ragas_dataset,
-            metrics=[faithfulness_metric, relevancy_metric],  # Use configured metrics
+            metrics=[faithfulness_metric],  # Only faithfulness for sub-requirements
             llm=llm,
         )
         df = ragas_result.to_pandas()
         
-        # Extended debug: print actual values returned by RAGAS
-        print(f"\n🔍 RAGAS Debug Info:")
-        print(f"  DataFrame columns: {df.columns.tolist()}")
-        print(f"  DataFrame shape: {df.shape}")
-        if 'answer_relevancy' in df.columns:
-            print(f"  Raw relevancy values: {df['answer_relevancy'].tolist()}")
-            print(f"  Relevancy dtype: {df['answer_relevancy'].dtype}")
-            print(f"  Any NaN?: {df['answer_relevancy'].isna().any()}")
-            print(f"  First relevancy score: {df['answer_relevancy'].iloc[0] if len(df) > 0 else 'N/A'}")
-        if 'faithfulness' in df.columns:
-            print(f"  Faithfulness values: {df['faithfulness'].tolist()}")
-        # Groundedness temporarily disabled
-        groundedness = None
-        # # Extract groundedness
-        # if 'nv_response_groundedness' in df.columns:
-        #     groundedness = float(df['nv_response_groundedness'].mean())
-        # elif 'response_groundedness' in df.columns:
-        #     groundedness = float(df['response_groundedness'].mean())
-        # elif 'groundedness' in df.columns:
-        #     groundedness = float(df['groundedness'].mean())
-        # else:
-        #     groundedness = None
-        # Extract faithfulness
-        if "nv_response_faithfulness" in df.columns:
+        # Extract faithfulness score
+        if "faithfulness" in df.columns:
+            faithfulness = float(df["faithfulness"].mean())
+            print(f"  Faithfulness mean: {faithfulness:.4f}")
+        elif "nv_response_faithfulness" in df.columns:
             faithfulness = float(df["nv_response_faithfulness"].mean())
+            print(f"  Faithfulness mean (nv): {faithfulness:.4f}")
         elif "response_faithfulness" in df.columns:
             faithfulness = float(df["response_faithfulness"].mean())
-        elif "faithfulness" in df.columns:
-            faithfulness = float(df["faithfulness"].mean())
+            print(f"  Faithfulness mean (response): {faithfulness:.4f}")
         else:
             faithfulness = None
-        # Extract relevance
-        if "nv_response_answer_relevancy" in df.columns:
-            relevancy_series = df["nv_response_answer_relevancy"].dropna()
-            relevancy = float(relevancy_series.mean()) if len(relevancy_series) > 0 else None
-            print(f"  Using 'nv_response_answer_relevancy', non-null count: {len(relevancy_series)}")
-        elif "response_answer_relevancy" in df.columns:
-            relevancy_series = df["response_answer_relevancy"].dropna()
-            relevancy = float(relevancy_series.mean()) if len(relevancy_series) > 0 else None
-            print(f"  Using 'response_answer_relevancy', non-null count: {len(relevancy_series)}")
-        elif "answer_relevancy" in df.columns:
-            relevancy_series = df["answer_relevancy"].dropna()
-            relevancy = float(relevancy_series.mean()) if len(relevancy_series) > 0 else None
-            print(f"  Using 'answer_relevancy', non-null count: {len(relevancy_series)}")
-            print(f"  Relevancy mean: {relevancy}")
-        else:
-            relevancy = None
-            print(f"  ⚠️ No relevancy column found!")
-        # Correctness temporarily disabled
-        correctness = None
-        # # Extract correctness
-        # if "nv_response_answer_correctness" in df.columns:
-        #     correctness = float(df["nv_response_answer_correctness"].mean())
-        # elif "response_answer_correctness" in df.columns:
-        #     correctness = float(df["response_answer_correctness"].mean())
-        # elif "answer_correctness" in df.columns:
-        #     correctness = float(df["answer_correctness"].mean())
-        # else:
-        #     correctness = None
-        return {"groundedness": groundedness, "faithfulness": faithfulness, "relevancy": relevancy, "correctness": correctness}
+            print("  ⚠️ No faithfulness column found!")
+        
+        # Groundedness and relevancy are not computed for sub-requirements
+        # Correctness is computed separately on main requirements
+        return {
+            "groundedness": None, 
+            "faithfulness": faithfulness, 
+            "relevancy": None,  # Removed - problematic in legal context
+            "correctness": None  # Computed separately on main requirements
+        }
     except Exception as e:
         print(f"⚠ Failed to compute RAGAS metrics: {e}")
         return {"groundedness": None, "faithfulness": None, "relevancy": None, "correctness": None}
+
+
+def compute_correctness_on_main_requirements(
+    main_requirement_samples: List[Dict[str, Any]], embedding_model=None
+) -> Optional[float]:
+    """
+    Compute AnswerCorrectness specifically for main requirements that have ground truth.
+    This is separate from sub-requirement metrics (faithfulness/relevancy).
+    
+    Args:
+        main_requirement_samples: List of main requirement samples with ground_truth field
+        embedding_model: Optional (not used for correctness but kept for consistency)
+    
+    Returns:
+        Average correctness score or None if unavailable
+    """
+    if not main_requirement_samples:
+        print("  No main requirement samples with ground truth for correctness calculation.")
+        return None
+    
+    # Filter samples that have non-empty ground truth
+    samples_with_gt = [
+        s for s in main_requirement_samples 
+        if s.get("ground_truth") and str(s.get("ground_truth")).strip()
+    ]
+    
+    if not samples_with_gt:
+        print(f"  No samples with ground truth found (filtered from {len(main_requirement_samples)} samples).")
+        return None
+    
+    if not RAGAS_CORRECTNESS_AVAILABLE:
+        print("⚠ AnswerCorrectness metric unavailable (check ragas installation).")
+        return None
+    
+    import yaml
+    import os
+    try:
+        # Load LLM configuration
+        params_path = os.path.join(os.path.dirname(__file__), "..", "params.yaml")
+        with open(params_path, "r", encoding="utf-8") as f:
+            params = yaml.safe_load(f)
+        llm_model = params.get("evaluation", {}).get("llm_model", None)
+        llm_temperature = params.get("evaluation", {}).get("llm_temperature", 0.0)
+        
+        if llm_model is None:
+            print("⚠ LLM model name not found in params.yaml under evaluation.llm_model.")
+            return None
+        
+        llm = ChatOpenAI(model=llm_model, temperature=llm_temperature, request_timeout=180)
+        correctness_metric = AnswerCorrectness(llm=llm)
+        
+        ragas_dataset = Dataset.from_list([
+            {
+                "question": sample['question'],
+                "answer": sample["answer"],
+                "contexts": sample["contexts"],
+                "ground_truth": sample.get("ground_truth", ""),
+            }
+            for sample in samples_with_gt
+        ])
+        
+        print(f"\n🔍 Computing AnswerCorrectness on {len(samples_with_gt)} main requirements with ground truth...")
+        ragas_result = ragas_evaluate(
+            dataset=ragas_dataset,
+            metrics=[correctness_metric],
+            llm=llm,
+        )
+        df = ragas_result.to_pandas()
+        
+        # Extract correctness score
+        if "answer_correctness" in df.columns:
+            correctness = float(df["answer_correctness"].mean())
+            print(f"  AnswerCorrectness mean: {correctness:.4f}")
+            return correctness
+        else:
+            print("  ⚠️ No answer_correctness column found in results!")
+            return None
+            
+    except Exception as e:
+        print(f"⚠ Failed to compute AnswerCorrectness: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
