@@ -41,7 +41,7 @@ rag_params = params.get("rag", {})
 
 
 
-RequirementScore = Union[int, str] # Score can be an integer from 0 to 5, or "N/A" if not applicable or if parsing fails
+RequirementScore = Union[int, float, str] # Score can be an integer/float from 0 to 5, or "N/A" if not applicable or if parsing fails
 
 class SubRequirementReport(BaseModel):
     Reference: str

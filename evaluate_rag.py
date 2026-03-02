@@ -183,7 +183,7 @@ def main() -> None:
 
                     agg_prompt_template = rag_engine.evaluation_engine._get_aggregate_prompt([
                         {"reference": example_reference, "score": 5, "answer": "Good"}
-                    ])
+                    ], computed_score=3.5)
                     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix="_aggregate_prompt_template.txt", encoding="utf-8") as tf:
                         tf.write(agg_prompt_template)
                         tf.flush()
