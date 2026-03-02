@@ -10,8 +10,8 @@ vectorization:
   vector_index_path: "data/processed/vector_index" # Path to save vector index (if using local file-based storage)
 
 rag:
-  document_chunk_size: 300
-  document_chunk_overlap: 50
+  document_chunk_size: 1500
+  document_chunk_overlap: 150
   document_chunks_top_k: 3
   llm_model: "gpt-4o-mini"  # RAG LLM model
   llm_temperature: 0.0
