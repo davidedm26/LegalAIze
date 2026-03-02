@@ -96,7 +96,7 @@ def main() -> None:
     # Set seed for reproducibility where possible
     random.seed(random_seed)
 
-    # Prepare metrics dir ( useful when MLflow is not configured and we rely on local JSON output for metrics storage, e.g., for DVC tracking )
+    # Prepare metrics dir (useful when MLflow is not configured and local JSON output is needed for metrics storage, e.g., for DVC tracking)
     metrics_dir = os.path.dirname(metrics_output)
     if metrics_dir:
         os.makedirs(metrics_dir, exist_ok=True)
@@ -173,8 +173,7 @@ def main() -> None:
                     example_content = "EXAMPLE_CONTENT"
                     example_chunks = ["EXAMPLE_CHUNK_1", "EXAMPLE_CHUNK_2"]
 
-                    # Access private methods or use a public method to get template if available
-                    # Since methods are semi-private (_get_sub_prompt), we access them for logging purposes
+                    # Access methods to log prompt templates
                     sub_prompt_template = rag_engine.evaluation_engine._get_sub_prompt("EXAMPLE_MAIN_REQ", example_reference, "EXAMPLE_SOURCE", example_content, example_chunks)
                     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix="_sub_prompt_template.txt", encoding="utf-8") as tf:
                         tf.write(sub_prompt_template)
@@ -206,7 +205,7 @@ def main() -> None:
             print(f"Evaluating case: {name}")
             if not os.path.exists(doc_path):
                 print(f"⚠ Document not found: {doc_path}")
-                continue # Skip this case if document is missing
+                continue
             if report_path is None or not os.path.exists(report_path):
                 print(f"⚠ Ground truth report not found, Score MAE, Note Similarity and RAGAS Correctness metrics will be skipped for case: {doc_path}")
                 report_path_for_eval = None
@@ -256,7 +255,7 @@ def main() -> None:
                                 artifact_path=f"cases/{case_slug}/outputs/{label}",
                             )
 
-        # After processing all cases, compute aggregated metrics across all results and log them to MLflow and/or save to a JSON file for DVC tracking or other uses.
+        # Compute aggregated metrics across all results and log them to MLflow and/or save to a JSON file for DVC tracking.
         if all_results:
 
 
