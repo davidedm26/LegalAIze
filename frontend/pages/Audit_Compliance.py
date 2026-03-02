@@ -6,6 +6,14 @@ import time
 from fpdf import FPDF
 from pypdf import PdfReader
 import plotly.graph_objects as go
+import streamlit as st
+import requests
+import json
+import os
+import time
+from fpdf import FPDF
+from pypdf import PdfReader
+import plotly.graph_objects as go
 
 # ==============================================================================
 # CONFIGURATION & DYNAMIC PATHS
@@ -20,16 +28,19 @@ try:
     current_script_dir = os.path.dirname(os.path.abspath(__file__))
     
     # 2. Go up two levels to reach the project root 'LegalAIze'
-    # (Assuming structure: LegalAIze -> frontend -> pages -> ThisScript.py)
     project_root = os.path.abspath(os.path.join(current_script_dir, "..", ".."))
     
-    # 3. Build path to data folder
+    # 3. Build paths to data folders
     MAPPING_FILE = os.path.join(project_root, "data", "mapping.json")
+    REQUIREMENTS_FILE = os.path.join(project_root, "data", "processed", "requirement_chunks.json")
 
     print("Loaded MAPPING_FILE from:", MAPPING_FILE)
+    print("Loaded REQUIREMENTS_FILE from:", REQUIREMENTS_FILE)
+
 except Exception as e:
     # Fallback just in case
     MAPPING_FILE = "mapping.json"
+    REQUIREMENTS_FILE = "requirement_chunks.json"
     print(f"Path Error: {e}")
 
 # ==============================================================================
@@ -59,16 +70,21 @@ def reset_session():
     st.session_state.total_points = 0
     st.session_state.max_points = 0
 
+# Generic function to load any JSON file
 @st.cache_data
-def load_mapping_data(filepath):
+def load_json_data(filepath):
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
-        print(f"JSON Error: {e}")
+        print(f"JSON Error loading {filepath}: {e}")
         return {}
 
-MAPPING_DATA = load_mapping_data(MAPPING_FILE)
+# Load both files into memory
+MAPPING_DATA = load_json_data(MAPPING_FILE)
+REQUIREMENTS_DATA = load_json_data(REQUIREMENTS_FILE)
+
+
 
 # ==============================================================================
 # CUSTOM CSS
@@ -245,6 +261,34 @@ def group_requirements_by_principle(requirements, mapping_data):
         if principle:
             grouped.setdefault(principle, []).append(req)
     return grouped
+
+def get_reference_details(req_id, requirements_data):
+    """
+    Estrae i contenuti di dettaglio per le reference (AI Act e ISO) 
+    dal file requirement_chunks.json basandosi sull'ID.
+    """
+    # Cerca il chunk corrispondente all'ID
+    req_chunk = next((r for r in requirements_data if r.get("id") == req_id), None)
+    
+    ai_act_dict = {}
+    iso_dict = {}
+    
+    if req_chunk:
+        # Estrai articoli EU AI Act
+        for ai_ref in req_chunk.get("euAiActArticles", []):
+            ai_act_dict[ai_ref.get("reference")] = ai_ref.get("content", "Nessun contenuto disponibile.")
+            
+        # Estrai controlli ISO 42001
+        for iso_ref in req_chunk.get("iso42001Reference", []):
+            content = iso_ref.get("content", "")
+            # Gestisci il caso in cui la ISO usi "control" e "implementation_guidance" invece di "content"
+            if not content:
+                control = iso_ref.get("control", "")
+                guidance = iso_ref.get("implementation_guidance", "")
+                content = f"**Control:**\n{control}\n\n**Guidance:**\n{guidance}".strip()
+            iso_dict[iso_ref.get("reference")] = content
+            
+    return ai_act_dict, iso_dict
 
 # ==============================================================================
 # SIDEBAR
@@ -520,16 +564,33 @@ if st.session_state.audit_results is not None:
                         st.markdown(f"**Score:** {req['score_display']}")
 
                         st.caption("REFERENCES")
-                        st.markdown(f"**ISO:** {iso_ui}")
-                        st.markdown(f"**AI Act:** {ai_act_ui}")
+                        
+                        # --- LOGICA TOOLTIP ---
+                        # Recupera i dizionari con i testi lunghi per l'ID corrente
+                        ai_act_dict, iso_dict = get_reference_details(req['id'], REQUIREMENTS_DATA)
 
-                        st.progress(req["progress"]) 
-                    with col_B:
-                        st.caption("AI FINDINGS")
-                        st.write(req["notes"])
+                        # Mostra ISO 42001 in verticale con tooltip
+                        if iso_ui_list:
+                            st.markdown("**ISO 42001:**")
+                            for ref in iso_ui_list:
+                                help_text = iso_dict.get(ref, "Dettagli non trovati nel JSON.")
+                                st.markdown(f"- {ref}", help=help_text)
+                        else:
+                            st.markdown("**ISO 42001:** N/A")
+                        
+                        st.write("") # extra spacing
+                        
+                        # Mostra EU AI Act in verticale con tooltip
+                        if ai_act_list:
+                            st.markdown("**EU AI Act:**")
+                            for ref in ai_act_list:
+                                help_text = ai_act_dict.get(ref, "Dettagli non trovati nel JSON.")
+                                st.markdown(f"- {ref}", help=help_text)
+                        else:
+                            st.markdown("**EU AI Act:** N/A")
+                        # ----------------------------
 
-                        st.caption("Rationale")
-                        st.text(req.get("rationale", "No rationale provided."))
+                        st.progress(req["progress"])
 elif analyze_btn and not doc_text:
     st.warning("Please upload a file or paste text.")
 
