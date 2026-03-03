@@ -64,6 +64,14 @@ class RequirementReport(BaseModel):
 
 
 # Lightweight model for API responses (excludes verbose fields)
+class SubRequirementReportAPI(BaseModel):
+    Reference: str
+    Source: str
+    Score: RequirementScore
+    Rationale: str
+    Auditor_Notes: str
+    Contexts: List[str]
+
 class RequirementReportAPI(BaseModel):
     Requirement_ID: str
     Requirement_Category: str
@@ -71,6 +79,7 @@ class RequirementReportAPI(BaseModel):
     Score: RequirementScore
     Rationale: Optional[str] = None
     Auditor_Notes: str
+    SubRequirements: List[SubRequirementReportAPI] = []
 
 
 class AuditResponse(BaseModel):
