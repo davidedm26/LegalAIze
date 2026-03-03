@@ -6,8 +6,8 @@ stages:
     deps:
     - path: data/mapping.json
       hash: md5
-      md5: ca560cb920ae54ed03e552adfb1fb06f
-      size: 6054
+      md5: 56ab47b3f3fcd12122836b11ba11d6ec
+      size: 6089
     - path: data/raw_data/
       hash: md5
       md5: f941a48344d6b4813c536e7eeb258564.dir
@@ -15,14 +15,12 @@ stages:
       nfiles: 4
     - path: ingestion/
       hash: md5
-      md5: 42e0b300499a62bc6a968eef020ae108.dir
-      size: 42672
+      md5: 4067ff2edd407658c571800d19f51ccd.dir
+      size: 51702
       nfiles: 5
     params:
       params.yaml:
         ingestion:
-          chunk_size: 1000
-          chunk_overlap: 150
           data_dir: data/
           processed_data_dir: data/processed
     outs:
@@ -36,30 +34,30 @@ stages:
       size: 97874
     - path: data/processed/requirement_chunks.json
       hash: md5
-      md5: 16b6d0d3c497bcc8e45c091ea69260af
-      size: 121766
+      md5: 6a20994bdd1f0fb021a23b7a7c9ad2f0
+      size: 123713
   vectorize:
     cmd: python vectorize_data.py
     deps:
     - path: data/processed/requirement_chunks.json
       hash: md5
-      md5: 16b6d0d3c497bcc8e45c091ea69260af
-      size: 121766
+      md5: 6a20994bdd1f0fb021a23b7a7c9ad2f0
+      size: 123713
     - path: vectorize_data.py
       hash: md5
-      md5: 1a20e218449ca0e8451247d73de33920
-      size: 8127
+      md5: 66d924c6a0aa8be66bebdf65ffd62a5e
+      size: 8124
     params:
       params.yaml:
         vectorization:
-          model_name: all-MiniLM-L6-v2
+          model_name: paraphrase-multilingual-MiniLM-L12-v2
           collection_name: legal_docs
           vector_index_path: data/processed/vector_index
     outs:
     - path: data/processed/vector_index
       hash: md5
-      md5: f7867f184b501f88194ec9f9d0f2c501.dir
-      size: 406061
+      md5: 4738b20ce4b30402ed25c513c89cff6f.dir
+      size: 410157
       nfiles: 4
   precompute_rag:
     cmd: python precompute_rag.py
