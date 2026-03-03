@@ -60,37 +60,66 @@ flowchart TD
 ---
 
 ## Project Structure
-(Da aggiornare alla fine)
 ```text
 LegalAIze/
-├── backend/
-│   ├── app/
-│   ├── requirements.txt
-│   └── ...
-├── frontend/
-│   ├── app.py
-│   ├── requirements.txt
-│   └── ...
-├── data/
-│   └── ...
-├── models/
-│   └── ...
-├── notebooks/
-│   └── ...
-├── evaluation/
-│   ├── evaluate_rag.py
-│   └── ...
-├── ingestion/
-│   └── ...
-├── metrics/
-│   └── ...
-├── qdrant_init/
-│   └── ...
-├── params.yaml
-├── dvc.yaml
-├── docker-compose.yml
-├── requirements.txt
-└── .env.example
+├── backend/                           # FastAPI backend service
+│   ├── app.py                         # FastAPI application entry point
+│   ├── rag_engine.py                  # RAG system core logic
+│   ├── core/                          # Modular RAG components
+│   │   ├── evaluation.py              # Compliance evaluation engine
+│   │   └── retrieval.py               # Document retrieval system
+│   ├── Dockerfile                     # Backend container configuration
+│   └── requirements.txt               # Backend Python dependencies
+│
+├── frontend/                          # Streamlit user interface
+│   ├── app.py                         # Main Streamlit application
+│   ├── pages/                         # Multi-page app structure
+│   │   └── Audit_Compliance.py        # Compliance audit page
+│   ├── Dockerfile                     # Frontend container configuration
+│   └── requirements.txt               # Frontend Python dependencies
+│
+├── evaluation/                        # RAG evaluation framework
+│   ├── case_evaluation.py             # Single case evaluation logic
+│   ├── data_loading.py                # Ground truth data loaders
+│   ├── metrics.py                     # RAGAS metrics computation
+│   ├── mlflow_utils.py                # MLflow logging utilities
+│   └── utils.py                       # Evaluation helper functions
+│
+├── ingestion/                         # Document ingestion pipeline
+│   ├── data_ingestion.py              # Main ingestion orchestrator
+│   ├── parse_aia.py                   # EU AI Act HTML parser
+│   └── parse_iso.py                   # ISO 42001 PDF parser
+│
+├── data/                              # Data artifacts (DVC-tracked)
+│   ├── raw_data/                      # Original regulatory documents
+│   ├── processed/                     # Parsed and chunked documents
+│   │   ├── ai_act_parsed.json
+│   │   ├── iso_parsed.json
+│   │   ├── requirement_chunks.json
+│   │   └── vector_index/              # Local Qdrant vector store
+│   ├── ground_truth/                  # Evaluation test cases
+│   │   └── raw_data/                  # Documentation + ground truth reports
+│   ├── debug/                         # Debug audit outputs
+│   ├── qdrant_storage/                # Qdrant persistent storage (it appears after the docker activation)
+│   └── mapping.json                   # Requirement mapping structure
+│
+├── qdrant_init/                       # Qdrant initialization service
+│   ├── Dockerfile
+│   └── transfer_qdrant.py             # Vector DB seeding script
+│
+├── metrics/                           # Evaluation metrics output (DVC)
+├── img/                               # README images and assets
+├── .github/workflows/                 # CI/CD pipelines
+│
+├── evaluate_rag.py                    # Main evaluation script
+├── vectorize_data.py                  # Vectorization pipeline script
+│
+├── params.yaml                        # Experiment parameters (DVC)
+├── dvc.yaml                           # DVC pipeline definition
+├── docker-compose.yml                 # Multi-container orchestration
+├── requirements.txt                   # Root Python dependencies
+├── .env.example                       # Environment variables template
+└── README.md                          # This file
 ```
 
 ---
