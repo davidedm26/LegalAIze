@@ -404,7 +404,46 @@ def audit_document(
     document_chunk_size = rag_params.get("document_chunk_size", 512)
     document_chunk_overlap = rag_params.get("document_chunk_overlap", 64)
 
+    # Validate document input
+    MIN_DOCUMENT_LENGTH = 50  # Minimum characters for meaningful analysis
+    if not document_text or len(document_text.strip()) < MIN_DOCUMENT_LENGTH:
+        print(f"⚠ Warning: Document is empty or too short ({len(document_text.strip())} chars). Returning N/A for all requirements.")
+        # Return report with all requirements scored N/A (evaluation not applicable)
+        empty_reports = []
+        req_iter = requirement_chunks if requirement_limit is None else requirement_chunks[:requirement_limit]
+        for req_data in req_iter:
+            empty_reports.append(RequirementReport(
+                Requirement_ID=req_data.get("id", ""),
+                Requirement_Category=req_data.get("ethicalPrinciple", "unknown"),
+                Requirement_Name=req_data.get("requirementName", "unknown"),
+                Score="N/A",
+                Rationale="The provided document is empty or insufficient for compliance evaluation. A minimum of 50 characters is required for meaningful analysis.",
+                Auditor_Notes="Evaluation not applicable: no meaningful content found in the provided document. Adequate documentation is required to assess compliance.",
+                Prompt="",
+                SubRequirements=[]
+            ))
+        return AuditResponse(requirements=empty_reports)
+
     doc_chunks = _chunk_document(document_text, chunk_size=document_chunk_size, chunk_overlap=document_chunk_overlap)
+    
+    # Additional check after chunking
+    if not doc_chunks or len(doc_chunks) == 0:
+        print(f"⚠ Warning: No chunks generated from document. Returning N/A for all requirements.")
+        empty_reports = []
+        req_iter = requirement_chunks if requirement_limit is None else requirement_chunks[:requirement_limit]
+        for req_data in req_iter:
+            empty_reports.append(RequirementReport(
+                Requirement_ID=req_data.get("id", ""),
+                Requirement_Category=req_data.get("ethicalPrinciple", "unknown"),
+                Requirement_Name=req_data.get("requirementName", "unknown"),
+                Score="N/A",
+                Rationale="The provided document could not be processed into analyzable chunks. Document may be improperly formatted or lack sufficient text content.",
+                Auditor_Notes="Evaluation not applicable: document content is insufficient or improperly formatted for compliance evaluation.",
+                Prompt="",
+                SubRequirements=[]
+            ))
+        return AuditResponse(requirements=empty_reports)
+    
     doc_embs = _embed_chunks(doc_chunks, embedding_model)
 
 
