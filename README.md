@@ -248,15 +248,20 @@ You can run the backend and frontend separately without the use of docker:
 
 **Backend (FastAPI):**
 ```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app:app --reload --port 8000
+# Install backend dependencies
+pip install -r backend/requirements.txt
+
+# Run from project root (not from backend directory)
+uvicorn backend.app:app --reload --port 8000
 ```
 
 **Frontend (Streamlit):**
 ```bash
+# Install frontend dependencies  
+pip install -r frontend/requirements.txt
+
+# Run from frontend directory
 cd frontend
-pip install -r requirements.txt
 streamlit run app.py
 ```
 

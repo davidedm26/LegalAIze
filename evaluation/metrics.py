@@ -19,6 +19,39 @@ except ImportError:
     AnswerCorrectness = None
 
 
+# ============================================================================
+# RAGAS 0.4.0 has issues parsing JSON wrapped in markdown code fences (```json...```)
+# This patch intercepts json.loads calls to remove markdown formatting
+import json as json_module
+
+def _clean_json_string(s: str) -> str:
+    """Remove markdown code fences from JSON strings."""
+    if not isinstance(s, str):
+        return s
+    s = s.strip()
+    # Remove ```json and ``` markers
+    if s.startswith("```json"):
+        s = s[7:]  # Remove ```json
+    elif s.startswith("```"):
+        s = s[3:]  # Remove ```
+    if s.endswith("```"):
+        s = s[:-3]  # Remove trailing ```
+    return s.strip()
+
+# Store original json.loads
+_original_json_loads = json_module.loads
+
+def _patched_json_loads(s, *args, **kwargs):
+    """Patched json.loads that handles markdown code fences."""
+    if isinstance(s, str):
+        s = _clean_json_string(s)
+    return _original_json_loads(s, *args, **kwargs)
+
+# Apply monkey-patch to json module
+json_module.loads = _patched_json_loads
+print("Applied JSON markdown code fence patch for RAGAS compatibility")
+# ============================================================================
+
 
 RAGAS_FAITHFULNESS_AVAILABLE = (
     Dataset is not None
@@ -100,16 +133,19 @@ def compute_subrequirements_ragas_metrics(samples: List[Dict[str, Any]]) -> Dict
         )
         df = ragas_result.to_pandas()
         
-        # Extract faithfulness score
+        # Extract faithfulness score (excluding zeros from average)
         if "faithfulness" in df.columns:
-            faithfulness = float(df["faithfulness"].mean())
-            print(f"  Faithfulness mean: {faithfulness:.4f}")
+            non_zero_values = df["faithfulness"][df["faithfulness"] > 0.001]
+            faithfulness = float(non_zero_values.mean()) if len(non_zero_values) > 0 else 0.0
+            print(f"  Faithfulness mean: {faithfulness:.4f} (non-zero count: {len(non_zero_values)}/{len(df)})")
         elif "nv_response_faithfulness" in df.columns:
-            faithfulness = float(df["nv_response_faithfulness"].mean())
-            print(f"  Faithfulness mean (nv): {faithfulness:.4f}")
+            non_zero_values = df["nv_response_faithfulness"][df["nv_response_faithfulness"] > 0.001]
+            faithfulness = float(non_zero_values.mean()) if len(non_zero_values) > 0 else 0.0
+            print(f"  Faithfulness mean (nv): {faithfulness:.4f} (non-zero count: {len(non_zero_values)}/{len(df)})")
         elif "response_faithfulness" in df.columns:
-            faithfulness = float(df["response_faithfulness"].mean())
-            print(f"  Faithfulness mean (response): {faithfulness:.4f}")
+            non_zero_values = df["response_faithfulness"][df["response_faithfulness"] > 0.001]
+            faithfulness = float(non_zero_values.mean()) if len(non_zero_values) > 0 else 0.0
+            print(f"  Faithfulness mean (response): {faithfulness:.4f} (non-zero count: {len(non_zero_values)}/{len(df)})")
         else:
             faithfulness = None
             print("  ⚠️ No faithfulness column found!")
@@ -180,12 +216,12 @@ Phrases like 'lacks X', 'insufficient Y', 'gaps in Z', 'does not provide', 'abse
         except AttributeError:
             pass  # Fallback if prompt customization not available
         
-        # Compute on all samples (relevancy doesn't need GT)
+        # Compute on all samples (relevancy doesn't need GT or contexts)
         all_samples_dataset = Dataset.from_list([
             {
                 "question": sample['question'],
                 "answer": sample["answer"],
-                "contexts": sample["contexts"],
+                "contexts": sample.get("contexts", []),
                 "ground_truth": sample.get("ground_truth", ""),
             }
             for sample in main_requirement_samples
@@ -199,13 +235,14 @@ Phrases like 'lacks X', 'insufficient Y', 'gaps in Z', 'does not provide', 'abse
         )
         relevancy_df = relevancy_result.to_pandas()
         
-        # Extract relevancy score with detailed debugging
+        # Extract relevancy score (excluding zeros from average)
         if "answer_relevancy" in relevancy_df.columns:
             relevancy_values = relevancy_df["answer_relevancy"].tolist()
-            relevancy = float(relevancy_df["answer_relevancy"].mean())
+            non_zero_values = relevancy_df["answer_relevancy"][relevancy_df["answer_relevancy"] > 0.001]
+            relevancy = float(non_zero_values.mean()) if len(non_zero_values) > 0 else 0.0
             print(f"  AnswerRelevancy values: {relevancy_values}")
-            print(f"  AnswerRelevancy mean: {relevancy:.4f}")
-            print(f"  Non-zero count: {sum(1 for v in relevancy_values if v > 0.001)}/{len(relevancy_values)}")
+            print(f"  AnswerRelevancy mean (non-zero only): {relevancy:.4f}")
+            print(f"  Non-zero count: {len(non_zero_values)}/{len(relevancy_values)}")
         else:
             print("  ⚠️ No answer_relevancy column found!")
             relevancy = None
@@ -217,7 +254,7 @@ Phrases like 'lacks X', 'insufficient Y', 'gaps in Z', 'does not provide', 'abse
                 {
                     "question": sample['question'],
                     "answer": sample["answer"],
-                    "contexts": sample["contexts"],
+                    "contexts": sample.get("contexts", []),
                     "ground_truth": sample.get("ground_truth", ""),
                 }
                 for sample in samples_with_gt
@@ -232,8 +269,10 @@ Phrases like 'lacks X', 'insufficient Y', 'gaps in Z', 'does not provide', 'abse
             correctness_df = correctness_result.to_pandas()
             
             if "answer_correctness" in correctness_df.columns:
-                correctness = float(correctness_df["answer_correctness"].mean())
-                print(f"  AnswerCorrectness mean: {correctness:.4f}")
+                non_zero_values = correctness_df["answer_correctness"][correctness_df["answer_correctness"] > 0.001]
+                correctness = float(non_zero_values.mean()) if len(non_zero_values) > 0 else 0.0
+                print(f"  AnswerCorrectness mean (non-zero only): {correctness:.4f}")
+                print(f"  Non-zero count: {len(non_zero_values)}/{len(correctness_df)}")
             else:
                 print("  ⚠️ No answer_correctness column found!")
         else:

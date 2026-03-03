@@ -205,6 +205,12 @@ def evaluate_single_case(
     # MAE only computed if ground truth available
     mae = compute_mae(gt_scores, pred_scores) if ground_truth else None
     
+    # Display MAE result
+    if ground_truth and mae is not None:
+        print(f"\n📊 MAE (Mean Absolute Error): {mae:.4f} (based on {len(gt_scores)} score pairs)")
+    elif ground_truth:
+        print("\n⚠ MAE could not be computed - no valid score pairs found")
+    
     # Check for critical failures
     if case_faithfulness_score is None:
         print("⚠ Faithfulness score is None, RAGAS evaluation may have failed.")

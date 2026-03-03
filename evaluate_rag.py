@@ -86,6 +86,7 @@ def main() -> None:
     llm_model = eval_params.get("llm_model")
     llm_temperature = float(eval_params.get("llm_temperature"))
     metrics_output = eval_params.get("metrics_output", "metrics/rag_eval.json")
+    debug_output_dir = eval_params.get("debug_output_dir", "data/debug")
     gt_cases = eval_params.get("ground_truth", [])
     case_selector = normalize_case_selector(eval_params.get("case_selector"))
     requirement_limit = eval_params.get("requirement_limit", None)
@@ -100,6 +101,11 @@ def main() -> None:
     metrics_dir = os.path.dirname(metrics_output)
     if metrics_dir:
         os.makedirs(metrics_dir, exist_ok=True)
+    
+    # Prepare debug output dir for saving audit reports
+    if debug_output_dir:
+        os.makedirs(debug_output_dir, exist_ok=True)
+        print(f"📁 Debug reports will be saved to: {debug_output_dir}")
 
     # Aggregate metrics across all cases
     all_results: List[Dict[str, Any]] = []
@@ -230,6 +236,17 @@ def main() -> None:
                 ) # Evaluate this evaluation case
                 res["name"] = name # Add case name to results
                 all_results.append(res) # Append to all results
+                
+                # Save audit report to debug directory
+                if debug_output_dir and "artifacts" in res:
+                    backend_pred_path = res["artifacts"].get("backend_predictions")
+                    if backend_pred_path and os.path.exists(backend_pred_path):
+                        debug_report_path = os.path.join(debug_output_dir, f"audit_{case_slug}.json")
+                        with open(backend_pred_path, "r", encoding="utf-8") as src:
+                            predictions_data = json.load(src)
+                        with open(debug_report_path, "w", encoding="utf-8") as dst:
+                            json.dump(predictions_data, dst, indent=2, ensure_ascii=False)
+                        print(f"  💾 Saved audit report to: {debug_report_path}")
 
                 # Collect RAGAS records for logging
                 sub_ragas_records.extend(case_sub_ragas_records)  # Sub-requirements
