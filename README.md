@@ -221,7 +221,7 @@ Initialize DVC with the following commands to get a GUEST ACCESS to the DVC remo
 
 ```bash
 dvc remote modify origin --local auth basic
-dvc remote modify origin --local user davidedm_26
+dvc remote modify origin --local user davidedm26
 dvc remote modify origin --local password <GUEST_TOKEN>
 ```
 
