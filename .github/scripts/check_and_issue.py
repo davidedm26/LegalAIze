@@ -1,7 +1,4 @@
 # USAGE:
-#   set GITHUB_TOKEN=... (cmd)   or   $env:GITHUB_TOKEN="..." (PowerShell)
-#   set GITHUB_REPOSITORY=user/repo
-#   python .github/scripts/check_and_issue.py [launcher_name]
 
 import os, json, sys
 from github import Github 
