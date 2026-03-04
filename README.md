@@ -179,7 +179,7 @@ pip install dvc
 
 ## 4. MLflow Setup (facultative)
 
-Choose one of the following alternatives for experiment tracking:
+Choose one of the following alternatives for experiment tracking, you can skip this step and check the eval results in the ./metrics/ folder:
 
 ---
 
