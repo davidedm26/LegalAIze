@@ -201,19 +201,7 @@ The MLflow UI will be available at http://localhost:5000.
 
 ---
 
-### B. Remote DagsHub Instance (your own repository)
-
-Create your own DagsHub repository and set the following variables in your `.env`:
-
-```
-DAGSHUB_REPO=YOUR_REPO
-DAGSHUB_USERNAME=YOUR_USERNAME
-DAGSHUB_TOKEN=YOUR_TOKEN
-```
-
----
-
-### C. LegalAIze Team DagsHub Repository
+### B. LegalAIze Team DagsHub Repository
 
 To log experiments to the main LegalAIze DagsHub repository, request write access from the maintainers and set your credentials in the `.env`:
 
