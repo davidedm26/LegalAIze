@@ -49,7 +49,11 @@ def generate_report_from_audit(audit_json_path: str, output_csv_path: str) -> No
     with open(audit_json_path, 'r', encoding='utf-8') as f:
         audit_data = json.load(f)
     
-    requirements = audit_data.get('requirements', [])
+    # Handle both list format (direct array) and dict format (with 'requirements' key)
+    if isinstance(audit_data, list):
+        requirements = audit_data
+    else:
+        requirements = audit_data.get('requirements', [])
     print(f"   Found {len(requirements)} requirements")
     
     # Prepare CSV rows

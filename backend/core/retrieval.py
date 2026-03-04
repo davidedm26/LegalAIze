@@ -1,5 +1,4 @@
 from typing import List, Dict, Any, Optional
-import os
 import re
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
@@ -12,19 +11,46 @@ class RetrievalEngine:
     def _remove_law_names(self, text: str) -> str:
         """
         Removes common law names and references to focus search on semantic content.
+        Strips regulatory identifiers while preserving the substantive content.
         """
         law_patterns = [
-            r"\bISO\s*42001\b",
+            # EU AI Act variants
             r"\bEU\s*AI\s*ACT\b",
-            r"\bCodice\s*Etico\b",
-            r"\bAnnex\s*XI\b",
-            r"\bGDPR\b",
-            r"\bRegolamento\s*\(EU\)\b",
-            r"\blegge\b",
             r"\bAI\s*Act\b",
+            r"\bArtificial\s*Intelligence\s*Act\b",
+            r"\bAI\s*Regulation\b",
+            r"\bRegulation\s*\(EU\)\s*2024/1689\b",
+            
+            # ISO standards
+            r"\bISO\s*/?IEC\s*42001\b",
+            r"\bISO\s*42001\b",
+            r"\bISO\s*/?IEC\s*27001\b",
+            r"\bISO\s*/?IEC\s*27701\b",
+            r"\bISO\s*/?IEC\b",
             r"\bISO\b",
             r"\bIEC\b",
             r"\b42001\b",
+            r"\b27001\b",
+            
+            # EU regulations and directives
+            r"\bGDPR\b",
+            r"\bGeneral\s*Data\s*Protection\s*Regulation\b",
+            r"\bRegulation\s*\(EU\)\b",
+            r"\bDirective\s*\(EU\)\b",
+            r"\bRegolamento\s*\(EU\)\b",
+            
+            # Annexes and articles
+            r"\bAnnex\s*[IVX]+\b",
+            r"\bArticle\s*\d+\b",
+            r"\bArt\.\s*\d+\b",
+            
+            # Generic legal terms
+            r"\b[Rr]egulation\b",
+            r"\b[Dd]irective\b",
+            r"\b[Ss]tandard\b",
+            r"\b[Ll]egge\b",
+            r"\bCode\s*of\s*Ethics\b",
+            r"\bCodice\s*Etico\b",
         ]
         for pat in law_patterns:
             text = re.sub(pat, "", text, flags=re.IGNORECASE)

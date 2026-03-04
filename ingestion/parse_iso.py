@@ -1,4 +1,28 @@
 
+"""
+ISO 42001:2023 PDF Parser
+
+This module extracts structured sections from the ISO/IEC 42001:2023 standard PDF,
+converting the management system requirements into a machine-readable JSON format.
+
+Output Format:
+Each extracted section is a dictionary containing:
+{
+  "name": "Clause 6.1.1",
+  "section_id": "6.1.1",
+  "section_title": "6.1 Planning - 6.1.1 Actions to address risks",
+  "section_type": "management_requirement" | "implementation_guidance",
+  "content": "The organization shall...",          # For normative clauses
+  "control": "AI system inventory shall...",    # For Annex B controls
+  "implementation_guidance": "Consider...",     # For Annex B guidance
+  "metadata": {
+    "normative": true,
+    "annex": null | "B"
+  }
+}
+
+"""
+
 from typing import Optional, List, Dict, Any
 import fitz
 import re
@@ -99,7 +123,8 @@ def ingest_iso_advanced(pdf_path):
             })
 
     # --- 2. PARSING ANNEX A (CONTROLS) ---
-
+    # Removed   
+    
     # --- 3. PARSING ANNEX B (GUIDANCE) ---
     annex_b_matches = re.finditer(
         r'\n(?![^\n]*\.{3,})(B\.\d+(?:\.\d+)*)\s+([^\n]+)\n(.*?)(?=\n(?![^\n]*\.{3,})B\.\d|\nAnnex [A-C]|\Z)', 

@@ -1,62 +1,137 @@
-# Python
+# ==============================================================================
+# LegalAIze - Git Ignore Rules
+# ==============================================================================
+# Files and directories excluded from version control to keep the repository
+# clean, secure, and focused on source code.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Python Runtime & Cache
+# ------------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.pyo
+*.pyd
 .Python
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual Environments
 env/
 venv/
-backend/backend_venv/
-frontend/frontend_venv/
 ENV/
 .venv
+backend/backend_venv/
+frontend/frontend_venv/
 
-# MLflow
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# ------------------------------------------------------------------------------
+# Machine Learning & Experiment Tracking
+# ------------------------------------------------------------------------------
+# MLflow experiment tracking
 mlruns/
 mlartifacts/
 
-# DVC
-/data/*.csv
-/data/*.pdf
+# Model artifacts (too large for git)
+/models/*.pkl
+/models/*.h5
+/models/*.pth
+/models/*.joblib
+
+# Metrics and evaluation outputs
+metrics/**
+!metrics/.gitkeep
+
+# ------------------------------------------------------------------------------
+# Data Version Control (DVC)
+# ------------------------------------------------------------------------------
 .dvc/config.local
 .dvc/tmp
-
-/models/*.pkl
 .dvc/cache
 
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Environment variables
-.env
-
-# Docker
-*.log
-
-# Token
-dagshub_token.txt
-
-backend/debug_responses/
-
-# Data
-data/mapping.json
+# DVC-tracked large files (tracked via .dvc files instead)
+/data/*.csv
+/data/*.pdf
 data/qdrant_storage/
+data/processed/*
+data/debug/*
 data/ground_truth/raw_data/**
 data/unused/**
 data/raw_data/*.pdf
 data/raw_data/*.html
-data/processed/*
-data/debug/*
 
+# Data mapping (generated, not source)
+data/mapping.json
 
-# Metrics
-metrics/**
-metrics/ragas_records.json
+# ------------------------------------------------------------------------------
+# Development Tools & IDEs
+# ------------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+.project
+.pydevproject
+.settings/
+
+# ------------------------------------------------------------------------------
+# Operating System Files
+# ------------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.bak
+*~
+
+# ------------------------------------------------------------------------------
+# Security & Credentials (NEVER commit!)
+# ------------------------------------------------------------------------------
+.env
+*.key
+*.pem
+*.crt
+dagshub_token.txt
+secrets/
+
+# ------------------------------------------------------------------------------
+# Logs & Temporary Files
+# ------------------------------------------------------------------------------
+*.log
+*.tmp
+tmp/
+logs/
+*.pid
+
+# Docker logs
+docker-compose.override.yml
+
+# ------------------------------------------------------------------------------
+# Testing & Coverage
+# ------------------------------------------------------------------------------
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# ------------------------------------------------------------------------------
+# Application-Specific
+# ------------------------------------------------------------------------------
+backend/debug_responses/
+
+# ------------------------------------------------------------------------------
+# Archives (typically not source code)
+# ------------------------------------------------------------------------------
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z

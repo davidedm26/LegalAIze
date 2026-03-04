@@ -41,7 +41,7 @@ rag_params = params.get("rag", {})
 
 
 
-RequirementScore = Union[int, str] # Score can be an integer from 0 to 5, or "N/A" if not applicable or if parsing fails
+RequirementScore = Union[int, float, str] # Score can be an integer/float from 0 to 5, or "N/A" if not applicable or if parsing fails
 
 class SubRequirementReport(BaseModel):
     Reference: str
@@ -64,6 +64,14 @@ class RequirementReport(BaseModel):
 
 
 # Lightweight model for API responses (excludes verbose fields)
+class SubRequirementReportAPI(BaseModel):
+    Reference: str
+    Source: str
+    Score: RequirementScore
+    Rationale: str
+    Auditor_Notes: str
+    Contexts: List[str]
+
 class RequirementReportAPI(BaseModel):
     Requirement_ID: str
     Requirement_Category: str
@@ -71,10 +79,11 @@ class RequirementReportAPI(BaseModel):
     Score: RequirementScore
     Rationale: Optional[str] = None
     Auditor_Notes: str
+    SubRequirements: List[SubRequirementReportAPI] = []
 
 
 class AuditResponse(BaseModel):
-    requirements: List[RequirementReport] #We can include the providex doc context for future steps
+    requirements: List[RequirementReport] # Includes the provided doc context for future steps
 
 
 class AuditResponseAPI(BaseModel):
@@ -88,14 +97,15 @@ llm: Optional[ChatOpenAI] = None
 embedding_model: Optional[SentenceTransformer] = None
 requirement_chunks: Dict[str, Any] = {}
 
-# New engines
+# Main RAG components: RetrievalEngine and EvaluationEngine, instantiated globally for reuse across requests
 retrieval_engine: Optional[RetrievalEngine] = None
 evaluation_engine: Optional[EvaluationEngine] = None
 
 _initialized = False # Flag to prevent re-initialization if already done
 
 
-def _candidate_paths(relative_path: str) -> List[str]: # Generate candidate paths for a given relative path, including both relative and absolute forms, and ensure uniqueness while preserving order
+def _candidate_paths(relative_path: str) -> List[str]:
+    # Generate candidate paths for a given relative path, including both relative and absolute forms, and ensure uniqueness while preserving order
     rel = relative_path.replace("\\", "/")
     candidates = [
         os.path.join(PROJECT_ROOT, rel),
@@ -109,7 +119,9 @@ def _candidate_paths(relative_path: str) -> List[str]: # Generate candidate path
     return unique
 
 
-# Initialization function to set up vector DB, mapping, requirement chunks, and LLM. It checks for environment variables to determine how to connect to Qdrant (external service vs embedded index) and loads necessary data files. The function can be forced to re-initialize if needed.
+# Initialization function to set up vector DB, mapping, requirement chunks, and LLM.
+# It checks for environment variables to determine how to connect to Qdrant (external service vs embedded index)
+# and loads necessary data files. The function can be forced to re-initialize if needed.
 def init_rag(force: bool = False) -> None:
     global vector_db, llm, embedding_model, requirement_chunks, _initialized, retrieval_engine, evaluation_engine
     if _initialized and not force:
@@ -167,29 +179,13 @@ def init_rag(force: bool = False) -> None:
         print(f"✓ Embedding model initialized: {embedding_model_name}")
 
         # Initialize engines
-        evaluation_engine = EvaluationEngine(llm)
-        # Note: RetrievalEngine needs a doc_client, but that's per-document (in-memory).
-        # We can instantiate it dynamically or pass None and set it later.
-        # But wait, RetrievalEngine handles queries. It needs the embedding model.
-        # The doc_client is passed to the query method, so we can init RetrievalEngine here with just the model if we redesign it slightly,
-        # OR we just use it as a helper class instantiated per request?
-        # Let's keep it consistent: Init one "Service" or helper.
-        # But wait, the original `_query_qdrant` took `doc_client` as arg.
-        # So `RetrievalEngine` methods should probably take `doc_client`.
-        # Let's adjust RetrievalEngine to be a stateless service or initialized with global dependencies.
 
-        # Actually, RetrievalEngine was designed in step 1 to take `doc_client` in __init__.
-        # That means we need to instantiate it *per audit* or *per evaluation*.
-        # Let's instantiate a global helper if possible, or just keep the class definition available.
-        # Ideally, `RetrievalEngine` holds the embedding model.
+        # Instantiate RetrievalEngine 
         retrieval_engine = RetrievalEngine(doc_client=None, embedding_model=embedding_model)
-        # We will override doc_client in the method call or set it on the instance before use.
-        # Better design: pass doc_client to `query_for_requirement`. Let's assume I did that in step 1 (I did).
-        # Wait, I checked step 1 code:
-        # `class RetrievalEngine: def __init__(self, doc_client: QdrantClient, embedding_model: Optional[SentenceTransformer] = None): ...`
-        # `def query_for_requirement(self, collection_name: str, ...)` -> it uses `self.doc_client`.
-        # So I must instantiate it with the doc_client.
-        # Since doc_client is created in `audit_document`, I should instantiate RetrievalEngine there.
+
+        # Instantiate Evaluation Engine with the global LLM 
+        evaluation_engine = EvaluationEngine(llm)
+
 
         _initialized = True
     except Exception as exc:
@@ -209,7 +205,7 @@ def rag_ready() -> bool:
 
 def _get_requirement_chunks_from_qdrant(requirement_name: str, regulatory_client: QdrantClient, regulatory_collection: str) -> list:
     """
-    Retrieve all regulatory chunks (already embedded) for a given requirement from Qdrant.
+    Retrieve all regulatory chunks (already embedded) for a given requirement from Qdrant. The retrival is deterministic and based on the requirement name.
     Args:
         requirement_name: The name of the requirement.
         regulatory_client: QdrantClient instance for the regulatory chunks DB.
@@ -270,36 +266,17 @@ def evaluate_requirement(
         )
 
     # 2. Select relevant document chunks using RetrievalEngine
-    # Instantiate RetrievalEngine for this document context
-    # Note: We use the global embedding_model
+    # Instantiate RetrievalEngine for this document context using the global embedding_model
     retriever = RetrievalEngine(doc_client=_doc_client, embedding_model=embedding_model)
     
-    pre_rerank_top_k = int(rag_params.get("pre_rerank_top_k", 10))
+    document_chunks_top_k = int(rag_params.get("document_chunks_top_k", 10))
     
-    top_doc_chunks_by_group = retriever.query_for_requirement(
+    # Use the requirement chunks embeddings as queries to retrieve the most relevant document chunks for this requirement. The retrieval is done per group (e.g., per regulatory reference) to maintain traceability and relevance of the retrieved context.
+    top_doc_chunks_per_subreq = retriever.query_for_requirement(
         collection_name=_temp_collection,
         req_chunks_embeddings=req_chunks_embeddings,
-        top_k=pre_rerank_top_k
+        top_k=document_chunks_top_k
     )
-
-    # Optimization: deduplication of retrieved chunks across groups
-    unique_chunks = {}  # chunk_id -> {"content": str, "refs": set}
-    for group, chunks in top_doc_chunks_by_group.items():
-        for c in chunks:
-            cid = c['chunk_id']
-            if cid not in unique_chunks:
-                unique_chunks[cid] = {
-                    "content": c['content'],
-                    "refs": {group}
-                }
-            else:
-                unique_chunks[cid]["refs"].add(group)
-
-    # Build context (optional, for debug or legacy reasons)
-    doc_context_list = []
-    for cid, data in unique_chunks.items():
-        doc_context_list.append(data['content'])
-
 
     # 3. Evaluate Sub-requirements using EvaluationEngine
     sub_results = []
@@ -315,6 +292,7 @@ def evaluate_requirement(
         control = reg_chunk.get("control", "")
         guidance = reg_chunk.get("implementation_guidance", "")
         regulatory_parts = []
+        # Build regulatory context
         if content:
             regulatory_parts.append(content)
         if control:
@@ -323,8 +301,8 @@ def evaluate_requirement(
             regulatory_parts.append(f"[IMPLEMENTATION_GUIDANCE] {guidance}")
         content = "\n".join(regulatory_parts).strip()
 
-        # Find document chunks associated with this reference using top_doc_chunks_by_group
-        # Build group_key based on source
+        # Find document chunks associated with this reference using top_doc_chunks_per_subreq
+        # Build group_key based on source for search in top_doc_chunks_per_subreq. 
         group_key = None
         if reg_chunk.get('source') == 'EU_AI_ACT':
             group_key = f"AI_ACT::{reference}"
@@ -333,20 +311,15 @@ def evaluate_requirement(
         else:
             group_key = reference
         
-        doc_chunks_for_group = top_doc_chunks_by_group.get(group_key, [])
+        # Retrieve the relevant document chunks for this sub-requirement (reference) 
+        doc_chunks_for_group = top_doc_chunks_per_subreq.get(group_key, [])
         relevant_chunks = []
         if doc_chunks_for_group:
             for chunk in doc_chunks_for_group:
                 relevant_chunks.append(chunk['content'])
         else:
-            # Fallback: include all document chunks
-            for cid, data in unique_chunks.items():
-                relevant_chunks.append(data["content"])
+            print(f"⚠ No relevant document chunks found for reference '{reference}' (group key: '{group_key}'). This may affect the evaluation of this sub-requirement.")
 
-        sub_req_data = {
-            "name": reference,
-            "regulatory_content": content
-        }
 
         # Use EvaluationEngine to evaluate
         result = evaluator.evaluate_sub_requirement(
@@ -357,7 +330,7 @@ def evaluate_requirement(
             associated_chunks=relevant_chunks
         )
 
-        # Compose context for RAGAS (legacy / tracking)
+        # Compose context for RAGAS 
         ragas_contexts = []
         if content:
             reg_name = reference
@@ -369,11 +342,10 @@ def evaluate_requirement(
             for chunk in doc_chunks_for_group:
                 ragas_contexts.append(f"[DOCUMENT] {chunk['content']}")
         else:
-            # Fallback: include all document chunks
-            for cid, data in unique_chunks.items():
-                ragas_contexts.append(f"[DOCUMENT] {data['content']}")
+            ragas_contexts.append("[DOCUMENT] No relevant document chunks found for this reference.")
 
-        # We need to reconstruct the result dict expected by aggregate_results
+
+        # Reconstruct the result dict expected by aggregate_results
         # Combine rationale and notes for RAGAS evaluation to improve groundedness
         combined_answer = f"{result.get('rationale', '')}\n\nSummary: {result.get('auditor_notes', '')}"
 
@@ -432,11 +404,52 @@ def audit_document(
     document_chunk_size = rag_params.get("document_chunk_size", 512)
     document_chunk_overlap = rag_params.get("document_chunk_overlap", 64)
 
+    # Validate document input
+    MIN_DOCUMENT_LENGTH = 50  # Minimum characters for meaningful analysis
+    if not document_text or len(document_text.strip()) < MIN_DOCUMENT_LENGTH:
+        print(f"⚠ Warning: Document is empty or too short ({len(document_text.strip())} chars). Returning N/A for all requirements.")
+        # Return report with all requirements scored N/A (evaluation not applicable)
+        empty_reports = []
+        req_iter = requirement_chunks if requirement_limit is None else requirement_chunks[:requirement_limit]
+        for req_data in req_iter:
+            empty_reports.append(RequirementReport(
+                Requirement_ID=req_data.get("id", ""),
+                Requirement_Category=req_data.get("ethicalPrinciple", "unknown"),
+                Requirement_Name=req_data.get("requirementName", "unknown"),
+                Score="N/A",
+                Rationale="The provided document is empty or insufficient for compliance evaluation. A minimum of 50 characters is required for meaningful analysis.",
+                Auditor_Notes="Evaluation not applicable: no meaningful content found in the provided document. Adequate documentation is required to assess compliance.",
+                Prompt="",
+                SubRequirements=[]
+            ))
+        return AuditResponse(requirements=empty_reports)
+
     doc_chunks = _chunk_document(document_text, chunk_size=document_chunk_size, chunk_overlap=document_chunk_overlap)
+    
+    # Additional check after chunking
+    if not doc_chunks or len(doc_chunks) == 0:
+        print(f"⚠ Warning: No chunks generated from document. Returning N/A for all requirements.")
+        empty_reports = []
+        req_iter = requirement_chunks if requirement_limit is None else requirement_chunks[:requirement_limit]
+        for req_data in req_iter:
+            empty_reports.append(RequirementReport(
+                Requirement_ID=req_data.get("id", ""),
+                Requirement_Category=req_data.get("ethicalPrinciple", "unknown"),
+                Requirement_Name=req_data.get("requirementName", "unknown"),
+                Score="N/A",
+                Rationale="The provided document could not be processed into analyzable chunks. Document may be improperly formatted or lack sufficient text content.",
+                Auditor_Notes="Evaluation not applicable: document content is insufficient or improperly formatted for compliance evaluation.",
+                Prompt="",
+                SubRequirements=[]
+            ))
+        return AuditResponse(requirements=empty_reports)
+    
     doc_embs = _embed_chunks(doc_chunks, embedding_model)
 
 
-    #Store document chunks and embeddings in a temporary in-memory Qdrant collection for efficient retrieval during requirement evaluation. This avoids the need for file-based storage and cleanup issues, while still allowing us to leverage Qdrant's vector search capabilities.
+    # Store document chunks and embeddings in a temporary in-memory Qdrant collection
+    # for efficient retrieval during requirement evaluation. This avoids file-based storage
+    # and cleanup issues while still leveraging Qdrant's vector search capabilities.
     temp_collection = f"temp_doc_{os.getpid()}_audit"
     # Use in-memory Qdrant for doc_client to avoid file locking and cleanup issues
     doc_client = QdrantClient(":memory:")
@@ -464,8 +477,7 @@ def audit_document(
         index_path = vect_params.get("vector_index_path", "data/processed/vector_index")
         regulatory_client = QdrantClient(path=index_path)
 
-    # For each requirement in requirement_chunks (list), call evaluate_requirement to get the report for that requirement and collect all reports in a list.
-
+    # For each requirement in requirement_chunks, call evaluate_requirement to get its report.
     req_iter = requirement_chunks
     if requirement_limit is not None:
         req_iter = req_iter[:requirement_limit]
@@ -480,7 +492,8 @@ def audit_document(
         )
         requirements_reports.append(requirement_report)
 
-    if debug_dump_path: # If a debug dump path is provided, save the raw requirement reports
+    if debug_dump_path:
+        # If a debug dump path is provided, save the raw requirement reports
         debug_dir = os.path.dirname(debug_dump_path) or "."
         os.makedirs(debug_dir, exist_ok=True)
         with open(debug_dump_path, "w", encoding="utf-8") as f:

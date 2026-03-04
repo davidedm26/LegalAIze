@@ -398,11 +398,13 @@ if analyze_btn and doc_text:
                     r_id = item.get("Requirement_ID", "N/A")
                     r_notes = item.get("Auditor_Notes", "No notes available.")
                     r_rationale = item.get("Rationale", "No rationale provided.")
+                    r_sub_reqs = item.get("SubRequirements", [])
                     score = item.get("Score", 0) 
                     
                     processed_reqs.append({
                         "name": r_name, "id": r_id, "score_display": f"{score}/5", 
-                        "progress": score / 5.0, "notes": r_notes, "rationale": r_rationale
+                        "progress": score / 5.0, "notes": r_notes, "rationale": r_rationale,
+                        "sub_requirements": r_sub_reqs
                     })
                     total += score
                     maxim += 5
@@ -591,6 +593,23 @@ if st.session_state.audit_results is not None:
                         # ----------------------------
 
                         st.progress(req["progress"])
+                        
+                    with col_B:
+                        st.caption("AI FINDINGS")
+                        st.write(req["notes"])
+
+                        st.caption("Rationale")
+                        st.text(req.get("rationale", "No rationale provided."))
+
+                        sub_reqs = req.get("sub_requirements", [])
+                        if sub_reqs:
+                            with st.expander("Show Sub-Requirements Details"):
+                                for sub in sub_reqs:
+                                    st.markdown(f"#### {sub.get('Source', 'N/A')} - {sub.get('Reference', 'N/A')}")
+                                    st.markdown(f"**Score:** {sub.get('Score', 'N/A')}")
+                                    st.markdown(f"**Notes:** {sub.get('Auditor_Notes', 'N/A')}")
+                                    st.markdown(f"**Rationale:** {sub.get('Rationale', 'N/A')}")
+                                    st.markdown("---")
 elif analyze_btn and not doc_text:
     st.warning("Please upload a file or paste text.")
 

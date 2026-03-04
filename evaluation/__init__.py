@@ -4,8 +4,7 @@
 from evaluation.data_loading import load_params, load_text, load_ground_truth_csv
 from evaluation.metrics import (
     compute_mae,
-    compute_note_similarity,
-    compute_ragas_metrics,
+    compute_subrequirements_ragas_metrics,
 )
 
 from evaluation.mlflow_utils import log_case_input_artifacts
@@ -17,12 +16,7 @@ __all__ = [
     "load_text",
     "load_ground_truth_csv",
     "compute_mae",
-    "compute_note_similarity",
-    "compute_ragas_metrics",
-    "split_document_for_groundedness",
-    "build_requirement_question",
-    "select_relevant_contexts",
-    "extract_ground_truth_note",
+    "compute_subrequirements_ragas_metrics",
     "log_case_input_artifacts",
     "evaluate_single_case",
     "slugify_case_name",

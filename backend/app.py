@@ -10,10 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 try:
     from . import rag_engine
-    from .rag_engine import AuditResponse, AuditResponseAPI, RequirementReportAPI
+    from .rag_engine import AuditResponse, AuditResponseAPI, RequirementReportAPI, SubRequirementReportAPI
 except ImportError:  # Fallback when running as script (python app.py)
     import rag_engine  # type: ignore
-    from rag_engine import AuditResponse, AuditResponseAPI, RequirementReportAPI  # type: ignore
+    from rag_engine import AuditResponse, AuditResponseAPI, RequirementReportAPI, SubRequirementReportAPI  # type: ignore
 
 load_dotenv() # Load environment variables from .env file
 
@@ -63,7 +63,7 @@ async def audit(document_text: str = Body(..., embed=True)): # Audit endpoint
             debug_dump_path=DEBUG_DUMP_PATH,
         )
         
-        # Convert to lightweight API response (exclude Prompt and SubRequirements)
+        # Convert to lightweight API response (exclude Prompt, keep SubRequirements)
         api_requirements = [
             RequirementReportAPI(
                 Requirement_ID=req.Requirement_ID,
@@ -71,7 +71,18 @@ async def audit(document_text: str = Body(..., embed=True)): # Audit endpoint
                 Requirement_Name=req.Requirement_Name,
                 Score=req.Score,
                 Rationale=req.Rationale,
-                Auditor_Notes=req.Auditor_Notes
+                Auditor_Notes=req.Auditor_Notes,
+                SubRequirements=[
+                    SubRequirementReportAPI(
+                        Reference=sub.Reference,
+                        Source=sub.Source,
+                        Score=sub.Score,
+                        Rationale=sub.Rationale,
+                        Auditor_Notes=sub.Auditor_Notes,
+                        Contexts=sub.Contexts
+                    )
+                    for sub in req.SubRequirements
+                ]
             )
             for req in full_response.requirements
         ]

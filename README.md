@@ -60,37 +60,66 @@ flowchart TD
 ---
 
 ## Project Structure
-(Da aggiornare alla fine)
 ```text
 LegalAIze/
-├── backend/
-│   ├── app/
-│   ├── requirements.txt
-│   └── ...
-├── frontend/
-│   ├── app.py
-│   ├── requirements.txt
-│   └── ...
-├── data/
-│   └── ...
-├── models/
-│   └── ...
-├── notebooks/
-│   └── ...
-├── evaluation/
-│   ├── evaluate_rag.py
-│   └── ...
-├── ingestion/
-│   └── ...
-├── metrics/
-│   └── ...
-├── qdrant_init/
-│   └── ...
-├── params.yaml
-├── dvc.yaml
-├── docker-compose.yml
-├── requirements.txt
-└── .env.example
+├── backend/                           # FastAPI backend service
+│   ├── app.py                         # FastAPI application entry point
+│   ├── rag_engine.py                  # RAG system core logic
+│   ├── core/                          # Modular RAG components
+│   │   ├── evaluation.py              # Compliance evaluation engine
+│   │   └── retrieval.py               # Document retrieval system
+│   ├── Dockerfile                     # Backend container configuration
+│   └── requirements.txt               # Backend Python dependencies
+│
+├── frontend/                          # Streamlit user interface
+│   ├── app.py                         # Main Streamlit application
+│   ├── pages/                         # Multi-page app structure
+│   │   └── Audit_Compliance.py        # Compliance audit page
+│   ├── Dockerfile                     # Frontend container configuration
+│   └── requirements.txt               # Frontend Python dependencies
+│
+├── evaluation/                        # RAG evaluation framework
+│   ├── case_evaluation.py             # Single case evaluation logic
+│   ├── data_loading.py                # Ground truth data loaders
+│   ├── metrics.py                     # RAGAS metrics computation
+│   ├── mlflow_utils.py                # MLflow logging utilities
+│   └── utils.py                       # Evaluation helper functions
+│
+├── ingestion/                         # Document ingestion pipeline
+│   ├── data_ingestion.py              # Main ingestion orchestrator
+│   ├── parse_aia.py                   # EU AI Act HTML parser
+│   └── parse_iso.py                   # ISO 42001 PDF parser
+│
+├── data/                              # Data artifacts (DVC-tracked)
+│   ├── raw_data/                      # Original regulatory documents
+│   ├── processed/                     # Parsed and chunked documents
+│   │   ├── ai_act_parsed.json
+│   │   ├── iso_parsed.json
+│   │   ├── requirement_chunks.json
+│   │   └── vector_index/              # Local Qdrant vector store
+│   ├── ground_truth/                  # Evaluation test cases
+│   │   └── raw_data/                  # Documentation + ground truth reports
+│   ├── debug/                         # Debug audit outputs
+│   ├── qdrant_storage/                # Qdrant persistent storage (it appears after the docker activation)
+│   └── mapping.json                   # Requirement mapping structure
+│
+├── qdrant_init/                       # Qdrant initialization service
+│   ├── Dockerfile
+│   └── transfer_qdrant.py             # Vector DB seeding script
+│
+├── metrics/                           # Evaluation metrics output (DVC)
+├── img/                               # README images and assets
+├── .github/workflows/                 # CI/CD pipelines
+│
+├── evaluate_rag.py                    # Main evaluation script
+├── vectorize_data.py                  # Vectorization pipeline script
+│
+├── params.yaml                        # Experiment parameters (DVC)
+├── dvc.yaml                           # DVC pipeline definition
+├── docker-compose.yml                 # Multi-container orchestration
+├── requirements.txt                   # Root Python dependencies
+├── .env.example                       # Environment variables template
+└── README.md                          # This file
 ```
 
 ---
@@ -165,29 +194,50 @@ DAGSHUB_TOKEN=YOUR_TOKEN
 
 ## 5. Artifact Initialization
 
-### A.  Quick Demo Mode (uses precomputed artifacts) [RECOMMENDED]
-The git repo is already set with the required dvc. configuration (pointing to our DVC repo).
-Download all required artifacts:
+**Configure DVC with DagsHub Token**
+
+The DagsHub token is provided with the project documentation. Initialize DVC with your credentials:
+
+```bash
+dvc remote modify origin --local auth basic
+dvc remote modify origin --local user davidedm_26
+dvc remote modify origin --local password YOUR_DAGSHUB_TOKEN
+```
+
+Replace `YOUR_DAGSHUB_TOKEN` with the token provided in the documentation.
+
+---
+
+### A. Quick Demo Mode (uses precomputed artifacts) [RECOMMENDED]
+
+Pull precomputed artifacts:
+
 ```bash
 dvc pull
 ```
 
-### B.  Complete Demo Mode (recomputes all artifacts)
+---
+
+### B. Complete Demo Mode (recomputes all artifacts)
 
 Force full pipeline execution and artifact generation:
+
 ```bash
 pip install -r requirements.txt
 dvc pull
 dvc repro --force
 ```
+
 > **Note:** Requirements download and artifacts initialization may take several minutes.
+
 ---
 
-**Collaboration Mode**
+### C. Collaboration Mode
 
-> **Note:** It is imperative that you have collaboration access to the dagshub and github repositories.
+> **Note:** You must have collaboration access to the DagsHub and GitHub repositories.
 
-Initialize DVC:
+Update DVC remote with your credentials:
+
 ```bash
 dvc remote modify origin --local auth basic
 dvc remote modify origin --local user YOUR_USERNAME
@@ -227,15 +277,20 @@ You can run the backend and frontend separately without the use of docker:
 
 **Backend (FastAPI):**
 ```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app:app --reload --port 8000
+# Install backend dependencies
+pip install -r backend/requirements.txt
+
+# Run from project root (not from backend directory)
+uvicorn backend.app:app --reload --port 8000
 ```
 
 **Frontend (Streamlit):**
 ```bash
+# Install frontend dependencies  
+pip install -r frontend/requirements.txt
+
+# Run from frontend directory
 cd frontend
-pip install -r requirements.txt
 streamlit run app.py
 ```
 
@@ -280,13 +335,10 @@ Before running the evaluation, ensure your environment is fully configured by in
 pip install -r requirements.txt
 ```
 **2. Artifact Retrieval**
-Ensure you have the necessary artifacts. If you have not executed Section 5 yet (or if you are in a fresh environment), run the following command to download the artifacts:
+Ensure you have the necessary artifacts. If you have not executed Section 5 yet (or if you are in a fresh environment), choose one of the artifact initialization options to generate or pull the required artifacts.
 
-```bash
-dvc pull
-```
 
-**2. Execution**
+**3. Execution**
 Once the environment is ready and artifacts are present, run the evaluation script:
 
 ```bash
@@ -312,10 +364,16 @@ A: Verify your `OPENAI_API_KEY` is set correctly in the `.env` file and you have
 
 ## 12. Contributing / Development
 
-GitHub Actions are configured for CI/CD:
-- Linting and testing of Python code
-- Docker image build checks
-These actions run automatically on pushes to the repository.
+GitHub Actions are configured for CI/CD with the following workflows:
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| **Feature Branch Push Checks** | Push to `feat/**` | Quick linting with flake8 and dependency checks to ensure code quality standards in feature branches |
+| **Feature → Develop PR Checks** | PR to `develop` | Builds and evaluates the RAG system, logs metrics to MLflow, ensuring feature branches meet performance requirements |
+| **Develop → Main PR Checks** | PR to `main` | Comprehensive release gate: linting, full RAG evaluation, and metric threshold validation before production merge |
+| **Daily Evaluation & Alert** | Daily schedule (manual trigger) | Runs scheduled RAG evaluation and opens GitHub issues if metrics fall below defined thresholds |
+
+These workflows ensure code quality, performance consistency, and safe deployments across the development pipeline.
 
 ---
 
