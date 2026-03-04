@@ -68,6 +68,7 @@ services:
       - BACKEND_URL=http://backend:8000
     volumes:
       - ./data/mapping.json:/data/mapping.json:ro
+      - ./data/processed/requirement_chunks.json:/data/processed/requirement_chunks.json:ro
     restart: unless-stopped
 
 networks:
