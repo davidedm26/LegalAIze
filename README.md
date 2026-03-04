@@ -216,15 +216,16 @@ DAGSHUB_TOKEN=YOUR_TOKEN
 
 **Configure DVC with DagsHub Token**
 
-The DagsHub token is provided with the project documentation. Initialize DVC with your credentials:
+The DagsHub GUEST_TOKEN is provided with the project documentation. 
+Initialize DVC with the following commands to get a GUEST ACCESS to the DVC remote space to download all the artifacts:
 
 ```bash
 dvc remote modify origin --local auth basic
 dvc remote modify origin --local user davidedm_26
-dvc remote modify origin --local password YOUR_DAGSHUB_TOKEN
+dvc remote modify origin --local password <GUEST_TOKEN>
 ```
 
-Replace `YOUR_DAGSHUB_TOKEN` with the token provided in the documentation.
+Replace `GUEST_TOKEN` with the token provided in the documentation.
 
 ---
 
