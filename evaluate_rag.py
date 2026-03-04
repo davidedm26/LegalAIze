@@ -64,7 +64,7 @@ def setup_mlflow():
     if dagshub_user and dagshub_token:
         os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_user
         os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
-        remote_uri = f"https://dagshub.com/{dagshub_user}/{repo_name}.mlflow"
+        remote_uri = f"https://dagshub.com/davidedm26/{repo_name}.mlflow"
         mlflow.set_tracking_uri(remote_uri)
         print(f"🌐 MLflow connected to DagsHub: {remote_uri}")
     else:
