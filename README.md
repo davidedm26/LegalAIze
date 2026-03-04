@@ -214,10 +214,14 @@ DAGSHUB_TOKEN=YOUR_TOKEN
 
 ## 5. Artifact Initialization
 
-**Configure DVC with DagsHub Token**
+### A. Guest Mode  [RECOMMENDED]
+
+Use this mode to download the input and pre-computed artifact using guest credentials. You can also re-compute all the output artifacts from scratch.
+
+**Configure DVC with the DagsHub guest credentials**
 
 The DagsHub GUEST_TOKEN is provided with the project documentation. 
-Initialize DVC with the following commands to get a GUEST ACCESS to the DVC remote space to download all the artifacts:
+Initialize DVC with the following commands to get a GUEST ACCESS to the DVC remote space and download all the artifacts:
 
 ```bash
 dvc remote modify origin --local auth basic
@@ -229,7 +233,7 @@ Replace `GUEST_TOKEN` with the token provided in the documentation.
 
 ---
 
-### A. Quick Demo Mode (uses precomputed artifacts) [RECOMMENDED]
+
 
 Pull precomputed artifacts:
 
@@ -239,9 +243,9 @@ dvc pull
 
 ---
 
-### B. Complete Demo Mode (recomputes all artifacts)
+**Recomputes all artifacts [FACULTATIVE]**
 
-Force full pipeline execution and artifact generation:
+Eventually you can force the full pipeline execution and artifact generation:
 
 ```bash
 pip install -r requirements.txt
@@ -253,18 +257,18 @@ dvc repro --force
 
 ---
 
-### C. Collaboration Mode
+### B. Collaboration Mode
 
 > **Note:** You must have collaboration access to the DagsHub and GitHub repositories.
 
-Update DVC remote with your credentials:
+If you are a Collaborator with WRITE permissions on Dagshub and Github, you can collaborate with the LegalAIze team, setting your credentials :
 
 ```bash
 dvc remote modify origin --local auth basic
 dvc remote modify origin --local user YOUR_USERNAME
 dvc remote modify origin --local password YOUR_TOKEN
 ```
-Now you can eventually change the parameters, reproduce the pipeline and push a new version of the code, linked with the new artifacts, with:
+Now you can eventually **change the parameters, reproduce the pipeline and push a new version of the code and new artifacts**, with:
 ```bash
 git add .
 git commit -m "Update pipeline and artifacts"
