@@ -126,6 +126,9 @@ htmlcov/
 # Application-Specific
 # ------------------------------------------------------------------------------
 backend/debug_responses/
+generate_debug_audits.py
+generate_report_from_audits.py
+
 
 # ------------------------------------------------------------------------------
 # Archives (typically not source code)
@@ -135,3 +138,4 @@ backend/debug_responses/
 *.tar.gz
 *.rar
 *.7z
+

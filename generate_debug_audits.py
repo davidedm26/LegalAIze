@@ -1,7 +1,7 @@
 """
 Script to generate audit JSON files for evaluation cases.
 Saves them in data/debug/ for inspection and debugging.
-
+ 
 Usage:
     python generate_debug_audits.py                    # Process first 5 cases (default)
     python generate_debug_audits.py --case 0           # Process case at index 0
