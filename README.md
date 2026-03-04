@@ -214,6 +214,8 @@ DAGSHUB_TOKEN=YOUR_TOKEN
 
 ## 5. Artifact Initialization
 
+Choose one of the following alternatives DVC configuration. 
+
 ### A. Guest Mode  [RECOMMENDED]
 
 Use this mode to download the input and pre-computed artifact using guest credentials. You can also re-compute all the output artifacts from scratch.
@@ -268,7 +270,13 @@ dvc remote modify origin --local auth basic
 dvc remote modify origin --local user YOUR_USERNAME
 dvc remote modify origin --local password YOUR_TOKEN
 ```
-Now you can eventually **change the parameters, reproduce the pipeline and push a new version of the code and new artifacts**, with:
+Now you can eventually **change the parameters and reproduce the pipeline with:
+```bash
+dvc pull
+dvc repro
+```
+
+And then you can eventually **push a new version of the code and new artifacts**, with:
 ```bash
 git add .
 git commit -m "Update pipeline and artifacts"
