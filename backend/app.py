@@ -10,10 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 try:
     from . import rag_engine
-    from .rag_engine import AuditResponse
+    from .rag_engine import AuditResponse, AuditResponseAPI, RequirementReportAPI, SubRequirementReportAPI
 except ImportError:  # Fallback when running as script (python app.py)
     import rag_engine  # type: ignore
-    from rag_engine import AuditResponse  # type: ignore
+    from rag_engine import AuditResponse, AuditResponseAPI, RequirementReportAPI, SubRequirementReportAPI  # type: ignore
 
 load_dotenv() # Load environment variables from .env file
 
@@ -47,7 +47,7 @@ def health():
     return {"status": "healthy", "rag_ready": rag_engine.rag_ready()}
 
 
-@app.post("/audit", response_model=AuditResponse) # Audit endpoint, accepts document text and returns an audit report
+@app.post("/audit", response_model=AuditResponseAPI) # Audit endpoint, accepts document text and returns an audit report
 async def audit(document_text: str = Body(..., embed=True)): # Audit endpoint
     """
     Produce an audit report for the given document text.
@@ -58,10 +58,36 @@ async def audit(document_text: str = Body(..., embed=True)): # Audit endpoint
 
     import traceback
     try:
-        return rag_engine.audit_document(
+        full_response = rag_engine.audit_document(
             document_text,
             debug_dump_path=DEBUG_DUMP_PATH,
         )
+        
+        # Convert to lightweight API response (exclude Prompt, keep SubRequirements)
+        api_requirements = [
+            RequirementReportAPI(
+                Requirement_ID=req.Requirement_ID,
+                Requirement_Category=req.Requirement_Category,
+                Requirement_Name=req.Requirement_Name,
+                Score=req.Score,
+                Rationale=req.Rationale,
+                Auditor_Notes=req.Auditor_Notes,
+                SubRequirements=[
+                    SubRequirementReportAPI(
+                        Reference=sub.Reference,
+                        Source=sub.Source,
+                        Score=sub.Score,
+                        Rationale=sub.Rationale,
+                        Auditor_Notes=sub.Auditor_Notes,
+                        Contexts=sub.Contexts
+                    )
+                    for sub in req.SubRequirements
+                ]
+            )
+            for req in full_response.requirements
+        ]
+        
+        return AuditResponseAPI(requirements=api_requirements)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:

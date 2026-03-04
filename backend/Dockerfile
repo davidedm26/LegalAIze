@@ -10,11 +10,12 @@ RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/wh
 
 
 # Copy requirements and install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt ./backend/requirements.txt
+RUN pip install --no-cache-dir -r ./backend/requirements.txt
 
-# Copy backend code (FastAPI app + rag engine)
-COPY app.py rag_engine.py ./
+# Copy backend code (FastAPI app + rag engine + core modules)
+COPY app.py rag_engine.py ./backend/
+COPY core/ ./backend/core/
 
 # Create directory for the model
 RUN mkdir -p /app/models
@@ -22,5 +23,5 @@ RUN mkdir -p /app/models
 # Expose port for FastAPI
 EXPOSE 8000
 
-# Run FastAPI
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run FastAPI with full module path
+CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]

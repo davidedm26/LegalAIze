@@ -2,6 +2,7 @@
 RAG Evaluation Script
 This script evaluates the RAG system using the local RAG engine defined in backend.rag_engine. It loads evaluation cases defined in params.yaml, runs them through the RAG engine, computes metrics and logs results to MLflow (if configured).    
 """
+
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -72,6 +73,8 @@ def setup_mlflow():
 setup_mlflow()
 
 def main() -> None:
+
+    # Load parameters from params.yaml
     params = load_params()
     eval_params = params.get("evaluation", {})
     precompute_params = params.get("precompute", {})
@@ -79,52 +82,53 @@ def main() -> None:
     ingestion_params = params.get("ingestion", {})
 
     random_seed = int(eval_params.get("random_seed", 42))
-
+  
     llm_model = eval_params.get("llm_model")
     llm_temperature = float(eval_params.get("llm_temperature"))
     metrics_output = eval_params.get("metrics_output", "metrics/rag_eval.json")
+    debug_output_dir = eval_params.get("debug_output_dir", "data/debug")
     gt_cases = eval_params.get("ground_truth", [])
     case_selector = normalize_case_selector(eval_params.get("case_selector"))
+    requirement_limit = eval_params.get("requirement_limit", None)
 
-
-
-
+    # Initialize embedding model for evaluation
     embedding_model = SentenceTransformer(vect_params.get("model_name", "all-MiniLM-L6-v2"))
 
     # Set seed for reproducibility where possible
     random.seed(random_seed)
 
-    # Prepare metrics dir ( useful when MLflow is not configured and we rely on local JSON output for metrics storage, e.g., for DVC tracking )
+    # Prepare metrics dir (useful when MLflow is not configured and local JSON output is needed for metrics storage, e.g., for DVC tracking)
     metrics_dir = os.path.dirname(metrics_output)
     if metrics_dir:
         os.makedirs(metrics_dir, exist_ok=True)
+    
+    # Prepare debug output dir for saving audit reports
+    if debug_output_dir:
+        os.makedirs(debug_output_dir, exist_ok=True)
+        print(f"📁 Debug reports will be saved to: {debug_output_dir}")
 
     # Aggregate metrics across all cases
     all_results: List[Dict[str, Any]] = []
-    ragas_records: List[Dict[str, Any]] = []
+    sub_ragas_records: List[Dict[str, Any]] = []  # Sub-requirements (for faithfulness)
+    main_ragas_records: List[Dict[str, Any]] = []  # Main requirements (for relevancy/correctness)
 
     experiment_name = eval_params.get("mlflow_experiment", "rag_evaluation")
 
     if mlflow is not None:
         mlflow.set_experiment(experiment_name)
 
+    # Start MLflow run context (if MLflow is configured properly, otherwise this will be None and logging calls will be skipped)
     run_ctx = (
         mlflow.start_run(run_name="rag_eval")
         if mlflow is not None
         else None
     )
 
-    prompt_template_path = None
-
-    # Save prompt template locally for next steps (artifact logging) if available in rag_engine.
-    if run_ctx is not None and rag_engine is not None:
-        with tempfile.NamedTemporaryFile("w", suffix="_prompt_template.txt", delete=False, encoding="utf-8") as f:
-            f.write(getattr(rag_engine, "PROMPT_TEMPLATE", "").strip())
-            prompt_template_path = f.name
     
     if rag_engine is None:
         raise RuntimeError("backend.rag_engine is not available. Run evaluate_rag from the repository root.")
 
+    # Initialize RAG engine components (like retriever, LLM, etc.) before running evaluations. This ensures that the RAG system is ready to process the evaluation cases. The initialization logic is defined in backend.rag_engine.init_rag(), which is also called on startup in the FastAPI app lifespan event.
     rag_engine.init_rag()
     print("✓ Using local RAG engine (backend.rag_engine)")
 
@@ -161,13 +165,41 @@ def main() -> None:
             mlflow.log_param("llm_temperature", llm_temperature)
             mlflow.log_param("embedding_model",vect_params.get("model_name", ""))
             mlflow.log_param("precompute_top_k", precompute_params.get("top_k", 3))
-            mlflow.log_param("chunk_size", ingestion_params.get("chunk_size"))
-            mlflow.log_param("chunk_overlap", ingestion_params.get("chunk_overlap"))
-            if prompt_template_path and os.path.exists(prompt_template_path):
-                mlflow.log_artifact(prompt_template_path, artifact_path="inputs")
+            mlflow.log_param("requirement_limit", requirement_limit if requirement_limit is not None else "all")
+            # Log the actual chunk_size and chunk_overlap used by the backend
+            mlflow.log_param("chunk_size", rag_engine.rag_params.get("document_chunk_size"))
+            mlflow.log_param("chunk_overlap", rag_engine.rag_params.get("document_chunk_overlap"))
 
+            # Log prompt templates to MLflow after run initialization
+            try:
+                # Use the EvaluationEngine from rag_engine to access prompt templates
+                if rag_engine.evaluation_engine:
+                    # Example values for template logging
+                    example_reference = "EXAMPLE_REFERENCE"
+                    example_content = "EXAMPLE_CONTENT"
+                    example_chunks = ["EXAMPLE_CHUNK_1", "EXAMPLE_CHUNK_2"]
+
+                    # Access methods to log prompt templates
+                    sub_prompt_template = rag_engine.evaluation_engine._get_sub_prompt("EXAMPLE_MAIN_REQ", example_reference, "EXAMPLE_SOURCE", example_content, example_chunks)
+                    sub_prompt_file = os.path.join(tempfile.gettempdir(), "sub_prompt_template.txt")
+                    with open(sub_prompt_file, "w", encoding="utf-8") as f:
+                        f.write(sub_prompt_template)
+                    mlflow.log_artifact(sub_prompt_file, artifact_path="prompt_templates")
+
+                    agg_prompt_template = rag_engine.evaluation_engine._get_aggregate_prompt([
+                        {"reference": example_reference, "score": 5, "answer": "Good"}
+                    ], computed_score=3.5)
+                    agg_prompt_file = os.path.join(tempfile.gettempdir(), "aggregate_prompt_template.txt")
+                    with open(agg_prompt_file, "w", encoding="utf-8") as f:
+                        f.write(agg_prompt_template)
+                    mlflow.log_artifact(agg_prompt_file, artifact_path="prompt_templates")
+            except Exception as e:
+                print(f"⚠ Failed to log prompt templates to MLflow: {e}")
+
+        # Select evaluation cases based on case_selector
         filtered_cases = select_cases(gt_cases, case_selector) # Select cases based on case_selector (params)
 
+        
         # Loop through evaluation cases
         for i, case in enumerate(filtered_cases):
             ground_truth_present = True
@@ -180,7 +212,7 @@ def main() -> None:
             print(f"Evaluating case: {name}")
             if not os.path.exists(doc_path):
                 print(f"⚠ Document not found: {doc_path}")
-                continue # Skip this case if document is missing
+                continue
             if report_path is None or not os.path.exists(report_path):
                 print(f"⚠ Ground truth report not found, Score MAE, Note Similarity and RAGAS Correctness metrics will be skipped for case: {doc_path}")
                 report_path_for_eval = None
@@ -193,27 +225,37 @@ def main() -> None:
 
             # Use a temporary directory for any artifacts related to this case (like backend predictions)
             with tempfile.TemporaryDirectory(prefix=f"case_{case_slug}_") as tmpdir:
-                res, case_ragas_records = evaluate_single_case(
+                res, case_sub_ragas_records, case_main_ragas_records = evaluate_single_case(
                     case_name=name,
                     gt_path=report_path_for_eval,
                     doc_path=doc_path,
                     case_artifact_dir=tmpdir,
                     embedding_model=embedding_model,
                     ground_truth=ground_truth_present,
+                    requirement_limit=requirement_limit,
                 ) # Evaluate this evaluation case
                 res["name"] = name # Add case name to results
                 all_results.append(res) # Append to all results
+                
+                # Save audit report to debug directory
+                if debug_output_dir and "artifacts" in res:
+                    backend_pred_path = res["artifacts"].get("backend_predictions")
+                    if backend_pred_path and os.path.exists(backend_pred_path):
+                        debug_report_path = os.path.join(debug_output_dir, f"audit_{case_slug}.json")
+                        with open(backend_pred_path, "r", encoding="utf-8") as src:
+                            predictions_data = json.load(src)
+                        with open(debug_report_path, "w", encoding="utf-8") as dst:
+                            json.dump(predictions_data, dst, indent=2, ensure_ascii=False)
+                        print(f"  💾 Saved audit report to: {debug_report_path}")
 
-                ragas_records.extend(case_ragas_records) # Collect groundedness samples for potential further analysis or separate logging
+                # Collect RAGAS records for logging
+                sub_ragas_records.extend(case_sub_ragas_records)  # Sub-requirements
+                main_ragas_records.extend(case_main_ragas_records)  # Main requirements
 
                 if run_ctx is not None:
                     # Log per-case metrics with a step index (for easier aggregation in MLflow UI charts)
                     if res.get("mae_score") is not None:
                         mlflow.log_metric("mae_score_list", res["mae_score"], step=i)
-                    if res.get("mean_note_similarity") is not None:
-                        mlflow.log_metric("note_similarity_list", res["mean_note_similarity"], step=i)
-                    if res.get("groundedness_score") is not None:
-                        mlflow.log_metric("groundedness_list", res["groundedness_score"], step=i)
                     if res.get("faithfulness_score") is not None:
                         mlflow.log_metric("faithfulness_list", res["faithfulness_score"], step=i)
                     if res.get("relevancy_score") is not None:
@@ -231,13 +273,9 @@ def main() -> None:
                                 artifact_path=f"cases/{case_slug}/outputs/{label}",
                             )
 
-        # After processing all cases, compute aggregated metrics across all results and log them to MLflow and/or save to a JSON file for DVC tracking or other uses.
+        # Compute aggregated metrics across all results and log them to MLflow and/or save to a JSON file for DVC tracking.
         if all_results:
-
-
             total_score_pairs = sum(r["num_pairs"] for r in all_results)
-            total_note_pairs = sum(r.get("note_similarity_count", 0) for r in all_results)
-            total_groundedness_samples = sum(r.get("groundedness_sample_count", 0) for r in all_results)
             total_faithfulness_samples = sum(r.get("faithfulness_sample_count", 0) for r in all_results)
             total_relevancy_samples = sum(r.get("relevancy_sample_count", 0) for r in all_results)
             total_correctness_samples = sum(r.get("correctness_sample_count", 0) for r in all_results)
@@ -248,21 +286,6 @@ def main() -> None:
                 if total_score_pairs > 0
                 else 0.0
             )
-
-            # Weighted note similarity by number of note pairs
-            weighted_note_similarity = (
-                sum((r.get("mean_note_similarity") or 0.0) * (r.get("note_similarity_count") or 0) for r in all_results) / total_note_pairs
-                if total_note_pairs > 0
-                else 0.0
-            )
-
-            # Weighted groundedness by sample count
-            weighted_groundedness = None
-            groundedness_results = [r for r in all_results if r.get("groundedness_score") is not None]
-            if groundedness_results and total_groundedness_samples > 0:
-                weighted_groundedness = (
-                    sum((r.get("groundedness_score") or 0) * (r.get("groundedness_sample_count") or 0) for r in groundedness_results) / total_groundedness_samples
-                )
 
             # Weighted faithfulness by sample count
             weighted_faithfulness = None
@@ -290,14 +313,10 @@ def main() -> None:
 
         else: # Fallback values if no results were processed (e.g., all cases were skipped due to missing files)
             total_score_pairs = 0
-            total_note_pairs = 0
-            total_groundedness_samples = 0
             total_faithfulness_samples = 0
             total_relevancy_samples = 0
             total_correctness_samples = 0
             weighted_mae = 0.0
-            weighted_note_similarity = 0.0
-            weighted_groundedness = None
             weighted_faithfulness = None
             weighted_relevancy   = None
             weighted_correctness = None
@@ -306,13 +325,9 @@ def main() -> None:
             "total_cases": len(all_results),
             "total_score_pairs": total_score_pairs,
             "weighted_mae_score": weighted_mae,
-            "total_note_pairs": total_note_pairs,
-            "mean_note_similarity": weighted_note_similarity,
-            "total_groundedness_samples": total_groundedness_samples,
             "total_faithfulness_samples": total_faithfulness_samples,
             "total_relevancy_samples": total_relevancy_samples,
             "total_correctness_samples": total_correctness_samples,
-            "mean_groundedness_score": weighted_groundedness,
             "mean_faithfulness_score": weighted_faithfulness,
             "mean_relevancy_score": weighted_relevancy,
             "mean_correctness_score": weighted_correctness,
@@ -327,13 +342,7 @@ def main() -> None:
             mlflow.log_metric("mae_score_pairs", total_score_pairs)
             if weighted_mae is not None:
                 mlflow.log_metric("mae_weighted_score", weighted_mae)
-            mlflow.log_metric("note_similarity_pairs", total_note_pairs)
-            if weighted_note_similarity is not None:
-                mlflow.log_metric("note_similarity_mean", weighted_note_similarity)
 
-            if weighted_groundedness is not None:
-                mlflow.log_metric("groundedness_score", weighted_groundedness)
-                mlflow.log_metric("groundedness_samples", total_groundedness_samples)
             if weighted_faithfulness is not None:
                 mlflow.log_metric("faithfulness_score", weighted_faithfulness)
                 mlflow.log_metric("faithfulness_samples", total_faithfulness_samples)
@@ -349,16 +358,33 @@ def main() -> None:
             if os.path.exists(mapping_path):
                 mlflow.log_artifact(mapping_path, artifact_path="inputs")
 
-            # Log RAGAS records as artifact for potential further analysis
-            if ragas_records:
-                ragas_artifact_path = os.path.join(metrics_dir, "ragas_records.json")
-                with open(ragas_artifact_path, "w", encoding="utf-8") as f:
-                    json.dump(ragas_records, f, indent=2)
-                mlflow.log_artifact(ragas_artifact_path, artifact_path="ragas")
+            # Log RAGAS records as artifacts for potential further analysis
+            # Sub-requirements records (for faithfulness evaluation)
+            if sub_ragas_records:
+                sub_ragas_path = os.path.join(metrics_dir, "ragas_sub_requirements.json")
+                with open(sub_ragas_path, "w", encoding="utf-8") as f:
+                    json.dump(sub_ragas_records, f, indent=2, ensure_ascii=False)
+                mlflow.log_artifact(sub_ragas_path, artifact_path="ragas")
+                print(f"✓ Logged {len(sub_ragas_records)} sub-requirement records to MLflow")
+            
+            # Main requirements records (for relevancy/correctness evaluation)
+            if main_ragas_records:
+                main_ragas_path = os.path.join(metrics_dir, "ragas_main_requirements.json")
+                with open(main_ragas_path, "w", encoding="utf-8") as f:
+                    json.dump(main_ragas_records, f, indent=2, ensure_ascii=False)
+                mlflow.log_artifact(main_ragas_path, artifact_path="ragas")
+                print(f"✓ Logged {len(main_ragas_records)} main requirement records to MLflow")
 
         print("✓ RAG evaluation completed.")
 
     finally:
+        # Clean up resources to avoid shutdown warnings
+        if rag_engine and hasattr(rag_engine, 'vector_db') and rag_engine.vector_db:
+            try:
+                rag_engine.vector_db.close()
+            except Exception:
+                pass  # Ignore errors during cleanup
+        
         if run_ctx is not None:
             mlflow.end_run()
 

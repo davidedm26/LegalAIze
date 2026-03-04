@@ -16,6 +16,10 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 from qdrant_client.http.models import Distance, VectorParams, PointStruct
 
+# New modular imports
+from backend.core.retrieval import RetrievalEngine
+from backend.core.evaluation import EvaluationEngine
+
 load_dotenv()
 
 PARAMS_PATH = os.environ.get("PARAMS_PATH")
@@ -36,44 +40,17 @@ vect_params = params.get("vectorization", {})
 rag_params = params.get("rag", {})
 
 
-# Static prompt template 
-PROMPT_TEMPLATE = """
-You are a Senior AI Compliance Auditor. Your task is to perform a strict, evidence-based gap analysis using a "Guidance-based Assessment" logic.
 
-DOCUMENT TO EVALUATE (chunks from the original document, retrieved based on relevance to the requirement being evaluated, and tagged with [[Next chunk is relevant for: ...]] to indicate which regulatory requirement(s) they pertain to):
-{document_text}
+RequirementScore = Union[int, float, str] # Score can be an integer/float from 0 to 5, or "N/A" if not applicable or if parsing fails
 
-REQUIREMENT SUMMARY:
-Requirement name: {requirement_name}
-
-This requirement is associated with the following regulatory references (AI Act articles and ISO 42001 sections). Use these as the basis for your evaluation.
-Requirement references: {requirement_references}
-
-REGULATORY CONTEXT (The ONLY source of truth for your evaluation. Use this to understand the requirement and to identify what evidence in the document would correspond to different levels of compliance):
-{regulatory_references}
-
-AUDIT RULES (MANDATORY):
-1. STRICT ANCHORING (Faithfulness): The compliance score and verdict MUST be derived EXCLUSIVELY from the provided 'REGULATORY CONTEXT'. Do NOT use external knowledge, prior training, or general AI Act/ISO assumptions. If a requirement is not in the provided text, do not evaluate it.
-2. NO HALLUCINATION: Do not deduce, infer, or assume missing procedures. If an objective, metric, or procedure is not explicitly written in the DOCUMENT TO EVALUATE, it does not exist.
-3. EXPLICIT MAPPING (Groundedness): You must explicitly quote the REGULATORY CONTEXT and map it directly to the tagged evidence ([[Next chunk is relevant for: ...]]) in the DOCUMENT TO EVALUATE.
-
-SCORING CRITERIA:
-5 (Full Compliance): Perfect alignment with the provided regulatory context; specific technical evidence is present.
-4 (Substantial Compliance): Solid implementation, but lacks secondary details requested by the regulation.
-3 (Partial Compliance): Some evidence present, but significant procedural gaps exist against the regulation.
-2 (Major Gap): Minimal evidence; major aspects of the regulation are ignored.
-1 (Negligible): The requirement is mentioned, but without substantive evidence.
-0 (No Compliance): The document is completely silent on the requirement.
-
-RESPONSE FORMAT (JSON ONLY):
-{{
-    "rationale": "For each claim about compliance or non-compliance, use the following format, separating each claim with two newlines. For each claim: \n\nClaim: <state the claim concisely>\nSupported by: <quote or cite specific document chunks using the provided tags, e.g. [[Next chunk is relevant for: ...]] ...chunk text...; if not supported, write 'None'>\nRegulatory reference: <quote the exact requirement/guidance from the Regulatory Context>\n\nRepeat for each claim. If a claim is not supported by any chunk, 'Supported by' must be 'None'.",
-    "score": "integer (0-5) or 'N/A'",
-    "auditor_notes": "Start EXACTLY with 'The document is [compliant / partially compliant / not compliant] with {requirement_name}.' Then provide a comprehensive summary that explicitly names the regulatory reference driving your conclusion (e.g., 'As required by ISO 42001 B.3.2...') and explicitly states what specific evidence was found or is missing in the evaluated document. Ensure the language is natural and conversational. Max 120 words."
-}}
-"""
-
-RequirementScore = Union[int, str] # Score can be an integer from 0 to 5, or "N/A" if not applicable or if parsing fails
+class SubRequirementReport(BaseModel):
+    Reference: str
+    Source: str
+    Score: RequirementScore
+    Rationale: str
+    Auditor_Notes: str
+    Contexts: List[str]
+    Prompt: str  # evaluation prompt used for this sub-requirement
 
 class RequirementReport(BaseModel):
     Requirement_ID: str
@@ -82,13 +59,35 @@ class RequirementReport(BaseModel):
     Score: RequirementScore
     Rationale: Optional[str] = None
     Auditor_Notes: str
-    Prompt: str  # static prompt included for monitoring/debugging purposes
-    Context: Optional[List[str]] = None # We can include the providex doc context for debug steps
-    
+    Prompt: str  # aggregation prompt used for this requirement
+    SubRequirements: List[SubRequirementReport] = []
+
+
+# Lightweight model for API responses (excludes verbose fields)
+class SubRequirementReportAPI(BaseModel):
+    Reference: str
+    Source: str
+    Score: RequirementScore
+    Rationale: str
+    Auditor_Notes: str
+    Contexts: List[str]
+
+class RequirementReportAPI(BaseModel):
+    Requirement_ID: str
+    Requirement_Category: str
+    Requirement_Name: str
+    Score: RequirementScore
+    Rationale: Optional[str] = None
+    Auditor_Notes: str
+    SubRequirements: List[SubRequirementReportAPI] = []
 
 
 class AuditResponse(BaseModel):
-    requirements: List[RequirementReport] #We can include the providex doc context for future steps
+    requirements: List[RequirementReport] # Includes the provided doc context for future steps
+
+
+class AuditResponseAPI(BaseModel):
+    requirements: List[RequirementReportAPI]
 
 
 
@@ -97,10 +96,16 @@ mapping: Optional[Dict[str, Any]] = None
 llm: Optional[ChatOpenAI] = None
 embedding_model: Optional[SentenceTransformer] = None
 requirement_chunks: Dict[str, Any] = {}
+
+# Main RAG components: RetrievalEngine and EvaluationEngine, instantiated globally for reuse across requests
+retrieval_engine: Optional[RetrievalEngine] = None
+evaluation_engine: Optional[EvaluationEngine] = None
+
 _initialized = False # Flag to prevent re-initialization if already done
 
 
-def _candidate_paths(relative_path: str) -> List[str]: # Generate candidate paths for a given relative path, including both relative and absolute forms, and ensure uniqueness while preserving order
+def _candidate_paths(relative_path: str) -> List[str]:
+    # Generate candidate paths for a given relative path, including both relative and absolute forms, and ensure uniqueness while preserving order
     rel = relative_path.replace("\\", "/")
     candidates = [
         os.path.join(PROJECT_ROOT, rel),
@@ -114,9 +119,11 @@ def _candidate_paths(relative_path: str) -> List[str]: # Generate candidate path
     return unique
 
 
-# Initialization function to set up vector DB, mapping, requirement chunks, and LLM. It checks for environment variables to determine how to connect to Qdrant (external service vs embedded index) and loads necessary data files. The function can be forced to re-initialize if needed.
+# Initialization function to set up vector DB, mapping, requirement chunks, and LLM.
+# It checks for environment variables to determine how to connect to Qdrant (external service vs embedded index)
+# and loads necessary data files. The function can be forced to re-initialize if needed.
 def init_rag(force: bool = False) -> None:
-    global vector_db, llm, embedding_model, requirement_chunks, _initialized 
+    global vector_db, llm, embedding_model, requirement_chunks, _initialized, retrieval_engine, evaluation_engine
     if _initialized and not force:
         return
 
@@ -171,6 +178,15 @@ def init_rag(force: bool = False) -> None:
         embedding_model = SentenceTransformer(embedding_model_name)
         print(f"✓ Embedding model initialized: {embedding_model_name}")
 
+        # Initialize engines
+
+        # Instantiate RetrievalEngine 
+        retrieval_engine = RetrievalEngine(doc_client=None, embedding_model=embedding_model)
+
+        # Instantiate Evaluation Engine with the global LLM 
+        evaluation_engine = EvaluationEngine(llm)
+
+
         _initialized = True
     except Exception as exc:
         print(f"⚠ Init Error: {exc}")
@@ -183,30 +199,13 @@ def rag_ready() -> bool:
         vector_db is not None,
         llm is not None,
         requirement_chunks is not None,
+        embedding_model is not None
     ])
-
-
-def _build_requirement_text(req_data: Dict[str, Any]) -> str:
-    """
-    Build a requirement text for prompting, using the new structure from requirement_chunks.json.
-    - requirementName: the main requirement name/title
-    - euAiActArticles: list of dicts with 'reference' and 'content' (AI Act articles)
-    - iso42001Reference: list of dicts with 'reference' and 'content' (ISO references)
-    """
-    req_name = req_data.get("requirementName", "")
-    ai_act_text = "\n".join([
-        f"[AI Act: {art.get('reference', '')}]" for art in req_data.get("euAiActArticles", [])
-    ])
-    iso_text = "\n".join([
-        f"[ISO 42001: {iso.get('reference', '')}] " for iso in req_data.get("iso42001Reference", [])
-    ])
-    # Compose all together for the prompt
-    return f"Requirement: {req_name}\n\nAI Act References:\n{ai_act_text}\n\nISO 42001 References:\n{iso_text}".strip()
 
 
 def _get_requirement_chunks_from_qdrant(requirement_name: str, regulatory_client: QdrantClient, regulatory_collection: str) -> list:
     """
-    Retrieve all regulatory chunks (already embedded) for a given requirement from Qdrant.
+    Retrieve all regulatory chunks (already embedded) for a given requirement from Qdrant. The retrival is deterministic and based on the requirement name.
     Args:
         requirement_name: The name of the requirement.
         regulatory_client: QdrantClient instance for the regulatory chunks DB.
@@ -243,6 +242,7 @@ def evaluate_requirement(
     """
     if not rag_ready():
         raise RuntimeError("RAG system not initialized")
+
     # 1. Retrieve already embedded regulatory chunks for the requirement from Qdrant regulatory collection.
     if _regulatory_client and _regulatory_collection:
         requirement_name = requirement_data.get("requirementName", "unknown")
@@ -260,112 +260,138 @@ def evaluate_requirement(
             Requirement_Name=requirement_name,
             Score=0,
             Auditor_Notes="Failed to retrieve regulatory chunks from Qdrant.",
-            Prompt=PROMPT_TEMPLATE.strip(),
-            Context=None
+            Prompt="",
+            Context=None,
+            SubRequirements=[]
         )
 
-    # 2. Select relevant document chunks by querying Qdrant with the requirement chunks as queries. This retrieves the most relevant parts of the document that pertain to the requirement being evaluated.
-
-    doc_client = _doc_client # The Qdrant client 
-    temp_collection = _temp_collection
+    # 2. Select relevant document chunks using RetrievalEngine
+    # Instantiate RetrievalEngine for this document context using the global embedding_model
+    retriever = RetrievalEngine(doc_client=_doc_client, embedding_model=embedding_model)
     
-    # Read the pre-rerank top-k parameter from params.yaml
-    pre_rerank_top_k = int(rag_params.get("pre_rerank_top_k", 10)) 
-
+    document_chunks_top_k = int(rag_params.get("document_chunks_top_k", 10))
     
-    # We pass the list of regulatory chunks (with their embeddings) to query Qdrant and retrieve the most relevant document chunks for that requirement. The retrieved chunks are grouped by the regulatory chunk they are relevant to, which allows us to maintain the mapping between the regulatory context and the evidence in the document.
-    top_doc_chunks_by_group = _query_qdrant_for_requirement(doc_client, temp_collection, req_chunks_embeddings, top_k=pre_rerank_top_k)
-
-    # e.g Data Governance requirement has 3 regulatory chunks (e.g. 3 AI Act articles), for each of them we query Qdrant and we obtain a list of the most relevant document chunks for each regulatory chunk, so we have a mapping like this:
-    # {
-    #     "AI Act Article 1": [chunk1, chunk2, ...],
-    #     "AI Act Article 2": [chunk3, chunk4, ...],
-    #     "ISO 42001 Section 5.1": [chunk5, chunk6, ...],
-    # }
-
-    # Now, in order to reduce redunancy in the prompt we organize the data structure for chunks, keeping track for each of the retrieved document chunk which regulatory chunk(s) it was relevant for. 
-
-    # Optimization: deduplication of retrieved chunks across groups
-    unique_chunks = {}  # chunk_id -> {"content": str, "refs": set}
-    for group, chunks in top_doc_chunks_by_group.items():
-        for c in chunks:
-            cid = c['chunk_id']
-            if cid not in unique_chunks:
-                unique_chunks[cid] = {
-                    "content": c['content'],
-                    "refs": {group}
-                }
-            else:
-                unique_chunks[cid]["refs"].add(group)
-
-    # E.g if chunk1 was relevant for both "AI Act Article 1" and "ISO 42001 Section 5.1", we will have:
-    # unique_chunks = {
-    #     "chunk1_id": {
-    #         "content": "text of chunk1",
-    #         "refs": {"AI Act Article 1", "ISO 42001 Section 5.1"}
-    #     },
-    #     ...
-
-    # Build context
-    doc_context_list = []
-    for cid, data in unique_chunks.items():
-        refs_str = ", ".join(sorted(list(data['refs'])))
-        chunk_entry = f"[[Next chunk is relevant for: {refs_str}]]\n{data['content']}"
-        doc_context_list.append(chunk_entry)
-
-    doc_context = "\n\n".join(doc_context_list)
-    #all_doc_chunks = [data['content'] for data in unique_chunks.values()]
-
-    # 3. re-ranking (skipped)
-    # top_k = int(rag_params.get("top_k", 4))
-
-    # 4. Build the prompt and call the LLM
-    regulatory_context_list = [f"[{c.get('reference', '')}] {c.get('content', '')}" for c in req_chunks_embeddings]
-
-    # Build a list that cointains the whole provided context for RAGAS purposes
-    eval_context_list = doc_context_list + regulatory_context_list 
-    
-    regulatory_context = "\n".join([c.get('content', '') for c in req_chunks_embeddings])
-
-    prompt = PROMPT_TEMPLATE.format(
-        document_text=doc_context.strip(),
-        requirement_name=requirement_name,
-        requirement_references=_build_requirement_text(requirement_data),
-        regulatory_references=regulatory_context,
+    # Use the requirement chunks embeddings as queries to retrieve the most relevant document chunks for this requirement. The retrieval is done per group (e.g., per regulatory reference) to maintain traceability and relevance of the retrieved context.
+    top_doc_chunks_per_subreq = retriever.query_for_requirement(
+        collection_name=_temp_collection,
+        req_chunks_embeddings=req_chunks_embeddings,
+        top_k=document_chunks_top_k
     )
 
-    # Debug for only one requirement to avoid too much logs, we can focus on the "Data Governance" requirement as an example, or if the retrieved context is empty (which is a critical case to debug)
-    #if (requirement_name == "Risks" ):
-    #    print(f"Evaluating requirement '{requirement_name}' with prompt:\n{prompt}\n") # Debug: print the #prompt being sent to the LLM
+    # 3. Evaluate Sub-requirements using EvaluationEngine
+    sub_results = []
+    sub_reports = []
 
-    assert llm is not None
-    llm_response = llm.invoke(prompt).content.strip()
-    try:
-        cleaned_response = llm_response.replace("```json", "").replace("```", "").strip()
-        response_json = json.loads(cleaned_response)
-        score_0_5 = int(response_json["score"])
-        auditor_notes = response_json["auditor_notes"]
-        rationale = response_json.get("rationale", "")
-    except Exception:
-        score_0_5 = 0
-        auditor_notes = f"LLM response parsing failed. Response was: {llm_response}"
-        rationale = ""
+    # Instantiate EvaluationEngine (global llm)
+    evaluator = EvaluationEngine(llm)
+
+    for reg_chunk in req_chunks_embeddings:
+        reference = reg_chunk.get("reference", "")
+        content = reg_chunk.get("content", "")
+        # Fallback: if content is missing, try control + implementation_guidance, and always label them if present
+        control = reg_chunk.get("control", "")
+        guidance = reg_chunk.get("implementation_guidance", "")
+        regulatory_parts = []
+        # Build regulatory context
+        if content:
+            regulatory_parts.append(content)
+        if control:
+            regulatory_parts.append(f"[CONTROL] {control}")
+        if guidance:
+            regulatory_parts.append(f"[IMPLEMENTATION_GUIDANCE] {guidance}")
+        content = "\n".join(regulatory_parts).strip()
+
+        # Find document chunks associated with this reference using top_doc_chunks_per_subreq
+        # Build group_key based on source for search in top_doc_chunks_per_subreq. 
+        group_key = None
+        if reg_chunk.get('source') == 'EU_AI_ACT':
+            group_key = f"AI_ACT::{reference}"
+        elif reg_chunk.get('source') == 'ISO_42001':
+            group_key = f"ISO_42001::{reference}"
+        else:
+            group_key = reference
+        
+        # Retrieve the relevant document chunks for this sub-requirement (reference) 
+        doc_chunks_for_group = top_doc_chunks_per_subreq.get(group_key, [])
+        relevant_chunks = []
+        if doc_chunks_for_group:
+            for chunk in doc_chunks_for_group:
+                relevant_chunks.append(chunk['content'])
+        else:
+            print(f"⚠ No relevant document chunks found for reference '{reference}' (group key: '{group_key}'). This may affect the evaluation of this sub-requirement.")
+
+
+        # Use EvaluationEngine to evaluate
+        result = evaluator.evaluate_sub_requirement(
+            main_req_name=requirement_name,
+            sub_req_name=reference,
+            source=reg_chunk.get("source", ""),
+            regulatory_reference=content,
+            associated_chunks=relevant_chunks
+        )
+
+        # Compose context for RAGAS 
+        ragas_contexts = []
+        if content:
+            reg_name = reference
+            reg_source = reg_chunk.get("source", "")
+            ragas_contexts.append(f"[REGULATORY] [NAME: {reg_name}] [SOURCE: {reg_source}] {content}")
+
+        # Add document chunks to RAGAS contexts (reuse the same chunks)
+        if doc_chunks_for_group:
+            for chunk in doc_chunks_for_group:
+                ragas_contexts.append(f"[DOCUMENT] {chunk['content']}")
+        else:
+            ragas_contexts.append("[DOCUMENT] No relevant document chunks found for this reference.")
+
+
+        # Reconstruct the result dict expected by aggregate_results
+        # Combine rationale and notes for RAGAS evaluation to improve groundedness
+        combined_answer = f"{result.get('rationale', '')}\n\nSummary: {result.get('auditor_notes', '')}"
+
+        sub_results.append({
+            "reference": reference,
+            "source": reg_chunk.get("source", ""),
+            "prompt": result.get("prompt", ""),  # Use prompt from evaluate_sub_requirement
+            "ragas_question": result.get("ragas_question", ""),
+            "answer": combined_answer, # For RAGAS evaluation
+            "auditor_notes": result.get("auditor_notes", ""), # For aggregation prompt
+            "contexts": ragas_contexts,
+            "score": result.get("score", "N/A"),
+            "rationale": result.get("rationale", "")
+        })
+
+        sub_reports.append(SubRequirementReport(
+            Reference=reference,
+            Source=reg_chunk.get("source", ""),
+            Score=result.get("score", "N/A"),
+            Rationale=result.get("rationale", ""),
+            Auditor_Notes=result.get("auditor_notes", ""),
+            Contexts=ragas_contexts,
+            Prompt=result.get("prompt", "")
+        ))
+
+    # 4. Aggregate results
+    agg_result = evaluator.aggregate_results(sub_results)
+
     return RequirementReport(
         Requirement_ID=requirement_data.get("id", ""),
         Requirement_Category=requirement_data.get("ethicalPrinciple", "unknown"),
         Requirement_Name=requirement_name,
-        Score=score_0_5 if isinstance(score_0_5, int) else "N/A",
-        Auditor_Notes=auditor_notes,
-        Rationale=rationale,
-        Prompt=prompt,
-        Context= eval_context_list, 
+        Score=agg_result.get("score", "N/A"),
+        Auditor_Notes=agg_result.get("auditor_notes", ""),
+        Rationale=agg_result.get("rationale", ""),
+        Prompt=agg_result.get("prompt", ""),
+        SubRequirements=sub_reports
     )
+
 
 # Main function to perform a full audit of a document by evaluating all requirements in the mapping
 def audit_document(
     document_text: str,
     *,
     debug_dump_path: Optional[str] = None,
+    requirement_limit: Optional[int] = None,
 ) -> AuditResponse:
     if not rag_ready():
         raise RuntimeError("RAG system not initialized")
@@ -378,11 +404,52 @@ def audit_document(
     document_chunk_size = rag_params.get("document_chunk_size", 512)
     document_chunk_overlap = rag_params.get("document_chunk_overlap", 64)
 
+    # Validate document input
+    MIN_DOCUMENT_LENGTH = 50  # Minimum characters for meaningful analysis
+    if not document_text or len(document_text.strip()) < MIN_DOCUMENT_LENGTH:
+        print(f"⚠ Warning: Document is empty or too short ({len(document_text.strip())} chars). Returning N/A for all requirements.")
+        # Return report with all requirements scored N/A (evaluation not applicable)
+        empty_reports = []
+        req_iter = requirement_chunks if requirement_limit is None else requirement_chunks[:requirement_limit]
+        for req_data in req_iter:
+            empty_reports.append(RequirementReport(
+                Requirement_ID=req_data.get("id", ""),
+                Requirement_Category=req_data.get("ethicalPrinciple", "unknown"),
+                Requirement_Name=req_data.get("requirementName", "unknown"),
+                Score="N/A",
+                Rationale="The provided document is empty or insufficient for compliance evaluation. A minimum of 50 characters is required for meaningful analysis.",
+                Auditor_Notes="Evaluation not applicable: no meaningful content found in the provided document. Adequate documentation is required to assess compliance.",
+                Prompt="",
+                SubRequirements=[]
+            ))
+        return AuditResponse(requirements=empty_reports)
+
     doc_chunks = _chunk_document(document_text, chunk_size=document_chunk_size, chunk_overlap=document_chunk_overlap)
+    
+    # Additional check after chunking
+    if not doc_chunks or len(doc_chunks) == 0:
+        print(f"⚠ Warning: No chunks generated from document. Returning N/A for all requirements.")
+        empty_reports = []
+        req_iter = requirement_chunks if requirement_limit is None else requirement_chunks[:requirement_limit]
+        for req_data in req_iter:
+            empty_reports.append(RequirementReport(
+                Requirement_ID=req_data.get("id", ""),
+                Requirement_Category=req_data.get("ethicalPrinciple", "unknown"),
+                Requirement_Name=req_data.get("requirementName", "unknown"),
+                Score="N/A",
+                Rationale="The provided document could not be processed into analyzable chunks. Document may be improperly formatted or lack sufficient text content.",
+                Auditor_Notes="Evaluation not applicable: document content is insufficient or improperly formatted for compliance evaluation.",
+                Prompt="",
+                SubRequirements=[]
+            ))
+        return AuditResponse(requirements=empty_reports)
+    
     doc_embs = _embed_chunks(doc_chunks, embedding_model)
 
 
-    #Store document chunks and embeddings in a temporary in-memory Qdrant collection for efficient retrieval during requirement evaluation. This avoids the need for file-based storage and cleanup issues, while still allowing us to leverage Qdrant's vector search capabilities.
+    # Store document chunks and embeddings in a temporary in-memory Qdrant collection
+    # for efficient retrieval during requirement evaluation. This avoids file-based storage
+    # and cleanup issues while still leveraging Qdrant's vector search capabilities.
     temp_collection = f"temp_doc_{os.getpid()}_audit"
     # Use in-memory Qdrant for doc_client to avoid file locking and cleanup issues
     doc_client = QdrantClient(":memory:")
@@ -410,8 +477,12 @@ def audit_document(
         index_path = vect_params.get("vector_index_path", "data/processed/vector_index")
         regulatory_client = QdrantClient(path=index_path)
 
-    # For each requirement in requirement_chunks (list), call evaluate_requirement to get the report for that requirement and collect all reports in a list.
-    for req_data in requirement_chunks:
+    # For each requirement in requirement_chunks, call evaluate_requirement to get its report.
+    req_iter = requirement_chunks
+    if requirement_limit is not None:
+        req_iter = req_iter[:requirement_limit]
+
+    for req_data in req_iter:
         requirement_report = evaluate_requirement(
             requirement_data=req_data,
             _doc_client=doc_client,
@@ -421,7 +492,8 @@ def audit_document(
         )
         requirements_reports.append(requirement_report)
 
-    if debug_dump_path: # If a debug dump path is provided, save the raw requirement reports
+    if debug_dump_path:
+        # If a debug dump path is provided, save the raw requirement reports
         debug_dir = os.path.dirname(debug_dump_path) or "."
         os.makedirs(debug_dir, exist_ok=True)
         with open(debug_dump_path, "w", encoding="utf-8") as f:
@@ -472,51 +544,6 @@ def _embed_chunks(chunks: List[str], model: SentenceTransformer):
         Numpy array of embeddings.
     """
     return model.encode(chunks, convert_to_numpy=True, show_progress_bar=False)
-
-
-def _query_qdrant_for_requirement(doc_client: QdrantClient, doc_collection: str, req_chunks_embeddings: List[dict], top_k: int = 4):
-    
-    from collections import defaultdict
-    group_to_chunks = defaultdict(list)
-    #print(req_chunks_embeddings[0].keys() if req_chunks_embeddings else "Empty list")
-    for req in req_chunks_embeddings: # For each requirement
-        reference = req.get("reference") # 
-        source = req.get("source") 
-        assigned = False
-        if reference and source:
-            if source == "EU_AI_ACT":
-                group_to_chunks[f"AI_ACT::{reference}"].append(req)
-                assigned = True
-            elif source == "ISO_42001":
-                group_to_chunks[f"ISO_42001::{reference}"].append(req)
-                assigned = True
-        if not assigned:
-            group_to_chunks['NO_GROUP'].append(req)
-
-    results_by_group = {}
-    for group, chunks in group_to_chunks.items():
-        group_results = []
-        for req in chunks:
-            req_emb = req['embedding']
-            hits = doc_client.query_points(collection_name=doc_collection, query=req_emb, limit=top_k).points
-            for hit in hits:
-                group_results.append({
-                    'score': hit.score,
-                    'content': hit.payload.get('content', ''),
-                    'chunk_id': hit.payload.get('chunk_id', None)
-                })
-        # Deduplicate by chunk_id, keep only the highest score
-        seen = {}
-        for r in group_results:
-            cid = r['chunk_id']
-            if cid not in seen or r['score'] > seen[cid]['score']:
-                seen[cid] = r
-        # Take top_k for each group
-        top_chunks = list(seen.values())
-        top_chunks.sort(key=lambda x: x['score'], reverse=True)
-        results_by_group[group] = top_chunks[:top_k]
-
-    return results_by_group
 
 
 if __name__ == "__main__":

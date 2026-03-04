@@ -1,43 +1,98 @@
-# Escludi file di sistema e cache Python
+# ==============================================================================
+# Docker Build Context Exclusions - LegalAIze
+# ==============================================================================
+# Files and directories excluded from Docker build context to reduce image size
+# and prevent sensitive data from being included in containers.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Python Runtime & Cache
+# ------------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
+# Virtual Environments
 env/
 venv/
 ENV/
 .venv
+backend_venv/
+frontend_venv/
 
-# Escludi file IDE
+# ------------------------------------------------------------------------------
+# Development Tools & IDEs
+# ------------------------------------------------------------------------------
 .vscode/
 .idea/
 *.swp
 *.swo
+*.swn
 
-# Escludi file OS
+# ------------------------------------------------------------------------------
+# OS-Specific Files
+# ------------------------------------------------------------------------------
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# SECURITY: EXCLUDE KEYS AND SECRETS
+# ------------------------------------------------------------------------------
+# Security & Credentials (NEVER include in images)
+# ------------------------------------------------------------------------------
 .env
 dagshub_token.txt
-*.log
+*.pem
+*.key
+*.crt
+secrets/
 
-# Exclude data, models, output, DVC, git, etc.
+# ------------------------------------------------------------------------------
+# Data & Model Artifacts (too large for container images)
+# ------------------------------------------------------------------------------
 data/
 models/
 mlruns/
 mlartifacts/
-.dvc/
+metrics/
+output/
+tmp/
+logs/
+
+# ------------------------------------------------------------------------------
+# Version Control & Experiment Tracking
+# ------------------------------------------------------------------------------
 .git/
+.dvc/
 *.dvc
+.gitignore
+.dockerignore
+
+# ------------------------------------------------------------------------------
+# Archives & Large Files
+# ------------------------------------------------------------------------------
 *.gz
 *.zip
 *.tar
 *.tar.gz
+*.rar
+*.7z
+
+# ------------------------------------------------------------------------------
+# Jupyter Notebooks & Documentation
+# ------------------------------------------------------------------------------
 *.ipynb
-output/
-tmp/
-logs/
 notebooks/
+docs/
+*.md
+!README.md
+
+# ------------------------------------------------------------------------------
+# Test & CI/CD
+# ------------------------------------------------------------------------------
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+.github/

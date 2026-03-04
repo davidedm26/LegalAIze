@@ -6,6 +6,14 @@ import time
 from fpdf import FPDF
 from pypdf import PdfReader
 import plotly.graph_objects as go
+import streamlit as st
+import requests
+import json
+import os
+import time
+from fpdf import FPDF
+from pypdf import PdfReader
+import plotly.graph_objects as go
 
 # ==============================================================================
 # CONFIGURATION & DYNAMIC PATHS
@@ -20,16 +28,16 @@ try:
     current_script_dir = os.path.dirname(os.path.abspath(__file__))
     
     # 2. Go up two levels to reach the project root 'LegalAIze'
-    # (Assuming structure: LegalAIze -> frontend -> pages -> ThisScript.py)
     project_root = os.path.abspath(os.path.join(current_script_dir, "..", ".."))
     
-    # 3. Build path to data folder
+    # 3. Build paths to data folders
     MAPPING_FILE = os.path.join(project_root, "data", "mapping.json")
+    REQUIREMENTS_FILE = os.path.join(project_root, "data", "processed", "requirement_chunks.json")
 
-    print("Loaded MAPPING_FILE from:", MAPPING_FILE)
 except Exception as e:
     # Fallback just in case
     MAPPING_FILE = "mapping.json"
+    REQUIREMENTS_FILE = "requirement_chunks.json"
     print(f"Path Error: {e}")
 
 # ==============================================================================
@@ -51,6 +59,14 @@ if 'total_points' not in st.session_state:
     st.session_state.total_points = 0
 if 'max_points' not in st.session_state:
     st.session_state.max_points = 0
+if '_analyzing' not in st.session_state:
+    st.session_state._analyzing = False
+if '_pending_doc' not in st.session_state:
+    st.session_state._pending_doc = None
+if 'input_mode' not in st.session_state:
+    st.session_state.input_mode = "📄 Upload File"
+if 'doc_text' not in st.session_state:
+    st.session_state.doc_text = ""
 
 # Function to clear results automatically when a new file is uploaded
 def reset_session():
@@ -58,17 +74,38 @@ def reset_session():
     st.session_state.global_score = 0
     st.session_state.total_points = 0
     st.session_state.max_points = 0
+    st.session_state.pdf_bytes = None
+    st.session_state.doc_text = ""
 
+# Generic function to load any JSON file
 @st.cache_data
-def load_mapping_data(filepath):
+def load_json_data(filepath):
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
-        print(f"JSON Error: {e}")
+        print(f"JSON Error loading {filepath}: {e}")
         return {}
 
-MAPPING_DATA = load_mapping_data(MAPPING_FILE)
+# Load both files into memory
+MAPPING_DATA = load_json_data(MAPPING_FILE)
+REQUIREMENTS_DATA = load_json_data(REQUIREMENTS_FILE)
+
+def _parse_score(raw) -> float | None:
+    """Convert a score value (int, float, or 'N/A') to float, or None if not applicable."""
+    if raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    s = str(raw).strip().upper()
+    if s in ("N/A", "NA", ""):
+        return None
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
 
 # ==============================================================================
 # CUSTOM CSS
@@ -246,6 +283,34 @@ def group_requirements_by_principle(requirements, mapping_data):
             grouped.setdefault(principle, []).append(req)
     return grouped
 
+def get_reference_details(req_id, requirements_data):
+    """
+    Estrae i contenuti di dettaglio per le reference (AI Act e ISO) 
+    dal file requirement_chunks.json basandosi sull'ID.
+    """
+    # Cerca il chunk corrispondente all'ID
+    req_chunk = next((r for r in requirements_data if r.get("id") == req_id), None)
+    
+    ai_act_dict = {}
+    iso_dict = {}
+    
+    if req_chunk:
+        # Estrai articoli EU AI Act
+        for ai_ref in req_chunk.get("euAiActArticles", []):
+            ai_act_dict[ai_ref.get("reference")] = ai_ref.get("content", "Nessun contenuto disponibile.")
+            
+        # Estrai controlli ISO 42001
+        for iso_ref in req_chunk.get("iso42001Reference", []):
+            content = iso_ref.get("content", "")
+            # Gestisci il caso in cui la ISO usi "control" e "implementation_guidance" invece di "content"
+            if not content:
+                control = iso_ref.get("control", "")
+                guidance = iso_ref.get("implementation_guidance", "")
+                content = f"**Control:**\n{control}\n\n**Guidance:**\n{guidance}".strip()
+            iso_dict[iso_ref.get("reference")] = content
+            
+    return ai_act_dict, iso_dict
+
 # ==============================================================================
 # SIDEBAR
 # ==============================================================================
@@ -300,15 +365,24 @@ if not MAPPING_DATA:
 with st.container(border=True):
     col_input, col_opt = st.columns([3, 1])
     with col_opt:
-        input_mode = st.radio("Data Source:", ["📄 Upload File", "✍️ Paste Text"], on_change=reset_session)
+        input_mode = st.radio("Data Source:", ["📄 Upload File", "✍️ Paste Text"],
+                              key="input_mode_radio",
+                              index=["📄 Upload File", "✍️ Paste Text"].index(st.session_state.input_mode),
+                              disabled=st.session_state._analyzing)
+        # Detect mode switch and clear stored doc_text to avoid stale content
+        if input_mode != st.session_state.input_mode:
+            st.session_state.input_mode = input_mode
+            st.session_state.doc_text = ""
     with col_input:
-        doc_text = ""
         if input_mode == "✍️ Paste Text":
-            # on_change=reset_session -> Clears analysis when text changes
-            doc_text = st.text_area("Technical Documentation", height=150, placeholder="Paste text here...", on_change=reset_session)
+            pasted = st.text_area("Technical Documentation", height=150, placeholder="Paste text here...",
+                                  key="paste_text_input", disabled=st.session_state._analyzing)
+            if pasted:
+                st.session_state.doc_text = pasted
         else:
-            # on_change==session -> Clears analysis when file changes
-            uploaded_file = st.file_uploader("Select document (PDF, TXT)", type=["pdf", "txt"], on_change=reset_session)
+            uploaded_file = st.file_uploader("Select document (PDF, TXT)", type=["pdf", "txt"],
+                                             key="file_uploader_input",
+                                             disabled=st.session_state._analyzing)
             if uploaded_file:
                 try:
                     if uploaded_file.type == "application/pdf":
@@ -316,27 +390,39 @@ with st.container(border=True):
                         text_content = []
                         for page in reader.pages:
                             text_content.append(page.extract_text())
-                        doc_text = "\n".join(text_content)
+                        st.session_state.doc_text = "\n".join(text_content)
                     else:
-                        doc_text = uploaded_file.read().decode("utf-8")
+                        st.session_state.doc_text = uploaded_file.read().decode("utf-8")
                 except Exception as e:
                     st.error(f"Error reading file: {e}")
+            else:
+                # No file currently uploaded; keep previously stored text only if we didn't just switch modes
+                if st.session_state.input_mode == "📄 Upload File" and not st.session_state.doc_text:
+                    st.session_state.doc_text = ""
 
 # 2. ACTION BUTTON
-analyze_btn = st.button("🚀 Start Compliance Analysis", type="primary", use_container_width=True)
+doc_text = st.session_state.doc_text
+analyze_btn = st.button("🚀 Start Compliance Analysis", type="primary", use_container_width=True, disabled=st.session_state._analyzing)
+
+# Phase 1: button clicked → save doc, set flag, rerun to disable all widgets BEFORE calling backend
+if analyze_btn and doc_text:
+    st.session_state._pending_doc = doc_text
+    st.session_state._analyzing = True
+    st.rerun()
 
 # ------------------------------------------------------------------------------
-# ANALYSIS LOGIC
+# ANALYSIS LOGIC  (Phase 2: runs on the rerun where widgets are already disabled)
 # ------------------------------------------------------------------------------
-if analyze_btn and doc_text:
+if st.session_state._analyzing and st.session_state._pending_doc:
+    st.session_state._analyzing = True
     with st.status("🧠 Analyzing document with AI...", expanded=True) as status:
         try:
             st.write("📤 Generating Report...")
             headers = {'Content-Type': 'application/json'}
             response = requests.post(
                 f"{BACKEND_URL}/audit", 
-                json={"document_text": doc_text}, 
-                headers=headers, timeout=180
+                json={"document_text": st.session_state._pending_doc}, 
+                headers=headers, timeout=1200
             )
 
             if response.status_code == 200:
@@ -354,14 +440,21 @@ if analyze_btn and doc_text:
                     r_id = item.get("Requirement_ID", "N/A")
                     r_notes = item.get("Auditor_Notes", "No notes available.")
                     r_rationale = item.get("Rationale", "No rationale provided.")
-                    score = item.get("Score", 0) 
-                    
+                    r_sub_reqs = item.get("SubRequirements", [])
+                    score = _parse_score(item.get("Score", 0))
+                    score_val = score if score is not None else 0.0
+                    is_na = score is None
+
                     processed_reqs.append({
-                        "name": r_name, "id": r_id, "score_display": f"{score}/5", 
-                        "progress": score / 5.0, "notes": r_notes, "rationale": r_rationale
+                        "name": r_name, "id": r_id,
+                        "score_display": "N/A" if is_na else f"{score_val:.0f}/5",
+                        "progress": 0.0 if is_na else score_val / 5.0,
+                        "notes": r_notes, "rationale": r_rationale,
+                        "sub_requirements": r_sub_reqs
                     })
-                    total += score
-                    maxim += 5
+                    if not is_na:
+                        total += score_val
+                        maxim += 5
 
                 # Save to Session State
                 st.session_state.audit_results = processed_reqs
@@ -370,13 +463,19 @@ if analyze_btn and doc_text:
                 st.session_state.global_score = (total / maxim) if maxim > 0 else 0.0
                 
                 status.update(label="✅ Analysis Complete!", state="complete", expanded=False)
-                time.sleep(1) 
-                st.rerun() 
-                
+                time.sleep(1)
+                st.session_state._analyzing = False
+                st.session_state._pending_doc = None
+                st.rerun()
+
             else:
+                st.session_state._analyzing = False
+                st.session_state._pending_doc = None
                 status.update(label="❌ Error", state="error")
                 st.error(f"Server Error: HTTP {response.status_code}")
         except Exception as e:
+            st.session_state._analyzing = False
+            st.session_state._pending_doc = None
             status.update(label="❌ Connection Failed", state="error")
             st.error(f"Connection failed: {e}")
 
@@ -457,8 +556,8 @@ if st.session_state.audit_results is not None:
         # --- PDF DOWNLOAD ---
         c_pdf_left, c_pdf_mid, c_pdf_right = st.columns([1, 2, 1])
         with c_pdf_mid:
-            # Generate PDF only once per session to avoid rerun on download
-            if 'pdf_bytes' not in st.session_state:
+            # Generate PDF once per analysis result (regenerate if cleared by reset_session)
+            if not st.session_state.get('pdf_bytes'):
                 st.session_state.pdf_bytes = create_pdf_report(
                     results, glob_score, 
                     st.session_state.total_points, st.session_state.max_points
@@ -520,16 +619,50 @@ if st.session_state.audit_results is not None:
                         st.markdown(f"**Score:** {req['score_display']}")
 
                         st.caption("REFERENCES")
-                        st.markdown(f"**ISO:** {iso_ui}")
-                        st.markdown(f"**AI Act:** {ai_act_ui}")
+                        
+                        # --- LOGICA TOOLTIP ---
+                        # Recupera i dizionari con i testi lunghi per l'ID corrente
+                        ai_act_dict, iso_dict = get_reference_details(req['id'], REQUIREMENTS_DATA)
 
-                        st.progress(req["progress"]) 
+                        # Mostra ISO 42001 in verticale con tooltip
+                        if iso_ui_list:
+                            st.markdown("**ISO 42001:**")
+                            for ref in iso_ui_list:
+                                help_text = iso_dict.get(ref, "Dettagli non trovati nel JSON.")
+                                st.markdown(f"- {ref}", help=help_text)
+                        else:
+                            st.markdown("**ISO 42001:** N/A")
+                        
+                        st.write("") # extra spacing
+                        
+                        # Mostra EU AI Act in verticale con tooltip
+                        if ai_act_list:
+                            st.markdown("**EU AI Act:**")
+                            for ref in ai_act_list:
+                                help_text = ai_act_dict.get(ref, "Dettagli non trovati nel JSON.")
+                                st.markdown(f"- {ref}", help=help_text)
+                        else:
+                            st.markdown("**EU AI Act:** N/A")
+                        # ----------------------------
+
+                        st.progress(req["progress"])
+                        
                     with col_B:
                         st.caption("AI FINDINGS")
                         st.write(req["notes"])
 
                         st.caption("Rationale")
                         st.text(req.get("rationale", "No rationale provided."))
+
+                        sub_reqs = req.get("sub_requirements", [])
+                        if sub_reqs:
+                            with st.expander("Show Sub-Requirements Details"):
+                                for sub in sub_reqs:
+                                    st.markdown(f"#### {sub.get('Source', 'N/A')} - {sub.get('Reference', 'N/A')}")
+                                    st.markdown(f"**Score:** {sub.get('Score', 'N/A')}")
+                                    st.markdown(f"**Notes:** {sub.get('Auditor_Notes', 'N/A')}")
+                                    st.markdown(f"**Rationale:** {sub.get('Rationale', 'N/A')}")
+                                    st.markdown("---")
 elif analyze_btn and not doc_text:
     st.warning("Please upload a file or paste text.")
 
