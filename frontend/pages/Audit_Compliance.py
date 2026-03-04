@@ -34,9 +34,6 @@ try:
     MAPPING_FILE = os.path.join(project_root, "data", "mapping.json")
     REQUIREMENTS_FILE = os.path.join(project_root, "data", "processed", "requirement_chunks.json")
 
-    print("Loaded MAPPING_FILE from:", MAPPING_FILE)
-    print("Loaded REQUIREMENTS_FILE from:", REQUIREMENTS_FILE)
-
 except Exception as e:
     # Fallback just in case
     MAPPING_FILE = "mapping.json"
@@ -62,6 +59,14 @@ if 'total_points' not in st.session_state:
     st.session_state.total_points = 0
 if 'max_points' not in st.session_state:
     st.session_state.max_points = 0
+if '_analyzing' not in st.session_state:
+    st.session_state._analyzing = False
+if '_pending_doc' not in st.session_state:
+    st.session_state._pending_doc = None
+if 'input_mode' not in st.session_state:
+    st.session_state.input_mode = "📄 Upload File"
+if 'doc_text' not in st.session_state:
+    st.session_state.doc_text = ""
 
 # Function to clear results automatically when a new file is uploaded
 def reset_session():
@@ -69,6 +74,8 @@ def reset_session():
     st.session_state.global_score = 0
     st.session_state.total_points = 0
     st.session_state.max_points = 0
+    st.session_state.pdf_bytes = None
+    st.session_state.doc_text = ""
 
 # Generic function to load any JSON file
 @st.cache_data
@@ -83,6 +90,20 @@ def load_json_data(filepath):
 # Load both files into memory
 MAPPING_DATA = load_json_data(MAPPING_FILE)
 REQUIREMENTS_DATA = load_json_data(REQUIREMENTS_FILE)
+
+def _parse_score(raw) -> float | None:
+    """Convert a score value (int, float, or 'N/A') to float, or None if not applicable."""
+    if raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    s = str(raw).strip().upper()
+    if s in ("N/A", "NA", ""):
+        return None
+    try:
+        return float(s)
+    except ValueError:
+        return None
 
 
 
@@ -344,15 +365,24 @@ if not MAPPING_DATA:
 with st.container(border=True):
     col_input, col_opt = st.columns([3, 1])
     with col_opt:
-        input_mode = st.radio("Data Source:", ["📄 Upload File", "✍️ Paste Text"], on_change=reset_session)
+        input_mode = st.radio("Data Source:", ["📄 Upload File", "✍️ Paste Text"],
+                              key="input_mode_radio",
+                              index=["📄 Upload File", "✍️ Paste Text"].index(st.session_state.input_mode),
+                              disabled=st.session_state._analyzing)
+        # Detect mode switch and clear stored doc_text to avoid stale content
+        if input_mode != st.session_state.input_mode:
+            st.session_state.input_mode = input_mode
+            st.session_state.doc_text = ""
     with col_input:
-        doc_text = ""
         if input_mode == "✍️ Paste Text":
-            # on_change=reset_session -> Clears analysis when text changes
-            doc_text = st.text_area("Technical Documentation", height=150, placeholder="Paste text here...", on_change=reset_session)
+            pasted = st.text_area("Technical Documentation", height=150, placeholder="Paste text here...",
+                                  key="paste_text_input", disabled=st.session_state._analyzing)
+            if pasted:
+                st.session_state.doc_text = pasted
         else:
-            # on_change==session -> Clears analysis when file changes
-            uploaded_file = st.file_uploader("Select document (PDF, TXT)", type=["pdf", "txt"], on_change=reset_session)
+            uploaded_file = st.file_uploader("Select document (PDF, TXT)", type=["pdf", "txt"],
+                                             key="file_uploader_input",
+                                             disabled=st.session_state._analyzing)
             if uploaded_file:
                 try:
                     if uploaded_file.type == "application/pdf":
@@ -360,27 +390,39 @@ with st.container(border=True):
                         text_content = []
                         for page in reader.pages:
                             text_content.append(page.extract_text())
-                        doc_text = "\n".join(text_content)
+                        st.session_state.doc_text = "\n".join(text_content)
                     else:
-                        doc_text = uploaded_file.read().decode("utf-8")
+                        st.session_state.doc_text = uploaded_file.read().decode("utf-8")
                 except Exception as e:
                     st.error(f"Error reading file: {e}")
+            else:
+                # No file currently uploaded; keep previously stored text only if we didn't just switch modes
+                if st.session_state.input_mode == "📄 Upload File" and not st.session_state.doc_text:
+                    st.session_state.doc_text = ""
 
 # 2. ACTION BUTTON
-analyze_btn = st.button("🚀 Start Compliance Analysis", type="primary", use_container_width=True)
+doc_text = st.session_state.doc_text
+analyze_btn = st.button("🚀 Start Compliance Analysis", type="primary", use_container_width=True, disabled=st.session_state._analyzing)
+
+# Phase 1: button clicked → save doc, set flag, rerun to disable all widgets BEFORE calling backend
+if analyze_btn and doc_text:
+    st.session_state._pending_doc = doc_text
+    st.session_state._analyzing = True
+    st.rerun()
 
 # ------------------------------------------------------------------------------
-# ANALYSIS LOGIC
+# ANALYSIS LOGIC  (Phase 2: runs on the rerun where widgets are already disabled)
 # ------------------------------------------------------------------------------
-if analyze_btn and doc_text:
+if st.session_state._analyzing and st.session_state._pending_doc:
+    st.session_state._analyzing = True
     with st.status("🧠 Analyzing document with AI...", expanded=True) as status:
         try:
             st.write("📤 Generating Report...")
             headers = {'Content-Type': 'application/json'}
             response = requests.post(
                 f"{BACKEND_URL}/audit", 
-                json={"document_text": doc_text}, 
-                headers=headers, timeout=180
+                json={"document_text": st.session_state._pending_doc}, 
+                headers=headers, timeout=1200
             )
 
             if response.status_code == 200:
@@ -399,15 +441,20 @@ if analyze_btn and doc_text:
                     r_notes = item.get("Auditor_Notes", "No notes available.")
                     r_rationale = item.get("Rationale", "No rationale provided.")
                     r_sub_reqs = item.get("SubRequirements", [])
-                    score = item.get("Score", 0) 
-                    
+                    score = _parse_score(item.get("Score", 0))
+                    score_val = score if score is not None else 0.0
+                    is_na = score is None
+
                     processed_reqs.append({
-                        "name": r_name, "id": r_id, "score_display": f"{score}/5", 
-                        "progress": score / 5.0, "notes": r_notes, "rationale": r_rationale,
+                        "name": r_name, "id": r_id,
+                        "score_display": "N/A" if is_na else f"{score_val:.0f}/5",
+                        "progress": 0.0 if is_na else score_val / 5.0,
+                        "notes": r_notes, "rationale": r_rationale,
                         "sub_requirements": r_sub_reqs
                     })
-                    total += score
-                    maxim += 5
+                    if not is_na:
+                        total += score_val
+                        maxim += 5
 
                 # Save to Session State
                 st.session_state.audit_results = processed_reqs
@@ -416,13 +463,19 @@ if analyze_btn and doc_text:
                 st.session_state.global_score = (total / maxim) if maxim > 0 else 0.0
                 
                 status.update(label="✅ Analysis Complete!", state="complete", expanded=False)
-                time.sleep(1) 
-                st.rerun() 
-                
+                time.sleep(1)
+                st.session_state._analyzing = False
+                st.session_state._pending_doc = None
+                st.rerun()
+
             else:
+                st.session_state._analyzing = False
+                st.session_state._pending_doc = None
                 status.update(label="❌ Error", state="error")
                 st.error(f"Server Error: HTTP {response.status_code}")
         except Exception as e:
+            st.session_state._analyzing = False
+            st.session_state._pending_doc = None
             status.update(label="❌ Connection Failed", state="error")
             st.error(f"Connection failed: {e}")
 
@@ -503,8 +556,8 @@ if st.session_state.audit_results is not None:
         # --- PDF DOWNLOAD ---
         c_pdf_left, c_pdf_mid, c_pdf_right = st.columns([1, 2, 1])
         with c_pdf_mid:
-            # Generate PDF only once per session to avoid rerun on download
-            if 'pdf_bytes' not in st.session_state:
+            # Generate PDF once per analysis result (regenerate if cleared by reset_session)
+            if not st.session_state.get('pdf_bytes'):
                 st.session_state.pdf_bytes = create_pdf_report(
                     results, glob_score, 
                     st.session_state.total_points, st.session_state.max_points

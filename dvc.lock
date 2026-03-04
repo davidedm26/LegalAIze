@@ -96,13 +96,13 @@ stages:
     deps:
     - path: backend/rag_engine.py
       hash: md5
-      md5: 480cb762e34216218f34efb16be01929
-      size: 24429
+      md5: 12bf8d0128af9af023383ee52ebd33c9
+      size: 24660
     - path: data/ground_truth
       hash: md5
-      md5: 0ea5dd6f2c6fe8a49d3871278294dbfd.dir
-      size: 966457
-      nfiles: 21
+      md5: 7ac0bc72dc1bc20fdf7a9e037ebf1a43.dir
+      size: 1001041
+      nfiles: 24
     - path: data/processed/requirement_chunks.json
       hash: md5
       md5: 6a20994bdd1f0fb021a23b7a7c9ad2f0
@@ -113,8 +113,8 @@ stages:
       size: 20220
     - path: evaluation/
       hash: md5
-      md5: 585f15464e663aada498220c8951c3bf.dir
-      size: 68955
+      md5: 3111071756dbff549717e4173f82c2e4.dir
+      size: 69291
       nfiles: 13
     params:
       params.yaml:
@@ -124,8 +124,11 @@ stages:
           mlflow_experiment: rag_evaluation
           debug_output_dir: data/debug
           case_selector:
+          - 1
+          - 2
           - 3
           - 4
+          - 5
           requirement_limit:
           ground_truth:
           - name: Evaluation1
@@ -135,15 +138,15 @@ stages:
           - name: Evaluation2
             document_path: 
               data/ground_truth/raw_data/Evaluation2/documentation.txt
-            report_path: data/ground_truth/raw_data/Evaluation2/report_2.CSV
+            report_path: data/ground_truth/raw_data/Evaluation2/report_3.CSV
           - name: Evaluation3
             document_path: 
               data/ground_truth/raw_data/Evaluation3/documentation.txt
-            report_path: data/ground_truth/raw_data/Evaluation3/report_2.CSV
+            report_path: data/ground_truth/raw_data/Evaluation3/report_3.CSV
           - name: Evaluation4
             document_path: 
               data/ground_truth/raw_data/Evaluation4/documentation.txt
-            report_path: data/ground_truth/raw_data/Evaluation4/report_2.CSV
+            report_path: data/ground_truth/raw_data/Evaluation4/report_3.CSV
           - name: Evaluation5
             document_path: 
               data/ground_truth/raw_data/Evaluation5/documentation.txt
@@ -157,13 +160,13 @@ stages:
     outs:
     - path: metrics/rag_eval.json
       hash: md5
-      md5: e43781016c051ab12d72069f026b2392
-      size: 28118
+      md5: 419f7ffd8221b8a07b373621a12607a2
+      size: 69733
     - path: metrics/ragas_main_requirements.json
       hash: md5
-      md5: 396c0e70c75a213886251045de314061
-      size: 64725
+      md5: 7be75fe7f8f4418bae51143e82232564
+      size: 150586
     - path: metrics/ragas_sub_requirements.json
       hash: md5
-      md5: 6163431135f90e927db67f0272920e7f
-      size: 932118
+      md5: 54b254bd2a87143719f7d044547685ae
+      size: 2229841
