@@ -150,11 +150,28 @@ Refer to `.env.example` for all available options.
 
 ## 3. Repository Initialization
 
-Clone the repository and install DVC:
+Clone the repository and create a virtual environment:
 
 ```bash
-git clone https://github.com/davidedm_26/LegalAIze.git
+git clone https://github.com/davidedm26/LegalAIze.git
 cd LegalAIze
+```
+
+**Linux / macOS:**
+```bash
+python3.11 -m venv venv
+source venv/bin/activate
+```
+
+**Windows:**
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+```
+
+Then install DVC:
+
+```bash
 pip install dvc
 ```
 
@@ -162,20 +179,31 @@ pip install dvc
 
 ## 4. MLflow Setup (facultative)
 
-By default, use a local MLflow instance for experiment tracking:
+Choose one of the following alternatives for experiment tracking:
+
+---
+
+### A. Local MLflow Instance
+
+Start a local MLflow server before running experiments:
+
+```bash
+mlflow ui --backend-store-uri ./mlruns --host 0.0.0.0 --port 5000
+```
+
+Then set the tracking URI in your `.env`:
 
 ```
 MLFLOW_TRACKING_URI=http://localhost:5000
 ```
 
-Start the MLflow server before running experiments:
+The MLflow UI will be available at http://localhost:5000.
 
-```bash
-mlflow ui --backend-store-uri ./mlruns --host 0.0.0.0 --port 5000
-```
-This will make the MLflow UI available at http://localhost:5000.
+---
 
-To use a remote MLflow instance on DagsHub, create your own DagsHub repository and set:
+### B. Remote DagsHub Instance (your own repository)
+
+Create your own DagsHub repository and set the following variables in your `.env`:
 
 ```
 DAGSHUB_REPO=YOUR_REPO
@@ -183,7 +211,11 @@ DAGSHUB_USERNAME=YOUR_USERNAME
 DAGSHUB_TOKEN=YOUR_TOKEN
 ```
 
-To collaborate with the LegalAIze team and log experiments to the main DagsHub repository, set your DagsHub username and token in the `.env` and request write access from the maintainers.
+---
+
+### C. LegalAIze Team DagsHub Repository
+
+To log experiments to the main LegalAIze DagsHub repository, request write access from the maintainers and set your credentials in the `.env`:
 
 ```
 DAGSHUB_USERNAME=YOUR_USERNAME
