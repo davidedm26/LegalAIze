@@ -486,15 +486,17 @@ if st.session_state.audit_results is not None:
     
     results = st.session_state.audit_results
     glob_score = st.session_state.global_score
+
+    total_points = round(st.session_state.total_points)
+    max_points = st.session_state.max_points
     
     with st.expander("✅ Analysis Results (Report Complete)", expanded=True):
-        
         # --- METRICS ---
         c1, c2, c3 = st.columns(3)
         c1.metric("Compliance Score", f"{glob_score*100:.0f}%", 
                   delta="Excellent" if glob_score > 0.8 else "Needs Work")
         c2.metric("Requirements Analyzed", len(results))
-        c3.metric("Total Points", f"{st.session_state.total_points}/{st.session_state.max_points}")
+        c3.metric("Total Points", f"{total_points}/{max_points}")
 
         st.markdown("---")
 
