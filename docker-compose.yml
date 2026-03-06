@@ -37,7 +37,6 @@ services:
     volumes:
       - ./params.yaml:/app/params.yaml:ro
       - ./data/mapping.json:/app/data/mapping.json:ro
-      - ./data/processed/chunks.json:/app/data/processed/chunks.json:ro
       - ./data/processed/requirement_chunks.json:/app/data/processed/requirement_chunks.json:ro
     env_file:
       - .env
