@@ -108,13 +108,22 @@ LegalAIze/
 │   └── transfer_qdrant.py             # Vector DB seeding script
 │
 ├── metrics/                           # Evaluation metrics output (DVC)
+│   ├── rag_eval.json                  # Global metrics
+│   ├── ragas_main_requirements.json   # Fairness metrics
+│   └── ragas_sub_requirements.json    # Correctness & Relevancy metrics
+│ 
 ├── img/                               # README images and assets
 ├── .github/workflows/                 # CI/CD pipelines
 │
 ├── evaluate_rag.py                    # Main evaluation script
 ├── vectorize_data.py                  # Vectorization pipeline script
 │
+├── .dvc/                              # DVC config folder
+│   ├── config                         # Remote repo config
+│   └── config.local                   # Local folder config
+│
 ├── params.yaml                        # Experiment parameters (DVC)
+├── dvc.lock                           # DVC state file
 ├── dvc.yaml                           # DVC pipeline definition
 ├── docker-compose.yml                 # Multi-container orchestration
 ├── requirements.txt                   # Root Python dependencies
